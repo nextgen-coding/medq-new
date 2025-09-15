@@ -1,0 +1,5 @@
+name,description,niveau,isFree
+Cardiologie,Spécialité médicale qui traite les maladies du cœur,PCEM1,true
+Pneumologie,Spécialité médicale qui traite les maladies des poumons,PCEM2,false
+Dermatologie,Spécialité médicale qui traite les maladies de la peau,DCEM1,true
+Ophtalmologie,Spécialité médicale qui traite les maladies des yeux,DCEM2,false

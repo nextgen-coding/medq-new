@@ -1,0 +1,298 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+    --primary: 210 100% 50%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 45%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 210 100% 50%;
+    --radius: 0.75rem;
+    
+    /* Sidebar variables for better platform compatibility */
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 210 100% 50%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 240 5.9% 90%;
+    --sidebar-ring: 210 100% 50%;
+    
+    /* Success colors for better platform compatibility */
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 98%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 98%;
+    --info: 210 100% 50%;
+    --info-foreground: 0 0% 98%;
+  }
+
+  .dark {
+    /* Refined dark palette: clearer elevation steps & reduced flat black look */
+    /* Base (page background) */
+    --background: 222 47% 5%;         /* near slate-950 */
+    --foreground: 0 0% 98%;
+
+    /* Surfaces / elevations */
+    --card: 222 40% 9%;               /* elevation 1 */
+    --card-foreground: 0 0% 98%;
+    --popover: 222 40% 9%;
+    --popover-foreground: 0 0% 98%;
+    --secondary: 222 32% 13%;         /* elevation 2 */
+    --secondary-foreground: 0 0% 98%;
+    --muted: 222 28% 15%;             /* subtle container */
+    --muted-foreground: 222 10% 70%;
+    --accent: 222 34% 18%;            /* interactive hover layer */
+    --accent-foreground: 0 0% 98%;
+
+    /* Functional */
+    --primary: 210 100% 50%;
+    --primary-foreground: 222 47% 5%;
+    --destructive: 0 62.8% 44%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 222 25% 23%;            /* clearer separators */
+    --input: 222 25% 23%;
+    --ring: 210 100% 50%;
+
+    /* Sidebar differentiation */
+    --sidebar-background: 222 50% 7%;  /* slightly brighter than page */
+    --sidebar-foreground: 0 0% 96%;
+    --sidebar-primary: 210 100% 50%;
+    --sidebar-primary-foreground: 222 50% 7%;
+    --sidebar-accent: 222 38% 12%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 222 28% 18%;
+    --sidebar-ring: 210 100% 50%;
+
+    /* Status colors unchanged for accessibility */
+    --success: 142 71% 45%;
+    --success-foreground: 222 47% 5%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 222 47% 5%;
+    --info: 210 100% 50%;
+    --info-foreground: 222 47% 5%;
+
+    /* Optional extra elevation tokens (future use) */
+    --surface-0: var(--background);
+    --surface-1: 222 40% 9%;
+    --surface-2: 222 32% 13%;
+    --surface-3: 222 34% 18%;
+  }
+
+  /* System preference support */
+  @media (prefers-color-scheme: dark) {
+    :root:not(.light) {
+      /* Mirror refined dark tokens for prefers-color-scheme */
+      --background: 222 47% 5%;
+      --foreground: 0 0% 98%;
+      --card: 222 40% 9%;
+      --card-foreground: 0 0% 98%;
+      --popover: 222 40% 9%;
+      --popover-foreground: 0 0% 98%;
+      --primary: 210 100% 50%;
+      --primary-foreground: 222 47% 5%;
+      --secondary: 222 32% 13%;
+      --secondary-foreground: 0 0% 98%;
+      --muted: 222 28% 15%;
+      --muted-foreground: 222 10% 70%;
+      --accent: 222 34% 18%;
+      --accent-foreground: 0 0% 98%;
+      --destructive: 0 62.8% 44%;
+      --destructive-foreground: 0 0% 98%;
+      --border: 222 25% 23%;
+      --input: 222 25% 23%;
+      --ring: 210 100% 50%;
+      --sidebar-background: 222 50% 7%;
+      --sidebar-foreground: 0 0% 96%;
+      --sidebar-primary: 210 100% 50%;
+      --sidebar-primary-foreground: 222 50% 7%;
+      --sidebar-accent: 222 38% 12%;
+      --sidebar-accent-foreground: 0 0% 98%;
+      --sidebar-border: 222 28% 18%;
+      --sidebar-ring: 210 100% 50%;
+      --success: 142 71% 45%;
+      --success-foreground: 222 47% 5%;
+      --warning: 38 92% 50%;
+      --warning-foreground: 222 47% 5%;
+      --info: 210 100% 50%;
+      --info-foreground: 222 47% 5%;
+      --surface-0: var(--background);
+      --surface-1: 222 40% 9%;
+      --surface-2: 222 32% 13%;
+      --surface-3: 222 34% 18%;
+    }
+  }
+}
+
+@layer base {
+  * { @apply border-border; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+  }
+
+  body { @apply bg-background text-foreground; }
+
+  /* Allow normal page scrolling (previously globally disabled). For pages that must lock scroll (e.g. full-screen viewers), wrap content in an element with the .no-page-scroll class below instead of disabling it globally. */
+}
+
+/* Optional utility to disable page scroll for specific full-screen experiences */
+.no-page-scroll {
+  overflow: hidden;
+  height: 100vh;
+}
+
+/* PDF.js styles for dark mode support */
+@layer components {
+  .react-pdf__Page {
+    @apply shadow-lg;
+  }
+  
+  .react-pdf__Page__canvas {
+    @apply max-w-full h-auto;
+  }
+  
+  .react-pdf__Page__textContent {
+    @apply hidden;
+  }
+  
+  .react-pdf__Page__annotations {
+    @apply hidden;
+  }
+
+  /* PDF viewer container */
+  .pdf-viewer-container {
+    @apply bg-gray-100 dark:bg-gray-900 transition-colors;
+  }
+
+  /* Custom scrollbar for correction zone */
+  .correction-zone-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(59, 130, 246, 0.3) transparent;
+  }
+  
+  .correction-zone-scroll::-webkit-scrollbar {
+    width: 6px;
+    display: block;
+  }
+  
+  .correction-zone-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .correction-zone-scroll::-webkit-scrollbar-thumb {
+    background-color: rgba(59, 130, 246, 0.3);
+    border-radius: 3px;
+  }
+  
+  .correction-zone-scroll::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(59, 130, 246, 0.5);
+  }
+  }
+
+  /* Force LTR text direction for all text inputs to prevent backward typing */
+  .force-ltr, 
+  .force-ltr textarea, 
+  .force-ltr input[type="text"], 
+  .force-ltr [contenteditable],
+  textarea.force-ltr,
+  input[type="text"].force-ltr,
+  [contenteditable].force-ltr {
+    direction: ltr !important;
+    text-align: left !important;
+    unicode-bidi: plaintext !important;
+    writing-mode: horizontal-tb !important;
+    text-orientation: mixed !important;
+  }
+
+  /* Aggressive LTR enforcement for comment inputs */
+  .comments-ltr-override *,
+  .comments-ltr-override textarea,
+  .comments-ltr-override input,
+  .comments-ltr-override [contenteditable] {
+    direction: ltr !important;
+    text-align: left !important;
+    unicode-bidi: embed !important;
+    writing-mode: horizontal-tb !important;
+    text-orientation: mixed !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  }
+
+  /* Browser-specific fixes */
+  @supports (-webkit-appearance: none) {
+    .force-ltr textarea {
+      -webkit-text-fill-color: inherit !important;
+      -webkit-opacity: 1 !important;
+      opacity: 1 !important;
+    }
+  }
+
+  /* Isolated edit comment containers */
+  .edit-comment-container {
+    isolation: isolate;
+    contain: layout style paint;
+    position: relative;
+    z-index: 1000;
+  }
+
+  .edit-comment-container * {
+    direction: ltr !important;
+    text-align: left !important;
+    unicode-bidi: plaintext !important;
+  }
+
+  .edit-comment-container [contenteditable] {
+    direction: ltr !important;
+    text-align: left !important;
+    unicode-bidi: plaintext !important;
+    writing-mode: horizontal-tb !important;
+  }
+
+  /* Ultra-specific edit input isolation */
+  .edit-input-isolation-layer {
+    isolation: isolate !important;
+    contain: layout style paint !important;
+    position: relative !important;
+    z-index: 999 !important;
+  }
+
+  .edit-input-isolation-layer *,
+  .edit-input-isolation-layer textarea,
+  .edit-input-isolation-layer [contenteditable],
+  .edit-input-isolation-layer input {
+    direction: ltr !important;
+    text-align: left !important;
+    unicode-bidi: plaintext !important;
+    writing-mode: horizontal-tb !important;
+    text-orientation: mixed !important;
+    font-family: inherit !important;
+  }
+
+  .edit-input-isolation-layer::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: -1px;
+    right: -1px;
+    bottom: -1px;
+    pointer-events: none;
+    z-index: -1;
+  }
