@@ -1,7 +1,6 @@
 'use client';
 import React from 'react';
-import Link from 'next/link';
-import { usePathname, useSearchParams } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import {
   Sidebar,
   SidebarContent,
@@ -34,34 +33,37 @@ import {
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useTranslation } from 'react-i18next';
-import { toast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+// Removed Tooltip around sign-out to prevent ref update loops
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 
 export function AdminSidebar() {
   const { user, logout } = useAuth();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const router = useRouter();
   const { state, setOpen, setOpenMobile, isMobile: sidebarIsMobile, open, openMobile, toggleSidebar } = useSidebar();
   const { t } = useTranslation();
   const isMobile = useIsMobile();
-  const currentTab = searchParams.get('tab') || 'dashboard';
-  const iconSize = state === 'expanded' ? 'h-5 w-5' : 'h-6 w-6';
   
-  const studentPanelItem = {
+  // Memoize stable values to prevent re-renders
+  const iconSize = React.useMemo(() => 
+    state === 'expanded' ? 'h-5 w-5' : 'h-6 w-6', 
+    [state]
+  );
+  
+  const studentPanelItem = React.useMemo(() => ({
     label: t('admin.studentPanel') || 'Student Panel',
     icon: GraduationCap,
     href: '/dashboard',
     description: 'Go to student dashboard'
-  };
+  }), [t]);
   
   const isAdmin = user?.role === 'admin';
   const isMaintainer = user?.role === 'maintainer';
 
-  const adminMenuItems = [
+  const adminMenuItems = React.useMemo(() => [
     { label: t('admin.dashboard'), icon: LayoutDashboard, href: '/admin/dashboard', description: t('admin.manageContent') },
     { label: t('admin.management') || 'Management', icon: BookOpen, href: '/admin/management', description: 'Manage specialties, courses, and questions' },
     { label: 'Validation', icon: CheckCircle, href: '/admin/validation', description: 'AI validation system' },
@@ -70,41 +72,42 @@ export function AdminSidebar() {
     { label: t('admin.importQuestions'), icon: Upload, href: '/admin/import', description: 'Import QROC questions' },
     { label: t('admin.reports'), icon: AlertTriangle, href: '/admin/reports', description: 'View reports' },
     studentPanelItem
-  ];
+  ], [t, studentPanelItem]);
 
-  const maintainerMenuItems = [
+  const maintainerMenuItems = React.useMemo(() => [
     { label: 'Sessions', icon: FileText, href: '/maintainer/sessions', description: 'Créer des sessions' },
     { label: t('admin.reports'), icon: AlertTriangle, href: '/maintainer/reports', description: 'Rapports par niveau' },
     studentPanelItem
-  ];
+  ], [t, studentPanelItem]);
 
-  const menuItems = isAdmin ? adminMenuItems : isMaintainer ? maintainerMenuItems : [studentPanelItem];
+  const menuItems = React.useMemo(() => 
+    isAdmin ? adminMenuItems : isMaintainer ? maintainerMenuItems : [studentPanelItem],
+    [isAdmin, isMaintainer, adminMenuItems, maintainerMenuItems, studentPanelItem]
+  );
 
-  const handleSignOut = async () => {
+  const handleSignOut = React.useCallback(async () => {
     try {
       await logout();
       router.push('/auth');
     } catch (err) {
       console.error('Unexpected sign out error:', err);
-      toast({
-        title: t('auth.signOutError'),
+      toast.error(t('auth.signOutError'), {
         description: t('auth.unexpectedError'),
-        variant: "destructive",
       });
     }
-  };
+  }, [logout, router, t]);
 
-  const handleCloseSidebar = () => {
+  const handleCloseSidebar = React.useCallback(() => {
     if (sidebarIsMobile) {
       setOpenMobile(false);
     } else {
       setOpen(false);
     }
-  };
+  }, [sidebarIsMobile, setOpenMobile, setOpen]);
 
-  const handleToggleSidebar = () => {
+  const handleToggleSidebar = React.useCallback(() => {
     toggleSidebar();
-  };
+  }, [toggleSidebar]);
 
   return (
     <>
@@ -158,30 +161,28 @@ export function AdminSidebar() {
                       isActive = pathname === item.href || pathname.startsWith(item.href + '/');
                     }
                     
+                    const buttonClassName = `group transition-all duration-200 font-medium rounded-xl ${
+                      state === 'expanded' 
+                        ? 'px-3 py-3 min-h-[44px] flex items-center' 
+                        : 'p-0 min-h-[44px] w-full flex items-center justify-center'
+                    } ${
+                      isActive
+                        ? 'bg-gradient-to-r from-blue-600 to-blue-800 text-white shadow-lg shadow-blue-500/25'
+                        : 'hover:bg-muted/80 text-foreground hover:text-blue-600'
+                    }`;
+
+                    const iconClassName = `${iconSize} ${isActive ? 'text-white' : 'text-blue-500 group-hover:text-blue-600'} transition-all flex-shrink-0`;
+                    
                     return (
                       <SidebarMenuItem key={item.href}>
                         <SidebarMenuButton 
-                          asChild 
-                          className={
-                            `group transition-all duration-200 font-medium rounded-xl ${
-                              state === 'expanded' 
-                                ? 'px-3 py-3 min-h-[44px] flex items-center' 
-                                : 'p-0 min-h-[44px] w-full flex items-center justify-center'
-                            } ${
-                              isActive
-                                ? 'bg-gradient-to-r from-blue-600 to-blue-800 text-white shadow-lg shadow-blue-500/25'
-                                : 'hover:bg-muted/80 text-foreground hover:text-blue-600'
-                            }`
-                          }
+                          className={buttonClassName}
+                          onClick={() => router.push(item.href)}
                         >
-                          <Link href={item.href} className={state === 'expanded' ? 'flex items-center gap-3 w-full' : 'flex items-center justify-center w-full h-full'}>
-                            <item.icon className={`${iconSize} ${isActive ? 'text-white' : 'text-blue-500 group-hover:text-blue-600'} transition-all flex-shrink-0`} />
-                            {state === 'expanded' && (
-                              <span className="font-medium text-sm">
-                                {item.label}
-                              </span>
-                            )}
-                          </Link>
+                          <item.icon className={iconClassName} />
+                          {state === 'expanded' && (
+                            <span className="font-medium text-sm">{item.label}</span>
+                          )}
                         </SidebarMenuButton>
                       </SidebarMenuItem>
                     );
@@ -193,36 +194,38 @@ export function AdminSidebar() {
                   </div>
                   
                   {/* Student Panel - Last item */}
-                  {(() => {
-                    const item = menuItems[menuItems.length - 1];
-                    const isStudentPanel = item.href === '/dashboard' && pathname.startsWith('/dashboard');
-                    return (
-                      <SidebarMenuItem key={item.href}>
-                        <SidebarMenuButton 
-                          asChild 
-                          tooltip={item.label}
-                          className={
-                            `group transition-all duration-200 font-medium rounded-xl ${
-                              state === 'expanded' 
-                                ? 'px-3 py-3 min-h-[44px] flex items-center' 
-                                : 'p-0 min-h-[44px] w-full flex items-center justify-center'
-                            } ${
-                              isStudentPanel
-                                ? 'bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg shadow-green-500/25'
-                                : 'hover:bg-muted/80 text-foreground hover:text-green-600'
-                            }`
-                          }
-                        >
-                          <Link href={item.href} className={`${state === 'expanded' ? 'flex items-center gap-3 w-full' : 'flex items-center justify-center w-full h-full'}`}>
-                            <item.icon className={`${iconSize} ${isStudentPanel ? 'text-white' : 'text-green-500 group-hover:text-green-600'} transition-all flex-shrink-0`} />
-                            <span className={`${state === 'expanded' ? 'block' : 'sr-only'} font-medium text-sm`}>
-                              {item.label}
-                            </span>
-                          </Link>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    );
-                  })()}
+                  {
+                    (() => {
+                      const item = menuItems[menuItems.length - 1];
+                      const isStudentPanel = item.href === '/dashboard' && pathname.startsWith('/dashboard');
+                      
+                      const buttonClassName = `group transition-all duration-200 font-medium rounded-xl ${
+                        state === 'expanded' 
+                          ? 'px-3 py-3 min-h-[44px] flex items-center' 
+                          : 'p-0 min-h-[44px] w-full flex items-center justify-center'
+                      } ${
+                        isStudentPanel
+                          ? 'bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg shadow-green-500/25'
+                          : 'hover:bg-muted/80 text-foreground hover:text-green-600'
+                      }`;
+
+                      const iconClassName = `${iconSize} ${isStudentPanel ? 'text-white' : 'text-green-500 group-hover:text-green-600'} transition-all flex-shrink-0`;
+                      
+                      return (
+                        <SidebarMenuItem key={item.href}>
+                          <SidebarMenuButton 
+                            className={buttonClassName}
+                            onClick={() => router.push(item.href)}
+                          >
+                            <item.icon className={iconClassName} />
+                            {state === 'expanded' && (
+                              <span className="font-medium text-sm">{item.label}</span>
+                            )}
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      );
+                    })()
+                  }
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
@@ -231,27 +234,20 @@ export function AdminSidebar() {
         
         <SidebarFooter className={`border-t border-border py-2.5 sm:py-3 bg-background ${state === 'expanded' ? 'px-3 sm:px-4' : 'px-2'}`}>
           <div className="space-y-2">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={`text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl ${
-                    state === 'expanded' 
-                      ? 'w-full justify-start px-3 py-3 min-h-[44px]' 
-                      : 'w-full h-[44px] p-0 flex items-center justify-center'
-                  }`}
-                  onClick={handleSignOut}
-                  title={t('auth.signOut')}
-                >
-                  <LogOut className="h-5 w-5 flex-shrink-0" />
-                  {state === "expanded" && <span className="ml-3 font-medium text-sm">{t('auth.signOut')}</span>}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right" align="center">
-                <p>{t('auth.signOut')}</p>
-              </TooltipContent>
-            </Tooltip>
+            <Button
+              variant="ghost"
+              size="sm"
+              className={`text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl ${
+                state === 'expanded' 
+                  ? 'w-full justify-start px-3 py-3 min-h-[44px]' 
+                  : 'w-full h-[44px] p-0 flex items-center justify-center'
+              }`}
+              onClick={handleSignOut}
+              title={t('auth.signOut')}
+            >
+              <LogOut className="h-5 w-5 flex-shrink-0" />
+              {state === "expanded" && <span className="ml-3 font-medium text-sm">{t('auth.signOut')}</span>}
+            </Button>
           </div>
         </SidebarFooter>
       </Sidebar>

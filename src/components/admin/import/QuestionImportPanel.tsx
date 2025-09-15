@@ -188,7 +188,73 @@ export function QuestionImportPanel() {
             </CardTitle>
             <CardDescription>Feuilles attendues: qcm, qroc, cas_qcm, cas_qroc</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            {/* Import Help Section */}
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 space-y-3">
+              <h4 className="font-medium text-green-900">📂 Guide d'Import</h4>
+              <div className="text-sm text-green-800 space-y-3">
+                <div>
+                  <p><strong>Objectif :</strong> Persister les questions validées dans la base de données</p>
+                </div>
+                
+                <div>
+                  <p><strong>En-têtes requis par feuille :</strong></p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+                    <div className="bg-white/60 p-2 rounded border">
+                      <p className="font-medium">QCM :</p>
+                      <ul className="text-xs space-y-1 mt-1">
+                        <li>• <code>matiere</code>, <code>cours</code>, <code>texte de la question</code></li>
+                        <li>• <code>option a</code>, <code>option b</code>... (A-E)</li>
+                        <li>• <code>reponse</code> (optionnel), <code>explication</code></li>
+                      </ul>
+                    </div>
+                    <div className="bg-white/60 p-2 rounded border">
+                      <p className="font-medium">QROC :</p>
+                      <ul className="text-xs space-y-1 mt-1">
+                        <li>• <code>matiere</code>, <code>cours</code>, <code>texte de la question</code></li>
+                        <li>• <code>reponse</code> (obligatoire)</li>
+                        <li>• <code>explication</code> (recommandée)</li>
+                      </ul>
+                    </div>
+                    <div className="bg-white/60 p-2 rounded border">
+                      <p className="font-medium">CAS QCM :</p>
+                      <ul className="text-xs space-y-1 mt-1">
+                        <li>• <code>texte du cas</code> ou <code>case</code></li>
+                        <li>• + toutes les colonnes QCM</li>
+                      </ul>
+                    </div>
+                    <div className="bg-white/60 p-2 rounded border">
+                      <p className="font-medium">CAS QROC :</p>
+                      <ul className="text-xs space-y-1 mt-1">
+                        <li>• <code>texte du cas</code> ou <code>case</code></li>
+                        <li>• + toutes les colonnes QROC</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <p><strong>Mapping automatique :</strong></p>
+                  <ul className="list-disc list-inside ml-4 space-y-1 text-xs">
+                    <li>Spécialités & cours : créés si non trouvés</li>
+                    <li>Type de question : déduit du nom de feuille</li>
+                    <li>Réponses QCM : A-E → indices 0-4</li>
+                    <li>Déduplication : clé basée sur le contenu complet</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <p><strong>💡 Conseils :</strong></p>
+                  <ul className="list-disc list-inside ml-4 space-y-1 text-xs">
+                    <li>Utilisez "?" ou "Pas de réponse" pour QCM sans réponse</li>
+                    <li>Passez d'abord par l'Assistance IA pour nettoyer vos données</li>
+                    <li>Vérifiez les noms de spécialités/cours pour éviter les doublons</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {/* File Upload Area */}
             <div className="flex items-center justify-center w-full">
               <label className={`flex flex-col items-center justify-center w-full h-56 border-2 border-dashed rounded-lg cursor-pointer transition-colors ${isDragging ? 'bg-primary/10 border-primary' : 'bg-muted/50 hover:bg-muted/80'}`} onDragOver={onDragOver} onDragEnter={onDragEnter} onDragLeave={onDragLeave} onDrop={onDrop}>
                 <div className="flex flex-col items-center justify-center pt-5 pb-6">

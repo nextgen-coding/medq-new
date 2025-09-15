@@ -1,5 +1,7 @@
+"use client"
+
 import * as React from "react"
-import { Slot } from "@radix-ui/react-slot"
+// Removed all Radix dependencies to prevent any nested update issues
 import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
@@ -39,15 +41,23 @@ export interface ButtonProps
   asChild?: boolean
 }
 
+// Ultra-minimal Button to prevent any possible infinite loops
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, ...props }, ref) => {
-    const Comp = asChild ? Slot : "button"
+  ({ className, variant, size, asChild = false, children, ...props }, ref) => {
+    // If asChild is requested, just render the child directly without any wrapper
+    if (asChild && React.isValidElement(children)) {
+      return children
+    }
+
+    // Otherwise render a simple button with no complex state or effects
     return (
-      <Comp
-        className={cn(buttonVariants({ variant, size, className }))}
-        ref={ref}
+      <button 
+        className={cn(buttonVariants({ variant, size }), className)}
+        ref={ref} 
         {...props}
-      />
+      >
+        {children}
+      </button>
     )
   }
 )

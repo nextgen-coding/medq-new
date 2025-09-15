@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { authenticateRequest } from '@/lib/auth-middleware';
 
-export async function GET(request: NextRequest, { params }: { params: { jobId: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ jobId: string }> }) {
   try {
     const authReq = await authenticateRequest(request);
     if (!authReq?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { jobId } = params;
+    const { jobId } = await params;
 
     const job = await prisma.aiValidationJob.findUnique({
       where: { id: jobId },
@@ -65,14 +65,14 @@ export async function GET(request: NextRequest, { params }: { params: { jobId: s
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { jobId: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ jobId: string }> }) {
   try {
     const authReq = await authenticateRequest(request);
     if (!authReq?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { jobId } = params;
+    const { jobId } = await params;
 
     const job = await prisma.aiValidationJob.findUnique({
       where: { id: jobId },

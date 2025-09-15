@@ -24,7 +24,7 @@ import {
   TrendingUp,
   Users
 } from 'lucide-react';
-import { toast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 
 interface AiJob {
   id: string;
@@ -90,13 +90,20 @@ export function FilePreviewDialog({ job, open, onOpenChange }: FilePreviewDialog
   const loadPreviewData = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/ai-jobs/${job.id}/preview`);
-      if (response.ok) {
-        const data = await response.json();
-        setPreviewData(data);
-      } else {
-        console.error('Failed to load preview data');
-      }
+      // For the new AI system, we don't have a separate preview endpoint
+      // Just show basic job information
+      setPreviewData({
+        explanations: [],
+        summary: {
+          totalExplanations: 0,
+          validExplanations: 0,
+          questionsWithAI: 0,
+          questionsWithoutAI: 0,
+          warnings: [
+            "Aperçu détaillé non disponible pour ce type de job. Les informations seront affichées lorsque le traitement avancé sera implémenté."
+          ]
+        }
+      });
     } catch (error) {
       console.error('Error loading preview data:', error);
     } finally {
@@ -138,7 +145,7 @@ export function FilePreviewDialog({ job, open, onOpenChange }: FilePreviewDialog
 
   const downloadJobResult = async () => {
     try {
-      const response = await fetch(`/api/ai-jobs/${job.id}/download`);
+      const response = await fetch(`/api/validation/ai-progress?aiId=${job.id}&action=download`);
       if (response.ok) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
@@ -150,17 +157,14 @@ export function FilePreviewDialog({ job, open, onOpenChange }: FilePreviewDialog
         a.click();
         window.URL.revokeObjectURL(url);
         
-        toast({
-          title: "Téléchargement réussi",
+        toast.success("Téléchargement réussi", {
           description: "Le fichier amélioré a été téléchargé",
         });
       }
     } catch (error) {
       console.error('Download error:', error);
-      toast({
-        title: "Erreur de téléchargement",
+      toast.error("Erreur de téléchargement", {
         description: "Impossible de télécharger le fichier",
-        variant: "destructive",
       });
     }
   };
@@ -205,9 +209,9 @@ export function FilePreviewDialog({ job, open, onOpenChange }: FilePreviewDialog
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-3">
+          <DialogTitle className="text-gray-900 dark:text-gray-100">
             <FileText className="h-5 w-5" />
             {job.fileName}
             <Badge className={`${getStatusColor(job.status)} border-0`}>
