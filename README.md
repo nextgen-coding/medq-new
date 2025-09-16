@@ -90,6 +90,10 @@ src/
 └── types/                # TypeScript type definitions
 ```
 
+## Import/Validation
+
+See IMPORT_README.md for the end-to-end validation-first workflow, file formats, strict duplicate rules, and available endpoints.
+
 ## Authentication System
 
 The platform uses a custom JWT-based authentication system with the following security features:

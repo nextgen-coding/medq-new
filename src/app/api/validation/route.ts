@@ -1,254 +1,260 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateRequest } from '@/lib/auth-middleware';
 import { read, utils, write } from 'xlsx';
-import { storeValidationFiles } from '@/lib/validation-file-store';
+
+type SheetName = 'qcm' | 'qroc' | 'cas_qcm' | 'cas_qroc';
+type GoodRow = { sheet: SheetName; row: number; data: Record<string, any> };
+type BadRow = { sheet: SheetName; row: number; reason: string; original: Record<string, any> };
+
+// Normalize sheet names to match aliases
+function normalizeSheet(name: string): string {
+  return String(name || '').toLowerCase().replace(/[-_\s]+/g, ' ').trim();
+}
+
+// Canonicalize header names to expected keys
+function canonicalizeHeader(header: string): string {
+  const h = String(header || '').toLowerCase().trim();
+  if (h.includes('texte') && h.includes('question')) return 'texte de la question';
+  if (h.includes('texte') && h.includes('cas')) return 'texte du cas';
+  if (h.includes('option') && h.includes('a')) return 'option a';
+  if (h.includes('option') && h.includes('b')) return 'option b';
+  if (h.includes('option') && h.includes('c')) return 'option c';
+  if (h.includes('option') && h.includes('d')) return 'option d';
+  if (h.includes('option') && h.includes('e')) return 'option e';
+  if (h.includes('explication') && h.includes('a')) return 'explication a';
+  if (h.includes('explication') && h.includes('b')) return 'explication b';
+  if (h.includes('explication') && h.includes('c')) return 'explication c';
+  if (h.includes('explication') && h.includes('d')) return 'explication d';
+  if (h.includes('explication') && h.includes('e')) return 'explication e';
+  if (h.includes('matiere')) return 'matiere';
+  if (h.includes('cours')) return 'cours';
+  if (h.includes('reponse')) return 'reponse';
+  if (h.includes('explication')) return 'explication';
+  if (h.includes('niveau')) return 'niveau';
+  if (h.includes('semestre')) return 'semestre';
+  if (h.includes('image')) return 'image';
+  if (h.includes('cas') && h.includes('n')) return 'cas n';
+  if (h.includes('question') && h.includes('n')) return 'question n';
+  return h;
+}
+
+function parseMCQOptions(record: Record<string, any>): { options: string[]; correctAnswers: number[] } {
+  const options: string[] = [];
+  const letters = ['a', 'b', 'c', 'd', 'e'];
+  for (const l of letters) {
+    const key = `option ${l}`;
+    const v = record[key];
+    const s = v == null ? '' : String(v).trim();
+    if (s) options.push(s);
+  }
+  const rawAns = String(record['reponse'] || '').trim();
+  const correctAnswers: number[] = [];
+  if (rawAns) {
+    for (const part of rawAns.toUpperCase().split(/[;,\s]+/).filter(Boolean)) {
+      const ch = part.trim()[0];
+      if (ch && ch >= 'A' && ch <= 'E') {
+        const idx = ch.charCodeAt(0) - 65;
+        if (idx >= 0 && idx < options.length) correctAnswers.push(idx);
+      }
+    }
+  }
+  return { options, correctAnswers };
+}
+
+function hasAnyExplanation(record: Record<string, any>): boolean {
+  if (String(record['explication'] || '').trim()) return true;
+  for (const l of ['a', 'b', 'c', 'd', 'e']) {
+    if (String(record[`explication ${l}`] || '').trim()) return true;
+  }
+  return false;
+}
+
+function dedupKey(record: Record<string, any>): string {
+  const keys = ['matiere', 'cours', 'texte de la question', 'reponse', 'option a', 'option b', 'option c', 'option d', 'option e'];
+  return keys.map((k) => String(record[k] ?? '')).join('|');
+}
+
+async function validateWorkbook(file: File) {
+  const buffer = await file.arrayBuffer();
+  const workbook = read(buffer);
+
+  const foundSheets = Object.keys(workbook.Sheets);
+  const present = new Map<string, string>();
+  for (const name of foundSheets) present.set(normalizeSheet(name), name);
+
+  const aliases: Record<SheetName, string[]> = {
+    qcm: ['qcm', 'mcq'],
+    qroc: ['qroc'],
+    cas_qcm: ['cas qcm', 'cas-qcm', 'cas_qcm', 'cas clinique qcm'],
+    cas_qroc: ['cas qroc', 'cas-qroc', 'cas_qroc', 'cas clinique qroc'],
+  };
+
+  const good: GoodRow[] = [];
+  const bad: BadRow[] = [];
+
+  let recognizedAny = false;
+  for (const sheet of Object.keys(aliases) as SheetName[]) {
+    let actualName: string | undefined;
+    for (const alias of aliases[sheet]) {
+      const norm = normalizeSheet(alias);
+      if (present.has(norm)) {
+        actualName = present.get(norm)!;
+        break;
+      }
+    }
+    if (!actualName) continue;
+    recognizedAny = true;
+
+    const ws = workbook.Sheets[actualName];
+    const rows = utils.sheet_to_json(ws, { header: 1 });
+    if (!Array.isArray(rows) || rows.length < 2) continue;
+
+    const headerRaw = (rows[0] as any[]).map((h) => String(h ?? ''));
+    const header = headerRaw.map(canonicalizeHeader);
+
+    const seen = new Set<string>();
+
+    for (let i = 1; i < rows.length; i++) {
+      const raw = rows[i] as any[];
+      if (!raw || raw.length === 0) continue;
+
+      const record: Record<string, any> = {};
+      header.forEach((h, idx) => (record[h] = String(raw[idx] ?? '').trim()));
+
+      const baseQuestionText = sheet.includes('cas')
+        ? record['texte de la question'] || record['texte de question'] || record['texte du cas']
+        : record['texte de la question'] || record['texte de question'];
+
+      if (!record['matiere'] || !record['cours'] || !baseQuestionText) {
+        bad.push({ sheet, row: i + 1, reason: 'Missing core fields (matiere/cours/question)', original: record });
+        continue;
+      }
+
+      if (sheet === 'qcm' || sheet === 'cas_qcm') {
+        const { options, correctAnswers } = parseMCQOptions(record);
+        if (options.length === 0) {
+          bad.push({ sheet, row: i + 1, reason: 'MCQ requires at least one option', original: record });
+          continue;
+        }
+        if (correctAnswers.length === 0) {
+          bad.push({ sheet, row: i + 1, reason: 'MCQ missing correct answers (A–E)', original: record });
+          continue;
+        }
+        if (!hasAnyExplanation(record)) {
+          bad.push({ sheet, row: i + 1, reason: 'MCQ missing explanation', original: record });
+          continue;
+        }
+      }
+
+      if (sheet === 'qroc' || sheet === 'cas_qroc') {
+        if (!String(record['reponse'] || '').trim()) {
+          bad.push({ sheet, row: i + 1, reason: 'QROC missing reponse', original: record });
+          continue;
+        }
+        if (!String(record['explication'] || '').trim()) {
+          bad.push({ sheet, row: i + 1, reason: 'QROC missing explication', original: record });
+          continue;
+        }
+      }
+
+      const key = dedupKey(record);
+      if (seen.has(key)) {
+        bad.push({ sheet, row: i + 1, reason: 'Duplicate row in same sheet', original: record });
+        continue;
+      }
+      seen.add(key);
+
+      good.push({ sheet, row: i + 1, data: record });
+    }
+  }
+
+  if (!recognizedAny) {
+    throw new Error(`Aucun onglet reconnu. Renommez vos onglets en: "qcm", "qroc", "cas qcm" ou "cas qroc". Feuilles trouvées: ${foundSheets.join(', ')}`);
+  }
+  if (good.length === 0 && bad.length === 0) {
+    throw new Error("Feuilles reconnues mais sans lignes sous l'en-tête. Ajoutez des questions puis réessayez.");
+  }
+
+  return { good, bad };
+}
 
 export async function POST(request: NextRequest) {
   try {
-    const authReq = await authenticateRequest(request);
-    if (!authReq?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Check admin permission
-    if (authReq.user.role !== 'admin') {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
-    }
-
     const formData = await request.formData();
-    const file = formData.get('file') as File;
+    const file = formData.get('file') as File | null;
+    if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 });
 
-    if (!file) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
-    }
-
-    // Validate file type
-    const allowedTypes = [
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'application/vnd.ms-excel',
-      'text/csv'
-    ];
-
-    if (!allowedTypes.includes(file.type) && 
-        !file.name.toLowerCase().endsWith('.xlsx') && 
-        !file.name.toLowerCase().endsWith('.xls') && 
-        !file.name.toLowerCase().endsWith('.csv')) {
-      return NextResponse.json({ 
-        error: 'Invalid file type. Only Excel (.xlsx, .xls) and CSV files are allowed.' 
-      }, { status: 400 });
-    }
-
-    // Validate file size (50MB max)
-    const maxSize = 50 * 1024 * 1024; // 50MB
-    if (file.size > maxSize) {
-      return NextResponse.json({ 
-        error: 'File too large. Maximum size is 50MB.' 
-      }, { status: 400 });
-    }
-
-    // Process the file for classic validation
-    const fileBuffer = await file.arrayBuffer();
-  const validationResult = await processClassicValidation(Buffer.from(fileBuffer), file.name);
-
-    // Return JSON with file analysis and download info
-    return NextResponse.json({
-      message: 'Validation completed successfully',
-      results: {
-        goodRecords: validationResult.goodCount,
-        errorRecords: validationResult.errorCount,
-        totalRecords: validationResult.totalCount,
-        sessionId: validationResult.sessionId
-      },
-      files: {
-        original: file.name,
-        goodFile: `good_records_${file.name}`,
-        errorFile: `error_records_${file.name}`,
-        reportFile: `validation_report_${file.name.replace(/\.[^/.]+$/, '')}.txt`
-      }
-    });
-
-  } catch (error) {
-    console.error('Classic validation error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error during validation' },
-      { status: 500 }
-    );
+    const { good, bad } = await validateWorkbook(file);
+    return NextResponse.json({ good, bad, goodCount: good.length, badCount: bad.length });
+  } catch (error: any) {
+    return NextResponse.json({ error: error?.message || 'Validation failed' }, { status: 400 });
   }
 }
 
 export async function GET(request: NextRequest) {
   try {
-    const authReq = await authenticateRequest(request);
-    if (!authReq?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const { searchParams } = new URL(request.url);
+    const mode = (searchParams.get('mode') as 'good' | 'bad') || 'good';
+    const payload = searchParams.get('payload');
+    if (!payload) return NextResponse.json({ error: 'Missing payload' }, { status: 400 });
+
+    const { good, bad } = JSON.parse(decodeURIComponent(payload));
+    const rows = mode === 'good' ? good : bad;
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return NextResponse.json({ error: 'No data to export' }, { status: 400 });
     }
 
-    // Check admin permission
-    if (authReq.user.role !== 'admin') {
-      return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
-    }
+    const header = mode === 'good'
+      ? ['sheet', 'row', 'matiere', 'cours', 'question n', 'cas n', 'texte du cas', 'texte de la question', 'reponse', 'option a', 'option b', 'option c', 'option d', 'option e', 'explication', 'explication a', 'explication b', 'explication c', 'explication d', 'explication e', 'image', 'niveau', 'semestre']
+      : ['sheet', 'row', 'reason', 'matiere', 'cours', 'question n', 'cas n', 'texte du cas', 'texte de la question', 'reponse', 'option a', 'option b', 'option c', 'option d', 'option e', 'explication', 'image'];
 
-    return NextResponse.json({
-      message: 'Classic validation endpoint',
-      supportedFormats: ['xlsx', 'xls', 'csv'],
-      maxFileSize: '50MB',
-      features: [
-        'Data validation',
-        'Format correction',
-        'Duplicate detection',
-        'Structure validation'
-      ]
+    const dataObjects = rows.map((r: any) => {
+      const rec = mode === 'good' ? r.data : r.original;
+      const base: any = {
+        sheet: r.sheet,
+        row: r.row,
+        ...(mode === 'good' ? {} : { reason: r.reason }),
+        matiere: rec?.['matiere'] ?? '',
+        cours: rec?.['cours'] ?? '',
+        'question n': rec?.['question n'] ?? '',
+        'cas n': rec?.['cas n'] ?? '',
+        'texte du cas': rec?.['texte du cas'] ?? '',
+        'texte de la question': rec?.['texte de la question'] ?? '',
+        reponse: rec?.['reponse'] ?? '',
+        'option a': rec?.['option a'] ?? '',
+        'option b': rec?.['option b'] ?? '',
+        'option c': rec?.['option c'] ?? '',
+        'option d': rec?.['option d'] ?? '',
+        'option e': rec?.['option e'] ?? '',
+        explication: rec?.['explication'] ?? '',
+        'explication a': rec?.['explication a'] ?? '',
+        'explication b': rec?.['explication b'] ?? '',
+        'explication c': rec?.['explication c'] ?? '',
+        'explication d': rec?.['explication d'] ?? '',
+        'explication e': rec?.['explication e'] ?? '',
+        image: rec?.['image'] ?? '',
+      };
+      if (mode === 'good') {
+        base['niveau'] = rec?.['niveau'] ?? '';
+        base['semestre'] = rec?.['semestre'] ?? '';
+      }
+      return base;
     });
 
-  } catch (error) {
-    console.error('Error in validation info:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
-}
+    const wb = utils.book_new();
+    const ws = utils.json_to_sheet(dataObjects, { header });
+    utils.book_append_sheet(wb, ws, mode === 'good' ? 'Valide' : 'Erreurs');
 
-async function processClassicValidation(fileBuffer: Buffer, fileName: string): Promise<{ 
-  goodCount: number; 
-  errorCount: number; 
-  totalCount: number; 
-  sessionId: string;
-  goodFileBuffer: Buffer;
-  errorFileBuffer: Buffer;
-  reportBuffer: Buffer;
-}> {
-  // Parse the incoming file (supports xlsx/xls/csv)
-  const workbook = read(fileBuffer, { type: 'buffer' });
+    // Use ArrayBuffer to be compatible with edge runtimes
+    const arrayBuffer = write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
+    const bytes = new Uint8Array(arrayBuffer);
 
-  // Merge all sheets rows into a single array of objects for validation
-  const allRows: Array<Record<string, any>> = [];
-  const sheetSummaries: Array<{ sheet: string; total: number; good: number; error: number }> = [];
-
-  const requiredColumns = ['matiere', 'cours', 'texte de la question'];
-  const seenKeysPerSheet = new Map<string, Map<string, number>>(); // for duplicate detection within same sheet
-
-  let goodRows: Array<Record<string, any>> = [];
-  let errorRows: Array<Record<string, any>> = [];
-
-  for (const sheetName of workbook.SheetNames) {
-    const ws = workbook.Sheets[sheetName];
-    if (!ws) continue;
-    // Extract JSON with header mapping via xlsx utils
-    const rows = utils.sheet_to_json<Record<string, any>>(ws, { defval: '' });
-    if (rows.length === 0) continue;
-
-    // Canonicalize headers similar to import logic
-    const canonicalize = (h: string) =>
-      String(h || '')
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^\w\s]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-
-    const headerMap = new Map<string, string>();
-    Object.keys(rows[0] || {}).forEach((h) => headerMap.set(h, canonicalize(h)));
-
-    // Per-sheet duplicate tracker
-    const firstSeen = new Map<string, number>();
-    seenKeysPerSheet.set(sheetName, firstSeen);
-
-    let sheetGood = 0;
-    let sheetErr = 0;
-
-    rows.forEach((rawRow, idx) => {
-      // Remap keys to canonical headers
-      const row: Record<string, any> = {};
-      for (const [original, canon] of headerMap.entries()) {
-        row[canon] = rawRow[original];
-      }
-
-      // Basic required fields validation
-      const missing = requiredColumns.filter((c) => !String(row[c] || '').trim());
-
-      // Generate duplicate key across all present columns for this sheet
-      const keys = Object.keys(row).sort();
-      const key = keys.map((k) => `${k}=${String(row[k] ?? '').trim()}`).join('|');
-      const prev = firstSeen.get(key);
-
-      if (missing.length > 0) {
-        errorRows.push({ ...row, __error__: `Missing required: ${missing.join(', ')}`, __sheet__: sheetName, __row__: idx + 2 });
-        sheetErr++;
-      } else if (prev !== undefined) {
-        errorRows.push({ ...row, __error__: `Duplicate in file: matches row ${prev}`, __sheet__: sheetName, __row__: idx + 2 });
-        sheetErr++;
-      } else {
-        firstSeen.set(key, idx + 2);
-        goodRows.push({ ...row, __sheet__: sheetName, __row__: idx + 2 });
-        sheetGood++;
-      }
+    return new NextResponse(bytes, {
+      headers: {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename="validation_${mode}.xlsx"`,
+      },
     });
-
-    sheetSummaries.push({ sheet: sheetName, total: rows.length, good: sheetGood, error: sheetErr });
-    allRows.push(...rows);
+  } catch (error: any) {
+    return NextResponse.json({ error: error?.message || 'Download failed' }, { status: 500 });
   }
-
-  const totalCount = goodRows.length + errorRows.length;
-  const goodCount = goodRows.length;
-  const errorCount = errorRows.length;
-
-  // Build workbooks for good and error rows
-  const buildSheetFromRows = (rows: Array<Record<string, any>>) => {
-    if (rows.length === 0) return utils.aoa_to_sheet([['No rows']]);
-    // Restore headers from union of keys except internal markers
-    const headersSet = new Set<string>();
-    rows.forEach((r) => Object.keys(r).forEach((k) => { if (!k.startsWith('__')) headersSet.add(k); }));
-    const headers = Array.from(headersSet);
-    const aoa = [headers, ...rows.map((r) => headers.map((h) => r[h] ?? ''))];
-    return utils.aoa_to_sheet(aoa);
-  };
-
-  const goodWb = utils.book_new();
-  utils.book_append_sheet(goodWb, buildSheetFromRows(goodRows), 'good');
-  const errorWb = utils.book_new();
-  utils.book_append_sheet(errorWb, buildSheetFromRows(errorRows), 'errors');
-
-  const goodFileBuffer = Buffer.from(write(goodWb, { type: 'buffer', bookType: 'xlsx' }) as Buffer);
-  const errorFileBuffer = Buffer.from(write(errorWb, { type: 'buffer', bookType: 'xlsx' }) as Buffer);
-
-  // Build textual validation report
-  const reportLines: string[] = [];
-  reportLines.push(`Classic Validation Report for ${fileName}`);
-  reportLines.push('========================================');
-  reportLines.push('');
-  reportLines.push(`Total records processed: ${totalCount}`);
-  reportLines.push(`Valid records: ${goodCount}`);
-  reportLines.push(`Invalid records: ${errorCount}`);
-  reportLines.push('');
-  if (sheetSummaries.length > 0) {
-    reportLines.push('Per-sheet summary:');
-    sheetSummaries.forEach((s) => reportLines.push(`- ${s.sheet}: total=${s.total}, good=${s.good}, error=${s.error}`));
-    reportLines.push('');
-  }
-  reportLines.push('Notes:');
-  reportLines.push('- Required columns: matiere, cours, texte de la question');
-  reportLines.push('- Duplicate detection: identical rows within the same sheet are flagged');
-
-  const reportBuffer = Buffer.from(reportLines.join('\n'));
-
-  // Allocate a session and store files in shared store for later download
-  const sessionId = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-  storeValidationFiles(sessionId, {
-    goodFileBuffer,
-    errorFileBuffer,
-    reportBuffer,
-    fileName,
-  });
-
-  return { 
-    goodCount, 
-    errorCount, 
-    totalCount, 
-    sessionId,
-    goodFileBuffer,
-    errorFileBuffer,
-    reportBuffer,
-  };
 }

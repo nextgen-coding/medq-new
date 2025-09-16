@@ -204,15 +204,19 @@ export function QuestionControlPanel({
     // Group questions by type
     const regularQuestions: Array<Question & { originalIndex: number }> = [];
     const clinicalCases: Array<ClinicalCase & { originalIndex: number }> = [];
-    const multiQrocGroups: Array<ClinicalCase & { originalIndex: number; multiQroc: boolean }> = [];
+  const multiQrocGroups: Array<ClinicalCase & { originalIndex: number; multiQroc: boolean }> = [];
+  const multiMcqGroups: Array<ClinicalCase & { originalIndex: number; multiMcq: boolean }> = [];
 
     // Classify questions: detect multi-QROC groups (ClinicalCase objects whose subquestions are all plain qroc)
     questions.forEach((item, index) => {
       if ('caseNumber' in item && 'questions' in item) {
         const caseItem = item as ClinicalCase;
         const allQroc = Array.isArray(caseItem.questions) && caseItem.questions.length > 0 && caseItem.questions.every(q => (q as any).type === 'qroc');
+        const allMcq = Array.isArray(caseItem.questions) && caseItem.questions.length > 0 && caseItem.questions.every(q => (q as any).type === 'mcq');
         if (allQroc) {
           multiQrocGroups.push({ ...caseItem, originalIndex: index, multiQroc: true });
+        } else if (allMcq) {
+          multiMcqGroups.push({ ...caseItem, originalIndex: index, multiMcq: true });
         } else {
           clinicalCases.push({ ...caseItem, originalIndex: index });
         }
@@ -257,6 +261,28 @@ export function QuestionControlPanel({
       groupedQuestions['qroc'].sort((a,b)=> (a.number||0)-(b.number||0));
     }
 
+    // Inject synthetic multi-MCQ navigation entries into mcq group
+    if (multiMcqGroups.length) {
+      if (!groupedQuestions['mcq']) groupedQuestions['mcq'] = [];
+      multiMcqGroups.forEach(group => {
+        groupedQuestions['mcq'].push({
+          id: `multimcq-${group.caseNumber}`,
+          lectureId: (group.questions[0] as any).lectureId,
+          lecture_id: (group.questions[0] as any).lectureId,
+          type: 'mcq',
+          text: `Groupe #${group.caseNumber}`,
+          number: group.caseNumber,
+          options: [],
+          correct_answers: [],
+          originalIndex: group.originalIndex as any,
+          questions: group.questions,
+          hidden: group.questions.every(q => (q as any).hidden),
+          meta: { multiMcq: true, total: group.totalQuestions }
+        } as any);
+      });
+      groupedQuestions['mcq'].sort((a,b)=> (a.number||0)-(b.number||0));
+    }
+
     // Normalize ordering per type: sort by existing number then original index, then assign displayNumber sequentially
     Object.keys(groupedQuestions).forEach(type => {
       const arr = groupedQuestions[type];
@@ -276,15 +302,13 @@ export function QuestionControlPanel({
       groupedByType: Object.keys(groupedQuestions).map(type => ({ type, count: groupedQuestions[type].length }))
     });
 
-    // Define type order and labels - include ALL possible types
-    const typeOrder = ['mcq', 'qroc', 'open', 'clinic_mcq', 'clinic_croq'];
+    // Define type order and labels - include base types; clinical are shown separately below
+    const typeOrder = ['mcq', 'qroc', 'open'];
     const getTypeLabel = (type: string) => {
       switch (type) {
         case 'mcq': return t('questions.mcq');
         case 'qroc': return 'QROC';
         case 'open': return t('questions.open');
-        case 'clinic_mcq': return 'MCQ Clinique';
-        case 'clinic_croq': return 'CROQ Clinique';
         default: return type.toUpperCase();
       }
     };
@@ -306,14 +330,19 @@ export function QuestionControlPanel({
           }
 
           const renderButton = (question: any, extraLabel?: string) => {
-            const isAnswered = answers[question.id] !== undefined;
+            // Consider grouped items answered when all children are answered
+            const isGroup = Array.isArray((question as any).questions);
+            const groupChildren: any[] = isGroup ? (question as any).questions : [];
+            const isAnswered = isGroup
+              ? groupChildren.every(q => answers[q.id] !== undefined)
+              : answers[question.id] !== undefined;
             const isCurrent = question.originalIndex === currentQuestionIndex && !isComplete;
             const isCorrect = answerResults[question.id];
             const hasNote = notesMap[question.id] === true;
             const isHidden = (question as any).hidden === true;
             const groupMeta = (question as any).meta;
-            const isPinned = pinnedIds.includes(question.id) || (groupMeta?.multiQroc && Array.isArray((question as any).questions) && (question as any).questions.some((q: any)=> pinnedIds.includes(q.id)));
-            const isGroupHidden = groupMeta?.multiQroc && Array.isArray((question as any).questions) && (question as any).questions.every((q:any)=> q.hidden);
+            const isPinned = pinnedIds.includes(question.id) || (isGroup && groupChildren.some((q: any)=> pinnedIds.includes(q.id)));
+            const isGroupHidden = isGroup && groupChildren.every((q:any)=> q.hidden);
             return (
               <motion.div
                 key={question.id}
@@ -362,7 +391,7 @@ export function QuestionControlPanel({
                       )}
                       <span className="text-left text-xs text-gray-600 dark:text-gray-400 truncate flex items-center gap-1 w-full">
                         {`${getTypeLabel(question.type)} ${(question as any).displayNumber ?? question.number ?? (question.originalIndex + 1)}`}
-                        {groupMeta?.multiQroc && (
+                        {(groupMeta?.multiQroc || groupMeta?.multiMcq) && (
                           <span className="inline-flex items-center text-[10px] px-1.5 py-0.5 rounded-md bg-medblue-100 text-medblue-700 dark:bg-medblue-900/40 dark:text-medblue-300 font-medium">
                             {groupMeta.total}x
                           </span>

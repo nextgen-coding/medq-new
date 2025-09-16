@@ -56,9 +56,21 @@ async function postHandler(request: AuthenticatedRequest) {
       );
     }
 
-    const questions = [];
+    const questions = [] as Array<{
+      lectureId: string;
+      type: 'qroc';
+      text: string;
+      correctAnswers: string[];
+      courseReminder: null;
+      number: number | null;
+      session: string | null;
+    }>;
     const errors = [];
     const totalRows = lines.length - 1; // Exclude header
+
+    // Strict duplicate detection within the uploaded file: mark as duplicate only if the FULL row is identical
+    const strictRowKey = (vals: string[]) => vals.map(v => String(v ?? '').trim()).join('||');
+    const seenInFile = new Map<string, number>(); // key -> first row index (1-based data row)
 
     // Process each data row
     for (let i = 1; i < lines.length; i++) {
@@ -82,6 +94,18 @@ async function postHandler(request: AuthenticatedRequest) {
         header.forEach((h, index) => {
           rowData[h] = values[index]?.trim() || '';
         });
+
+        // File-level duplicate check (full-row identity using canonical header order)
+        const ordered = expectedHeaders.map(h => rowData[h] || '');
+        const fileKey = strictRowKey(ordered);
+        const firstIdx = seenInFile.get(fileKey);
+        if (typeof firstIdx === 'number') {
+          const errorMsg = `Row ${i + 1}: Duplicate in file — identical to row ${firstIdx + 1}`;
+          console.warn(errorMsg);
+          errors.push(errorMsg);
+          continue;
+        }
+        seenInFile.set(fileKey, i);
 
         // Validate required fields with detailed error messages
         if (!rowData['texte de la question']) {
@@ -115,14 +139,22 @@ async function postHandler(request: AuthenticatedRequest) {
         }
 
         // Create question data
-        const questionData = {
+        const questionData: {
+          lectureId: string;
+          type: 'qroc';
+          text: string;
+          correctAnswers: string[];
+          courseReminder: null;
+          number: number | null;
+          session: string | null;
+        } = {
           lectureId,
           type: 'qroc',
           text: rowData['texte de la question'],
           correctAnswers: [rowData['reponse']],
           courseReminder: null, // Don't use cours for courseReminder
           number: parseInt(rowData['question n']) || null,
-          session: rowData['source'] // source maps to session
+          session: rowData['source'] || null // source maps to session
         };
 
         questions.push(questionData);
@@ -134,7 +166,7 @@ async function postHandler(request: AuthenticatedRequest) {
     }
 
     // Insert questions into database with progress tracking
-    const createdQuestions = [];
+    const createdQuestions = [] as any[];
     const importErrors = [];
     
     console.log(`Starting database insertion for ${questions.length} questions...`);
@@ -142,6 +174,50 @@ async function postHandler(request: AuthenticatedRequest) {
     for (let i = 0; i < questions.length; i++) {
       const questionData = questions[i];
       try {
+        // DB-level duplicate check: consider duplicate ONLY if all relevant fields are identical
+        const candidates = await prisma.question.findMany({
+          where: {
+            lectureId: questionData.lectureId,
+            type: questionData.type,
+            text: questionData.text
+          },
+          select: {
+            id: true,
+            lectureId: true,
+            type: true,
+            text: true,
+            correctAnswers: true,
+            courseReminder: true,
+            number: true,
+            session: true
+          }
+        });
+
+        const identical = candidates.find(q => {
+          const arrEq = (a?: any[] | null, b?: any[] | null) => {
+            const aa = Array.isArray(a) ? a.map(x => String(x)) : [];
+            const bb = Array.isArray(b) ? b.map(x => String(x)) : [];
+            if (aa.length !== bb.length) return false;
+            for (let k = 0; k < aa.length; k++) if (aa[k] !== bb[k]) return false;
+            return true;
+          };
+          const s = (x?: string | null) => String(x ?? '').trim();
+          return (
+            q.lectureId === questionData.lectureId &&
+            q.type === questionData.type &&
+            s(q.text) === s(questionData.text) &&
+            arrEq(q.correctAnswers as any, questionData.correctAnswers) &&
+            ((q.number ?? null) === (questionData.number ?? null)) &&
+            s(q.session) === s(questionData.session) &&
+            s(q.courseReminder) === s(questionData.courseReminder)
+          );
+        });
+
+        if (identical) {
+          importErrors.push(`Row ${i + 1}: Duplicate in database — identical question already exists`);
+          continue;
+        }
+
         const question = await prisma.question.create({
           data: questionData,
           include: {

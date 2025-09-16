@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { processAiValidationJob } from '@/lib/ai/aiValidationProcessor';
 import { authenticateRequest } from '@/lib/auth-middleware';
 
 export async function POST(request: NextRequest) {
@@ -71,25 +72,19 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    // In a real implementation, you would:
-    // 1. Save the file to storage
-    // 2. Add the job to a background processing queue
-    // 3. Start the AI validation process
-
-    // For now, simulate the job being processed
-    setTimeout(async () => {
-      try {
-        await simulateJobProcessing(job.id);
-      } catch (error) {
-        console.error('Error simulating job processing:', error);
-      }
-    }, 1000);
+    // Start processing immediately (synchronously kick off but don't block response)
+    const arrayBuffer = await file.arrayBuffer();
+    const bytes = new Uint8Array(arrayBuffer);
+    // Fire and forget - start real AI processing
+    processAiValidationJob(job.id, bytes, instructions).catch((err) => {
+      console.error('AI processing error:', err);
+    });
 
     return NextResponse.json({
       id: job.id,
       status: job.status,
       message: 'AI validation job created successfully',
-      estimatedDuration: '10-15 minutes',
+      estimatedDuration: 'quelques minutes selon la taille',
     });
 
   } catch (error) {
@@ -101,69 +96,4 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Simulate job processing for demo purposes
-async function simulateJobProcessing(jobId: string) {
-  try {
-    // Update job to processing
-    await prisma.aiValidationJob.update({
-      where: { id: jobId },
-      data: {
-        status: 'processing',
-        startedAt: new Date(),
-        totalItems: 100,
-        totalBatches: 3,
-        message: 'Starting AI analysis...',
-      }
-    });
-
-    // Simulate progress updates
-    const progressSteps = [
-      { progress: 10, message: 'Parsing file structure...', processedItems: 10 },
-      { progress: 30, message: 'Analyzing questions batch 1/3...', processedItems: 30, currentBatch: 1 },
-      { progress: 60, message: 'Analyzing questions batch 2/3...', processedItems: 60, currentBatch: 2 },
-      { progress: 90, message: 'Analyzing questions batch 3/3...', processedItems: 90, currentBatch: 3 },
-      { progress: 100, message: 'Finalizing results...', processedItems: 100 },
-    ];
-
-    for (const step of progressSteps) {
-      await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second delay
-      await prisma.aiValidationJob.update({
-        where: { id: jobId },
-        data: {
-          progress: step.progress,
-          message: step.message,
-          processedItems: step.processedItems,
-          currentBatch: step.currentBatch,
-        }
-      });
-    }
-
-    // Mark as completed
-    await prisma.aiValidationJob.update({
-      where: { id: jobId },
-      data: {
-        status: 'completed',
-        progress: 100,
-        message: 'AI validation completed successfully',
-        completedAt: new Date(),
-        outputUrl: `/output/${jobId}.xlsx`,
-        successfulAnalyses: 95,
-        failedAnalyses: 5,
-        ragAppliedCount: 80,
-        fixedCount: 25,
-      }
-    });
-
-  } catch (error) {
-    console.error('Error in job simulation:', error);
-    // Mark job as failed
-    await prisma.aiValidationJob.update({
-      where: { id: jobId },
-      data: {
-        status: 'failed',
-        message: 'Job processing failed',
-        errorMessage: 'Simulation error',
-      }
-    });
-  }
-}
+// Note: previous simulateJobProcessing removed in favor of real processing skeleton
