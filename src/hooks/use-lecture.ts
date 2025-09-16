@@ -40,49 +40,127 @@ export function useLecture(lectureId: string | undefined, mode?: string | null) 
     return allQuestions;
   }, [allQuestions, pinnedQuestionIds, mode]);
 
-  // Group clinical case questions and organize all questions properly
+  // Group questions and organize by sections with niveau-specific rules
   const groupedQuestions = useMemo(() => {
     if (!questions || questions.length === 0) {
       console.log('No questions available, returning empty array');
       return [];
     }
-    
-  const mcqQuestions: Question[] = [];
-  const qrocQuestions: Question[] = [];
-  // Multi QROC grouping map (caseNumber -> questions)
-  const multiQrocMap = new Map<number, Question[]>();
-  const clinicalCaseMap = new Map<number, Question[]>();
-  const textCaseMap = new Map<string, number>(); // map caseText -> synthetic caseNumber
-  let nextSyntheticCase = 100000; // large range to avoid collisions with real numbers
+    // Determine niveau
+    const niveauName = (lecture?.specialty?.niveau?.name || '').toLowerCase();
+    const isPreclinical = niveauName.includes('pcem 1') || niveauName.includes('pcem1') || niveauName.includes('pcem 2') || niveauName.includes('pcem2');
 
-    // Separate questions by type
-    questions.forEach(question => {
-      if ((question.type === 'clinic_mcq' || question.type === 'clinic_croq')) {
-        // Prefer explicit caseNumber; else group by identical caseText
-        let keyNum: number | undefined = question.caseNumber || undefined;
-        if (!keyNum) {
-          const text = (question.caseText || '').trim();
-          if (text) {
-            if (!textCaseMap.has(text)) {
-              textCaseMap.set(text, nextSyntheticCase++);
-            }
-            keyNum = textCaseMap.get(text)!;
+    const mcqSingles: Question[] = [];
+    const qrocSingles: Question[] = [];
+    // Multi grouping by explicit caseNumber
+    const multiMcqMap = new Map<number, Question[]>();
+    const multiQrocMap = new Map<number, Question[]>();
+  // Clinical cases by key (caseText-driven -> assigned caseNumber)
+  const clinicalCaseMap = new Map<number, Question[]>();
+    // Additional grouping by identical caseText (used for preclinical multi blocks)
+    const mcqTextMap = new Map<string, Question[]>();
+    const qrocTextMap = new Map<string, Question[]>();
+    const textCaseMap = new Map<string, number>(); // caseText -> synthetic caseNumber
+    let nextSyntheticCase = 100000; // large range to avoid collisions with real numbers
+
+    const norm = (s?: string | null) => (s || '').trim();
+
+    // Track membership to avoid duplicates across groupings
+    const groupedIdsByNumber = new Set<string>();
+    const groupedIdsByText = new Set<string>();
+
+    // First pass: distribute questions based on niveau rules
+    questions.forEach(orig => {
+      const baseType = orig.type === 'clinic_mcq' ? 'mcq' : orig.type === 'clinic_croq' ? 'qroc' : orig.type;
+      const hasText = norm(orig.caseText).length > 0;
+      const caseNum = orig.caseNumber;
+
+      if (isPreclinical) {
+        // No true clinical cases. Use caseText to form Multi QCM/QROC; also keep existing caseNumber-based multi groups.
+        if (baseType === 'mcq') {
+          if (typeof caseNum === 'number') {
+            const arr = multiMcqMap.get(caseNum) || [];
+            arr.push({ ...orig, type: 'mcq' } as Question);
+            multiMcqMap.set(caseNum, arr);
+          } else if (hasText) {
+            const key = norm(orig.caseText);
+            const arr = mcqTextMap.get(key) || [];
+            arr.push({ ...orig, type: 'mcq' } as Question);
+            mcqTextMap.set(key, arr);
+          } else {
+            mcqSingles.push({ ...orig, type: 'mcq' } as Question);
           }
+        } else if (baseType === 'qroc') {
+          if (typeof caseNum === 'number') {
+            const arr = multiQrocMap.get(caseNum) || [];
+            arr.push({ ...orig, type: 'qroc' } as Question);
+            multiQrocMap.set(caseNum, arr);
+          } else if (hasText) {
+            const key = norm(orig.caseText);
+            const arr = qrocTextMap.get(key) || [];
+            arr.push({ ...orig, type: 'qroc' } as Question);
+            qrocTextMap.set(key, arr);
+          } else {
+            qrocSingles.push({ ...orig, type: 'qroc' } as Question);
+          }
+        } else {
+          // Other types go to qrocSingles by default (open)
+          qrocSingles.push(orig);
         }
-        if (keyNum) {
-          if (!clinicalCaseMap.has(keyNum)) clinicalCaseMap.set(keyNum, []);
-          clinicalCaseMap.get(keyNum)!.push(question);
-          return;
-        }
-        // If still no key (no number and no text), fall back to type bucket below
-      }
-      if (question.type === 'mcq') {
-        mcqQuestions.push(question);
-      } else if (question.type === 'qroc' && question.caseNumber) {
-        if (!multiQrocMap.has(question.caseNumber)) multiQrocMap.set(question.caseNumber, []);
-        multiQrocMap.get(question.caseNumber)!.push(question);
       } else {
-        qrocQuestions.push(question);
+        // Non-preclinical (e.g., DCSEM 1/2/3): any item with caseText is part of a true clinical case (mix allowed)
+        if (hasText) {
+          // Prefer grouping by identical caseText. Assign a stable caseNumber per distinct text.
+          const keyText = norm(orig.caseText);
+          if (!textCaseMap.has(keyText)) {
+            // Reuse explicit caseNumber if available, else assign synthetic
+            textCaseMap.set(keyText, typeof caseNum === 'number' ? caseNum : nextSyntheticCase++);
+          }
+          const keyNum = textCaseMap.get(keyText)!;
+          const arr = clinicalCaseMap.get(keyNum) || [];
+          // Clone and coerce base types to clinical variants for rendering
+          const coerced = baseType === 'mcq' ? ({ ...orig, type: 'clinic_mcq', caseNumber: keyNum as any } as Question)
+                          : baseType === 'qroc' ? ({ ...orig, type: 'clinic_croq', caseNumber: keyNum as any } as Question)
+                          : ({ ...orig, caseNumber: keyNum as any } as Question);
+          arr.push(coerced);
+          clinicalCaseMap.set(keyNum, arr);
+        } else if (baseType === 'mcq') {
+          if (typeof caseNum === 'number') {
+            const arr = multiMcqMap.get(caseNum) || [];
+            arr.push({ ...orig, type: 'mcq' } as Question);
+            multiMcqMap.set(caseNum, arr);
+          } else {
+            mcqSingles.push({ ...orig, type: 'mcq' } as Question);
+          }
+        } else if (baseType === 'qroc') {
+          if (typeof caseNum === 'number') {
+            const arr = multiQrocMap.get(caseNum) || [];
+            arr.push({ ...orig, type: 'qroc' } as Question);
+            multiQrocMap.set(caseNum, arr);
+          } else {
+            qrocSingles.push({ ...orig, type: 'qroc' } as Question);
+          }
+        } else {
+          qrocSingles.push(orig);
+        }
+      }
+    });
+
+    // Promote multi MCQ groups (only groups with >1)
+    const multiMcqCases: ClinicalCase[] = [];
+    multiMcqMap.forEach((list, num) => {
+      if (list.length > 1) {
+        list.sort((a,b)=> (a.caseQuestionNumber||0)-(b.caseQuestionNumber||0));
+        list.forEach(q => groupedIdsByNumber.add(q.id));
+        multiMcqCases.push({
+          caseNumber: num,
+          caseText: (list.find(q => (q as any).caseText)?.caseText as any) || '',
+          questions: list,
+          totalQuestions: list.length
+        });
+      } else {
+        // single item fallback to normal bucket
+        mcqSingles.push(list[0]);
       }
     });
 
@@ -91,47 +169,89 @@ export function useLecture(lectureId: string | undefined, mode?: string | null) 
     multiQrocMap.forEach((list, num) => {
       if (list.length > 1) {
         list.sort((a,b)=> (a.caseQuestionNumber||0)-(b.caseQuestionNumber||0));
+        list.forEach(q => groupedIdsByNumber.add(q.id));
         multiQrocCases.push({
           caseNumber: num,
-          caseText: '',
+          caseText: (list.find(q => (q as any).caseText)?.caseText as any) || '',
           questions: list,
           totalQuestions: list.length
         });
       } else {
         // single item fallback to normal bucket
-        qrocQuestions.push(list[0]);
+        qrocSingles.push(list[0]);
       }
     });
 
-    // Sort each group by their number
-    mcqQuestions.sort((a, b) => (a.number || 0) - (b.number || 0));
-    qrocQuestions.sort((a, b) => (a.number || 0) - (b.number || 0));
-    multiQrocCases.sort((a,b)=> a.caseNumber - b.caseNumber);
-
-    // Convert clinical case groups to ClinicalCase objects and sort by case number
-  const clinicalCases: ClinicalCase[] = [];
-  Array.from(clinicalCaseMap.entries())
-      .sort(([a], [b]) => a - b) // Sort by case number
-      .forEach(([caseNumber, caseQuestions]) => {
-        // Sort questions within each case by caseQuestionNumber
-        const sortedQuestions = caseQuestions.sort((a, b) => 
-          (a.caseQuestionNumber || 0) - (b.caseQuestionNumber || 0)
-        );
-        
-        const clinicalCase: ClinicalCase = {
-          caseNumber,
-      caseText: (sortedQuestions[0]?.caseText || '').trim(),
-          questions: sortedQuestions,
-          totalQuestions: sortedQuestions.length
-        };
-
-        clinicalCases.push(clinicalCase);
+    // Additional preclinical grouping by identical caseText (only groups with >1)
+    if (isPreclinical) {
+      mcqTextMap.forEach((list, text) => {
+        const filtered = list.filter(q => !groupedIdsByNumber.has(q.id));
+        if (filtered.length > 1) {
+          if (!textCaseMap.has(text)) textCaseMap.set(text, nextSyntheticCase++);
+          const caseNumber = textCaseMap.get(text)!;
+          filtered.sort((a,b)=> (a.caseQuestionNumber||0)-(b.caseQuestionNumber||0));
+          filtered.forEach(q => groupedIdsByText.add(q.id));
+          multiMcqCases.push({
+            caseNumber,
+            caseText: text,
+            questions: filtered,
+            totalQuestions: filtered.length
+          });
+        }
       });
+      qrocTextMap.forEach((list, text) => {
+        const filtered = list.filter(q => !groupedIdsByNumber.has(q.id));
+        if (filtered.length > 1) {
+          if (!textCaseMap.has(text)) textCaseMap.set(text, nextSyntheticCase++);
+          const caseNumber = textCaseMap.get(text)!;
+          filtered.sort((a,b)=> (a.caseQuestionNumber||0)-(b.caseQuestionNumber||0));
+          filtered.forEach(q => groupedIdsByText.add(q.id));
+          multiQrocCases.push({
+            caseNumber,
+            caseText: text,
+            questions: filtered,
+            totalQuestions: filtered.length
+          });
+        }
+      });
+      // Remove items that were grouped by text from singles
+      const mcqSinglesFiltered = mcqSingles.filter(q => !groupedIdsByText.has(q.id) && !groupedIdsByNumber.has(q.id));
+      const qrocSinglesFiltered = qrocSingles.filter(q => !groupedIdsByText.has(q.id) && !groupedIdsByNumber.has(q.id));
+      mcqSingles.length = 0; mcqSingles.push(...mcqSinglesFiltered);
+      qrocSingles.length = 0; qrocSingles.push(...qrocSinglesFiltered);
+    }
 
-    // Combine all questions in the correct order: MCQ -> QROC -> Clinical Cases
+    // Sort singles by their number
+    mcqSingles.sort((a, b) => (a.number || 0) - (b.number || 0));
+    qrocSingles.sort((a, b) => (a.number || 0) - (b.number || 0));
+  multiQrocCases.sort((a,b)=> a.caseNumber - b.caseNumber);
+  multiMcqCases.sort((a,b)=> a.caseNumber - b.caseNumber);
+
+    // Convert clinical case groups to ClinicalCase objects and sort by case number (non-preclinical only)
+  const clinicalCases: ClinicalCase[] = [];
+    if (!isPreclinical) {
+      Array.from(clinicalCaseMap.entries())
+        .sort(([a], [b]) => a - b) // Sort by case number
+        .forEach(([caseNumber, caseQuestions]) => {
+          // Sort questions within each case by caseQuestionNumber
+          const sortedQuestions = caseQuestions.sort((a, b) => 
+            (a.caseQuestionNumber || 0) - (b.caseQuestionNumber || 0)
+          );
+          const clinicalCase: ClinicalCase = {
+            caseNumber,
+            caseText: (sortedQuestions[0]?.caseText || '').trim(),
+            questions: sortedQuestions,
+            totalQuestions: sortedQuestions.length
+          };
+          clinicalCases.push(clinicalCase);
+        });
+    }
+
+    // Combine all in the order: single MCQ -> grouped MCQ -> single QROC -> grouped QROC -> Clinical Cases
     const result: (Question | ClinicalCase)[] = [
-      ...mcqQuestions,
-      ...qrocQuestions,
+      ...mcqSingles,
+      ...multiMcqCases,
+      ...qrocSingles,
       ...multiQrocCases,
       ...clinicalCases
     ];
@@ -139,14 +259,14 @@ export function useLecture(lectureId: string | undefined, mode?: string | null) 
     console.log('Grouped questions result:', {
       totalQuestions: questions.length,
       totalGroupedItems: result.length,
-      mcqCount: mcqQuestions.length,
-      qrocCount: qrocQuestions.length,
+      mcqCount: mcqSingles.length,
+      qrocCount: qrocSingles.length,
   clinicalCasesCount: clinicalCases.length,
   multiQrocGroups: multiQrocCases.length
     });
 
     return result;
-  }, [questions]);
+  }, [questions, lecture?.specialty?.niveau?.name]);
 
   const fetchLectureData = useCallback(async () => {
     if (!lectureId) return;

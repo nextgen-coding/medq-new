@@ -221,9 +221,9 @@ export function MCQQuestion({
 
   // Handle userAnswer changes separately to avoid reinitialization loops
   useEffect(() => {
-    if (userAnswer && userAnswer.length > 0) {
-      setSelectedOptionIds(userAnswer);
-    }
+    const ua = Array.isArray(userAnswer) ? userAnswer : [];
+    // Always mirror external userAnswer. If empty, clear the local selection.
+    setSelectedOptionIds(ua);
   }, [userAnswer]);
 
   // Initialize component state based on whether question is already answered
@@ -243,7 +243,7 @@ export function MCQQuestion({
         setIsCorrect(answerResult === true);
         // Auto-expand only missed correct options and wrong selections
         const correct = question.correctAnswers || question.correct_answers || [];
-        const ua = (userAnswer || []) as string[];
+        const ua = Array.isArray(userAnswer) ? userAnswer : [];
         if (answerResult === true) {
           setExpandedExplanations([]);
         } else {
