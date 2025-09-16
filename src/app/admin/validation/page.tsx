@@ -63,6 +63,8 @@ export default function AdminValidationPage() {
     bad: BadRow[];
     goodCount: number;
     badCount: number;
+    sessionId?: string;
+    fileName?: string;
   } | null>(null);
 
   const [allJobs, setAllJobs] = useState<AiJob[]>([]);
@@ -183,8 +185,8 @@ export default function AdminValidationPage() {
         throw new Error(err?.error || 'Validation failed');
       }
 
-      const result = await response.json();
-      setValidationResult(result);
+  const result = await response.json();
+  setValidationResult(result);
       toast.success('Validation terminée', { description: `${result.goodCount} valides • ${result.badCount} erreurs` });
     } catch (error) {
       console.error('Classic validation error:', error);
@@ -194,15 +196,44 @@ export default function AdminValidationPage() {
     }
   };
 
-  const downloadValidated = (mode: 'good' | 'bad') => {
+  const downloadValidated = async (mode: 'good' | 'bad') => {
     if (!validationResult) return;
-    const payload = encodeURIComponent(JSON.stringify({
-      good: validationResult.good,
-      bad: validationResult.bad,
-    }));
-    const url = `/api/validation?mode=${mode}&payload=${payload}`;
-    // Open in a new tab to trigger download
-    window.open(url, '_blank');
+    try {
+      // Prefer session-based download (no long URLs)
+      if (validationResult.sessionId) {
+        const res = await fetch(`/api/validation?mode=${mode}&sessionId=${validationResult.sessionId}`);
+        if (!res.ok) throw new Error('Export failed');
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = `validation_${mode}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        return;
+      }
+
+      // Fallback to POST export with JSON body
+      const res = await fetch('/api/validation/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode, good: validationResult.good, bad: validationResult.bad })
+      });
+      if (!res.ok) throw new Error('Export failed');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = `validation_${mode}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      toast.error('Impossible de télécharger');
+    }
   };
 
   const resetValidation = () => {
@@ -342,7 +373,7 @@ export default function AdminValidationPage() {
                         <li>Présence des colonnes requises par type de feuille</li>
                         <li>Réponses QCM valides (A–E) ou "?" / "Pas de réponse"</li>
                         <li>Réponses QROC non vides</li>
-                        <li>Explications présentes (globale ou par option)</li>
+                        <li>Explications: facultatives (QCM/QROC/Cas clinique), si présentes on les conserve</li>
                       </ul>
                       <p><strong>Résultat :</strong> Liste des lignes valides vs invalides avec raisons d'erreur</p>
                     </div>

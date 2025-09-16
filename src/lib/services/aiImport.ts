@@ -18,38 +18,48 @@ export type MCQAiResult = {
   error?: string;
 };
 
-// Nouveau prompt enrichi (FR) pour correction de QCM médicaux avec style étudiant + RAG éventuel.
-// IMPORTANT: la sortie DOIT rester du JSON strict pour préserver la compatibilité côté serveur.
-const DEFAULT_SYSTEM_PROMPT = `Tu es un assistant IA qui aide des étudiants en médecine française à corriger leurs QCM. Tu reçois des questions à choix multiples avec leurs options et éventuellement une réponse proposée par l'étudiant.
+// Prompt enrichi: toujours produire des explications DÉTAILLÉES multi-phrases par option.
+// Objectif: mécanisme / correction / statistique (si sûre) / différentiel ou piège.
+// IMPORTANT: sortie JSON STRICT.
+const DEFAULT_SYSTEM_PROMPT = `Tu aides des étudiants en médecine à corriger des QCM. Tu reçois chaque question avec ses options.
 
-Style étudiant demandé:
-- Utilise des connecteurs variés : "Oui", "Exact", "En effet", "Au contraire", "Non", "Pas du tout", "Ici", "Attention", "Effectivement", "Bien sûr"
-- Évite le ton professoral ou formel
-- Sois concis et naturel
-- Quand tu cites le cours (si contexte fourni), utilise des guillemets exactement comme dans le texte
+EXIGENCES D'EXPLICATION (TOUJOURS DÉTAILLÉ):
+- Chaque option reçoit 2 à 4 phrases (5 si nécessaire) :
+  * Phrase 1: Connecteur varié + validation ou réfutation immédiate.
+  * Phrase 2: Mécanisme physiopath / principe clé OU correction précise si faux.
+  * Phrase 3: Conséquence clinique, épidémiologie ou critère différentiel majeur.
+  * Phrase 4 (si utile): Chiffre robuste ou piège classique / différentiel supplémentaire.
+- Aucune option ne doit se limiter à une seule phrase sauf impossibilité factuelle.
+- Varie les connecteurs : "Oui", "Exact", "Effectivement", "Au contraire", "Non, en fait", "Plutôt", "Pas du tout", "Correct", "Faux", "Juste" (pas deux identiques de suite si possible).
+- Ne recopie pas littéralement l'intitulé de l'option pour débuter; commence directement par le connecteur et la justification.
+- Si option FAUSSE: formuler la bonne notion après la correction (« Non, en fait ... car ... »).
+- Si chiffre incertain: ne pas inventer.
 
-Ta tâche:
-1. Pour chaque question, identifie la ou les réponse(s) correcte(s) parmi les options A, B, C, D, E
-2. Si la réponse fournie par l'étudiant est correcte → status="ok", pas de changement nécessaire mais fournis une explication concise
-3. Si la réponse est incorrecte ou manquante → status="ok" avec la bonne réponse + explication détaillée
-4. Si la question semble défectueuse (ambiguë, options manquantes, etc.) → status="error"
+GLOBAL EXPLANATION (facultatif): brève synthèse (2–3 phrases) : mécanisme central + piège principal + perle clinique.
 
-Important: Si contexte de cours fourni, cite des phrases exactes avec guillemets pour appuyer tes explications.
+ERREURS:
+- Utilise status="error" uniquement si question structurellement inutilisable (options manquantes, contradiction bloquante). Sinon toujours status="ok" même si la réponse fournie par l'étudiant est fausse.
 
-Sortie JSON strict uniquement:
+SORTIE JSON STRICT UNIQUEMENT (pas de markdown ni texte hors JSON):
 {
   "results": [
     {
       "id": "question_id",
       "status": "ok" | "error",
-      "correctAnswers": [0, 2], // indices des bonnes réponses (0=A, 1=B, 2=C, 3=D, 4=E)
-      "noAnswer": false, // true si aucune réponse n'est correcte
-      "globalExplanation": "Explication générale avec connecteurs variés et citations du cours entre guillemets",
-      "optionExplanations": ["Justification A", "Justification B", "Justification C", "Justification D", "Justification E"],
-      "error": "Description de l'erreur si status=error"
+      "correctAnswers": [0,2],
+      "noAnswer": false,
+      "globalExplanation": "...",
+      "optionExplanations": ["Oui …", "Au contraire …", "…"],
+      "error": "(si status=error)"
     }
   ]
-}`;
+}
+CONTRAINTES:
+- optionExplanations: EXACTEMENT une entrée par option, longueur >= 2 phrases chacune (sauf impossibilité mentionnée).
+- correctAnswers: indices numériques (A=0).
+- Pas d'autres clés.
+- Aucune explication ne doit être vide ou purement tautologique.
+`;
 
 function buildUserPrompt(items: MCQAiItem[]) {
   return JSON.stringify({

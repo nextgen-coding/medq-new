@@ -963,7 +963,6 @@ export default function CoursPageRoute() {
 function GroupedQrocContainer({ clinicalCase, answers, answerResults, pinnedQuestionIds, user, lecture, lectureId, specialtyId, onAnswerSubmit, onNext, onQuestionUpdate, setOpenQuestionsDialog }: any) {
   const [openNotes, setOpenNotes] = useState(false);
   const [resetCounter, setResetCounter] = useState(0);
-  const [openGroupEdit, setOpenGroupEdit] = useState(false);
   const [notesHasContent, setNotesHasContent] = useState(false); // track if notes have content
   const notesRef = useRef<HTMLDivElement | null>(null);
 
@@ -975,30 +974,7 @@ function GroupedQrocContainer({ clinicalCase, answers, answerResults, pinnedQues
   }, [notesHasContent]);
 
   const groupAnswered = clinicalCase.questions.every((q: any) => answers[q.id] !== undefined);
-  const groupPinned = clinicalCase.questions.some((q: any) => pinnedQuestionIds.includes(q.id));
-  const groupHidden = clinicalCase.questions.every((q: any) => (q as any).hidden);
-
-  const toggleGroupPin = async () => {
-    for (const q of clinicalCase.questions) {
-      try {
-        if (!groupPinned) {
-          await fetch('/api/pinned-questions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: user?.id, questionId: q.id }) });
-        } else {
-          await fetch(`/api/pinned-questions?userId=${user?.id}&questionId=${q.id}`, { method: 'DELETE' });
-        }
-      } catch {}
-    }
-    if (typeof window !== 'undefined') window.dispatchEvent(new Event('pinned-updated'));
-  };
-
-  const toggleGroupHidden = async () => {
-    for (const q of clinicalCase.questions) {
-      try {
-        await fetch(`/api/questions/${q.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ hidden: !groupHidden }) });
-        onQuestionUpdate(q.id, { hidden: !groupHidden });
-      } catch {}
-    }
-  };
+  // Duplicate group-level controls (pin/hide/edit/report/delete) removed to avoid redundancy with header actions
 
 
 
@@ -1009,31 +985,7 @@ function GroupedQrocContainer({ clinicalCase, answers, answerResults, pinnedQues
           <h2 className="text-lg font-semibold">Multi QROC #{clinicalCase.caseNumber}</h2>
           <div className="text-xs text-gray-500 dark:text-gray-400">{clinicalCase.totalQuestions} QROC</div>
         </div>
-        <div className="flex flex-wrap justify-end gap-2 mb-4">
-          <Button variant="outline" size="sm" onClick={toggleGroupPin} className="flex items-center gap-1">
-            {groupPinned ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
-            <span className="hidden sm:inline">{groupPinned ? 'Désépingler' : 'Épingler'}</span>
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => { window.location.href = `/matieres/${specialtyId}/cours/${lectureId}?report=${clinicalCase.questions[0].id}`; }} className="flex items-center gap-1">
-            <Flag className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Signaler</span>
-          </Button>
-          {(user?.role === 'admin' || user?.role === 'maintainer') && (
-            <Button variant="outline" size="sm" onClick={() => setOpenGroupEdit(true)} className="flex items-center gap-1" title="Modifier le bloc QROC">
-              <Pencil className="h-3.5 w-3.5" />
-            </Button>
-          )}
-          {(user?.role === 'admin' || user?.role === 'maintainer') && (
-            <Button variant="outline" size="sm" onClick={toggleGroupHidden} className="flex items-center gap-1" title={groupHidden ? 'Afficher' : 'Masquer'}>
-              {groupHidden ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
-            </Button>
-          )}
-          {user?.role === 'admin' && (
-            <Button variant="outline" size="sm" className="flex items-center gap-1 text-destructive" onClick={async () => { if (!confirm('Supprimer toutes les questions du groupe ?')) return; for (const q of clinicalCase.questions) { try { await fetch(`/api/questions/${q.id}`, { method: 'DELETE', credentials: 'include' }); } catch {} } window.location.reload(); }}>
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
-          )}
-        </div>
+        {/* Group-level action buttons removed; use global header Admin/Pin/Report */}
         <div className="grid gap-2">
           {clinicalCase.questions.map((q: any) => {
             const answered = answers[q.id] !== undefined;
@@ -1149,15 +1101,7 @@ function GroupedQrocContainer({ clinicalCase, answers, answerResults, pinnedQues
           </div>
         )}
       </div>
-      {openGroupEdit && (
-        <GroupedQrocEditDialog
-          caseNumber={clinicalCase.caseNumber}
-          questions={clinicalCase.questions}
-          isOpen={openGroupEdit}
-          onOpenChange={setOpenGroupEdit}
-          onSaved={() => { try { window.location.reload(); } catch {} }}
-        />
-      )}
+      {/* Edit for grouped QROC is accessible from the global Admin dialog */}
     </div>
   );
 }
@@ -1167,30 +1111,7 @@ function GroupedMcqContainer({ clinicalCase, answers, answerResults, pinnedQuest
   const [openNotes, setOpenNotes] = useState(false);
   const [notesHasContent, setNotesHasContent] = useState(false);
   const notesRef = useRef<HTMLDivElement | null>(null);
-  const groupPinned = clinicalCase.questions.some((q: any) => pinnedQuestionIds.includes(q.id));
-  const groupHidden = clinicalCase.questions.every((q: any) => (q as any).hidden);
-
-  const toggleGroupPin = async () => {
-    for (const q of clinicalCase.questions) {
-      try {
-        if (!groupPinned) {
-          await fetch('/api/pinned-questions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: user?.id, questionId: q.id }) });
-        } else {
-          await fetch(`/api/pinned-questions?userId=${user?.id}&questionId=${q.id}`, { method: 'DELETE' });
-        }
-      } catch {}
-    }
-    if (typeof window !== 'undefined') window.dispatchEvent(new Event('pinned-updated'));
-  };
-
-  const toggleGroupHidden = async () => {
-    for (const q of clinicalCase.questions) {
-      try {
-        await fetch(`/api/questions/${q.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ hidden: !groupHidden }) });
-        onQuestionUpdate(q.id, { hidden: !groupHidden });
-      } catch {}
-    }
-  };
+  // Duplicate group-level controls (pin/hide/edit/report/delete) removed to avoid redundancy with header actions
 
   const groupAnswered = clinicalCase.questions.every((q: any) => Array.isArray(answers[q.id]) ? (answers[q.id] as string[]).length > 0 : answers[q.id] !== undefined);
 
@@ -1213,26 +1134,7 @@ function GroupedMcqContainer({ clinicalCase, answers, answerResults, pinnedQuest
             </div>
           );
         })()}
-        <div className="flex flex-wrap justify-end gap-2 mb-4">
-          <Button variant="outline" size="sm" onClick={toggleGroupPin} className="flex items-center gap-1">
-            {groupPinned ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
-            <span className="hidden sm:inline">{groupPinned ? 'Unpin' : 'Pin'}</span>
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => { window.location.href = `/matieres/${specialtyId}/cours/${lectureId}?report=${clinicalCase.questions[0].id}`; }} className="flex items-center gap-1">
-            <Flag className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Signaler</span>
-          </Button>
-          {(user?.role === 'admin' || user?.role === 'maintainer') && (
-            <Button variant="outline" size="sm" onClick={toggleGroupHidden} className="flex items-center gap-1" title={groupHidden ? 'Unhide' : 'Hide'}>
-              {groupHidden ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
-            </Button>
-          )}
-          {user?.role === 'admin' && (
-            <Button variant="outline" size="sm" className="flex items-center gap-1 text-destructive" onClick={async () => { if (!confirm('Supprimer toutes les questions du groupe ?')) return; for (const q of clinicalCase.questions) { try { await fetch(`/api/questions/${q.id}`, { method: 'DELETE', credentials: 'include' }); } catch {} } window.location.reload(); }}>
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
-          )}
-        </div>
+        {/* Group-level action buttons removed; use global header Admin/Pin/Report */}
         <div className="grid gap-2">
           {clinicalCase.questions.map((q: any, idx: number) => {
             const answered = Array.isArray(answers[q.id]) && (answers[q.id] as string[]).length > 0;

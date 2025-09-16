@@ -617,53 +617,7 @@ export function ClinicalCaseQuestion({
                         {answerResult === false && <AlertCircle className="h-4 w-4 text-red-600" />}
                       </span>
                     )}
-                    <span className="ml-auto inline-flex gap-1">
-                      <Button variant="outline" size="sm" onClick={toggleGroupPin} className="flex items-center gap-1">
-                        {groupPinned ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
-                        <span className="hidden sm:inline">{groupPinned ? 'Unpin' : 'Pin'}</span>
-                      </Button>
-                      {(user?.role === 'admin' || user?.role === 'maintainer') && (
-                        <Button variant="outline" size="sm" onClick={toggleGroupHidden} disabled={isTogglingHidden} title={groupHidden ? 'Unhide' : 'Hide'}>
-                          {groupHidden ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
-                        </Button>
-                      )}
-                      {(user?.role === 'admin' || user?.role === 'maintainer') && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          title={displayMode === 'multi_qcm' ? 'Éditer le bloc QCM' : displayMode === 'multi_qroc' ? 'Éditer le bloc QROC' : 'Éditer le cas clinique'}
-                          onClick={() => {
-                            if (displayMode === 'multi_qcm') setOpenGroupMcqEdit(true);
-                            else if (displayMode === 'multi_qroc') setOpenGroupQrocEdit(true);
-                            else setOpenCaseEdit(true);
-                          }}
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
-                      {/* Report whole clinical case (reports first question id for context) */}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        title="Signaler"
-                        onClick={() => {
-                          const first = clinicalCase.questions[0];
-                          if (first) {
-                            setReportTargetQuestion(first);
-                            setIsReportDialogOpen(true);
-                          }
-                        }}
-                        className="flex items-center gap-1"
-                      >
-                        <Flag className="h-3.5 w-3.5" />
-                        <span className="hidden sm:inline">Signaler</span>
-                      </Button>
-                      {user?.role === 'admin' && (
-                        <Button variant="outline" size="sm" className="text-destructive" disabled={isDeleting} onClick={handleDeleteGroup} title="Delete all">
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
-                    </span>
+                    {/* Duplicate group action buttons removed per request to avoid second controllers */}
                   </div>
                   {/* Keep helper succinct; keyboard shortcuts removed to avoid confusion */}
                   {showResults && evaluationComplete && (

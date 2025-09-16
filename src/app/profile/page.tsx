@@ -21,6 +21,8 @@ export default function ProfilePageRoute() {
   const { user } = useAuth()
   const { t } = useTranslation()
   const [showChangePassword, setShowChangePassword] = useState(false)
+  // Local faculty selection (no faculty field on User type yet)
+  const [faculty, setFaculty] = useState('FMSF')
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
     newPassword: '',
@@ -115,10 +117,10 @@ export default function ProfilePageRoute() {
                           />
                         </div>
 
-                        {/* Faculté */}
+                        {/* Faculté (local state only; add to backend if needed) */}
                         <div className="space-y-2">
                           <Label className="text-gray-300">Faculté</Label>
-                          <Select defaultValue={user?.faculty || 'FMSF'}>
+                          <Select value={faculty} onValueChange={setFaculty}>
                             <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
                               <SelectValue />
                             </SelectTrigger>

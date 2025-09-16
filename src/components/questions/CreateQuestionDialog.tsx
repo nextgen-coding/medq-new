@@ -309,8 +309,9 @@ export function CreateQuestionDialog({ lecture, isOpen, onOpenChange, onQuestion
             courseReminderMediaUrl: formData.reminderMediaUrl || null,
             courseReminderMediaType: formData.reminderMediaType || null,
             caseNumber: groupNumber, // reuse/assign as group id
-            // For PCEM niveaux, also persist common case text so grouping-by-text works
-            caseText: (formData.text || '').trim() || null,
+            // For PCEM niveaux, persist common case text so text-based grouping works.
+            // For DCEM niveaux, leave caseText empty to keep this as a base Multi QROC (not clinical) by default.
+            caseText: isPreclinical ? ((formData.text || '').trim() || null) : null,
             caseQuestionNumber: i + 1,
             options: [],
             correctAnswers: [sq.answer.trim()],
@@ -380,7 +381,8 @@ export function CreateQuestionDialog({ lecture, isOpen, onOpenChange, onQuestion
             courseReminderMediaUrl: formData.reminderMediaUrl || null,
             courseReminderMediaType: formData.reminderMediaType || null,
             caseNumber: groupNumber,
-            caseText: (formData.text || '').trim() || null,
+            // PCEM: use common text as caseText for grouping-by-text; DCEM: keep null to avoid clinical grouping on creation
+            caseText: isPreclinical ? ((formData.text || '').trim() || null) : null,
             caseQuestionNumber: i + 1,
             options: sq.options.filter(o=>o.text.trim()).map(o=> ({ id: o.id, text: o.text.trim(), explanation: (o.explanation||'').trim() })),
             correctAnswers: sq.correctAnswers,
@@ -883,6 +885,9 @@ export function CreateQuestionDialog({ lecture, isOpen, onOpenChange, onQuestion
               }}>Activer multi QROC</Button>
             </div>
           )}
+          {formData.type === 'qroc' && multiQrocMode && !isPreclinical && (
+            <p className="text-[11px] text-muted-foreground -mt-2">DCEM: les blocs Multi QROC créés ici restent des QROC de base (non cliniques). Ils apparaissent dans la section QROC. Vous pourrez convertir vers cas clinique plus tard via l'organiseur.</p>
+          )}
           {/* Make multi QCM easily discoverable when user is on QCM */}
           {formData.type === 'mcq' && !multiQcmMode && (
             <div className="flex justify-end -mt-2">
@@ -910,6 +915,9 @@ export function CreateQuestionDialog({ lecture, isOpen, onOpenChange, onQuestion
                 Activer multi QCM
               </Button>
             </div>
+          )}
+          {formData.type === 'mcq' && multiQcmMode && !isPreclinical && (
+            <p className="text-[11px] text-muted-foreground -mt-2">DCEM: les blocs Multi QCM créés ici restent des QCM de base (non cliniques). Ils apparaissent dans la section QCM. Vous pourrez convertir vers cas clinique plus tard via l'organiseur.</p>
           )}
           {formData.type === 'qroc' && !multiQrocMode && (
             <QuickParseQroc

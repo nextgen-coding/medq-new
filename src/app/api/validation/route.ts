@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { read, utils, write } from 'xlsx';
+import { storeValidationFiles, getValidationFiles } from '@/lib/validation-file-store';
 
 type SheetName = 'qcm' | 'qroc' | 'cas_qcm' | 'cas_qroc';
 type GoodRow = { sheet: SheetName; row: number; data: Record<string, any> };
@@ -139,19 +140,11 @@ async function validateWorkbook(file: File) {
           bad.push({ sheet, row: i + 1, reason: 'MCQ missing correct answers (A–E)', original: record });
           continue;
         }
-        if (!hasAnyExplanation(record)) {
-          bad.push({ sheet, row: i + 1, reason: 'MCQ missing explanation', original: record });
-          continue;
-        }
       }
 
       if (sheet === 'qroc' || sheet === 'cas_qroc') {
         if (!String(record['reponse'] || '').trim()) {
           bad.push({ sheet, row: i + 1, reason: 'QROC missing reponse', original: record });
-          continue;
-        }
-        if (!String(record['explication'] || '').trim()) {
-          bad.push({ sheet, row: i + 1, reason: 'QROC missing explication', original: record });
           continue;
         }
       }
@@ -184,7 +177,67 @@ export async function POST(request: NextRequest) {
     if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 });
 
     const { good, bad } = await validateWorkbook(file);
-    return NextResponse.json({ good, bad, goodCount: good.length, badCount: bad.length });
+
+    // Pre-generate and store downloadable files to avoid massive URL payloads
+    const buildHeader = (mode: 'good'|'bad') => mode === 'good'
+      ? ['sheet', 'row', 'matiere', 'cours', 'question n', 'cas n', 'texte du cas', 'texte de la question', 'reponse', 'option a', 'option b', 'option c', 'option d', 'option e', 'explication', 'explication a', 'explication b', 'explication c', 'explication d', 'explication e', 'image', 'niveau', 'semestre']
+      : ['sheet', 'row', 'reason', 'matiere', 'cours', 'question n', 'cas n', 'texte du cas', 'texte de la question', 'reponse', 'option a', 'option b', 'option c', 'option d', 'option e', 'explication', 'image'];
+
+    const mapRows = (mode: 'good'|'bad') => (mode === 'good' ? good : bad).map((r: any) => {
+      const rec = mode === 'good' ? r.data : r.original;
+      const isCas = r.sheet === 'cas_qcm' || r.sheet === 'cas_qroc';
+      const qTextRaw = String(rec?.['texte de la question'] ?? '').trim();
+      const caseTextRaw = String(rec?.['texte du cas'] ?? '').trim();
+      const qText = qTextRaw || (isCas ? caseTextRaw : '');
+      const base: any = {
+        sheet: r.sheet,
+        row: r.row,
+        ...(mode === 'good' ? {} : { reason: r.reason }),
+        matiere: rec?.['matiere'] ?? '',
+        cours: rec?.['cours'] ?? '',
+        'question n': rec?.['question n'] ?? '',
+        'cas n': rec?.['cas n'] ?? '',
+        'texte du cas': rec?.['texte du cas'] ?? '',
+        'texte de la question': qText,
+        reponse: rec?.['reponse'] ?? '',
+        'option a': rec?.['option a'] ?? '',
+        'option b': rec?.['option b'] ?? '',
+        'option c': rec?.['option c'] ?? '',
+        'option d': rec?.['option d'] ?? '',
+        'option e': rec?.['option e'] ?? '',
+        explication: rec?.['explication'] ?? '',
+        'explication a': rec?.['explication a'] ?? '',
+        'explication b': rec?.['explication b'] ?? '',
+        'explication c': rec?.['explication c'] ?? '',
+        'explication d': rec?.['explication d'] ?? '',
+        'explication e': rec?.['explication e'] ?? '',
+        image: rec?.['image'] ?? '',
+      };
+      if (mode === 'good') {
+        base['niveau'] = rec?.['niveau'] ?? '';
+        base['semestre'] = rec?.['semestre'] ?? '';
+      }
+      return base;
+    });
+
+    const wbGood = utils.book_new();
+    const wsGood = utils.json_to_sheet(mapRows('good'), { header: buildHeader('good') });
+    utils.book_append_sheet(wbGood, wsGood, 'Valide');
+    const bufGood = write(wbGood, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
+
+    const wbErr = utils.book_new();
+    const wsErr = utils.json_to_sheet(mapRows('bad'), { header: buildHeader('bad') });
+    utils.book_append_sheet(wbErr, wsErr, 'Erreurs');
+    const bufErr = write(wbErr, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
+
+    const sessionId = `val_${Date.now()}_${Math.random().toString(36).slice(2,9)}`;
+    // Convert ArrayBuffer to Node Buffer for in-memory store
+    const goodFileBuffer = Buffer.from(new Uint8Array(bufGood));
+    const errorFileBuffer = Buffer.from(new Uint8Array(bufErr));
+    const reportBuffer = Buffer.from([]); // reserved for future summary report
+    storeValidationFiles(sessionId, { goodFileBuffer, errorFileBuffer, reportBuffer, fileName: file.name });
+
+    return NextResponse.json({ good, bad, goodCount: good.length, badCount: bad.length, sessionId, fileName: file.name });
   } catch (error: any) {
     return NextResponse.json({ error: error?.message || 'Validation failed' }, { status: 400 });
   }
@@ -194,9 +247,25 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const mode = (searchParams.get('mode') as 'good' | 'bad') || 'good';
-    const payload = searchParams.get('payload');
-    if (!payload) return NextResponse.json({ error: 'Missing payload' }, { status: 400 });
+    const sessionId = searchParams.get('sessionId');
 
+    // Prefer session-based buffers (safer than large payload URLs)
+    if (sessionId) {
+      const files = getValidationFiles(sessionId);
+      if (!files) return NextResponse.json({ error: 'Session not found or expired' }, { status: 404 });
+      const buffer = mode === 'good' ? files.goodFileBuffer : files.errorFileBuffer;
+      const bytes = new Uint8Array(buffer);
+      return new NextResponse(bytes, {
+        headers: {
+          'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'Content-Disposition': `attachment; filename="validation_${mode}.xlsx"`,
+        },
+      });
+    }
+
+    // Backward-compatibility: payload param
+    const payload = searchParams.get('payload');
+    if (!payload) return NextResponse.json({ error: 'Missing payload or sessionId' }, { status: 400 });
     const { good, bad } = JSON.parse(decodeURIComponent(payload));
     const rows = mode === 'good' ? good : bad;
     if (!Array.isArray(rows) || rows.length === 0) {
@@ -209,6 +278,10 @@ export async function GET(request: NextRequest) {
 
     const dataObjects = rows.map((r: any) => {
       const rec = mode === 'good' ? r.data : r.original;
+      const isCas = r.sheet === 'cas_qcm' || r.sheet === 'cas_qroc';
+      const qTextRaw = String(rec?.['texte de la question'] ?? '').trim();
+      const caseTextRaw = String(rec?.['texte du cas'] ?? '').trim();
+      const qText = qTextRaw || (isCas ? caseTextRaw : '');
       const base: any = {
         sheet: r.sheet,
         row: r.row,
@@ -218,7 +291,7 @@ export async function GET(request: NextRequest) {
         'question n': rec?.['question n'] ?? '',
         'cas n': rec?.['cas n'] ?? '',
         'texte du cas': rec?.['texte du cas'] ?? '',
-        'texte de la question': rec?.['texte de la question'] ?? '',
+        'texte de la question': qText,
         reponse: rec?.['reponse'] ?? '',
         'option a': rec?.['option a'] ?? '',
         'option b': rec?.['option b'] ?? '',
@@ -244,7 +317,6 @@ export async function GET(request: NextRequest) {
     const ws = utils.json_to_sheet(dataObjects, { header });
     utils.book_append_sheet(wb, ws, mode === 'good' ? 'Valide' : 'Erreurs');
 
-    // Use ArrayBuffer to be compatible with edge runtimes
     const arrayBuffer = write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
     const bytes = new Uint8Array(arrayBuffer);
 
