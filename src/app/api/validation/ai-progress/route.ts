@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireMaintainerOrAdmin, AuthenticatedRequest } from '@/lib/auth-middleware';
 import { analyzeMcqInChunks } from '@/lib/services/aiImport';
 import { isAzureConfigured, chatCompletions } from '@/lib/services/azureOpenAI';
+import { prisma } from '@/lib/prisma';
 // Remove canonicalizeHeader import for now
 function canonicalizeHeader(h: string): string {
   return String(h || '').toLowerCase().trim();
@@ -56,11 +57,63 @@ if (!(global as any).__aiCleanerStarted) {
   }, 5 * 60 * 1000).unref?.();
 }
 
+// Map in-memory phase => DB status
+function phaseToStatus(phase: AiSession['phase']): string {
+  switch (phase) {
+    case 'queued': return 'queued';
+    case 'running': return 'processing';
+    case 'complete': return 'completed';
+    case 'error': return 'failed';
+    default: return 'processing';
+  }
+}
+
+async function persistSessionToDb(id: string, sess: AiSession, deltaLog?: string) {
+  try {
+    // Fetch existing job; if not found, skip silently (could be deleted meanwhile)
+    const existing = await prisma.aiValidationJob.findUnique({ where: { id } });
+    if (!existing) return;
+    // Merge logs & stats into config JSON
+    let logs: string[] = [];
+    let stats: any = {};
+    if (existing.config && typeof existing.config === 'object') {
+      try {
+        const c = existing.config as any;
+        if (Array.isArray(c.logs)) logs = c.logs.slice();
+        if (c.stats && typeof c.stats === 'object') stats = c.stats;
+      } catch { /* ignore */ }
+    }
+    if (deltaLog) logs.push(deltaLog);
+    if (sess.stats) stats = { ...stats, ...sess.stats }; // merge latest counters
+    await prisma.aiValidationJob.update({
+      where: { id },
+      data: {
+        status: phaseToStatus(sess.phase),
+        progress: Math.min(100, Math.max(0, Math.floor(sess.progress))),
+        message: sess.message?.slice(0, 500) || null,
+        fixedCount: stats.fixedCount ?? undefined,
+        successfulAnalyses: stats.fixedCount ?? undefined,
+        failedAnalyses: stats.errorCount ?? undefined,
+        processedItems: stats.totalRows ?? undefined,
+        currentBatch: stats.processedBatches ?? undefined,
+        totalBatches: stats.totalBatches ?? undefined,
+        config: { logs, stats },
+        completedAt: sess.phase === 'complete' || sess.phase === 'error' ? new Date() : existing.completedAt,
+      }
+    });
+  } catch (e) {
+    // Non-blocking; log to server console
+    console.error('[AI][persistSessionToDb] error', (e as any)?.message);
+  }
+}
+
 function updateSession(id: string, patch: Partial<AiSession>, log?: string) {
   const s = activeAiSessions.get(id);
   if (!s) return;
   const logs = log ? [...s.logs, log] : s.logs;
-  activeAiSessions.set(id, { ...s, ...patch, logs, lastUpdated: Date.now() });
+  const merged: AiSession = { ...s, ...patch, logs, lastUpdated: Date.now() };
+  activeAiSessions.set(id, merged);
+  void persistSessionToDb(id, merged, log); // fire-and-forget persistence
 }
 
 function normalizeSheetName(name: string) {
@@ -510,7 +563,25 @@ async function postHandler(request: AuthenticatedRequest) {
   const file = form.get('file') as File | null;
   const instructions = typeof form.get('instructions') === 'string' ? String(form.get('instructions')) : undefined;
   if (!file) return NextResponse.json({ error: 'file required' }, { status: 400 });
-  const aiId = `ai_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+
+  // Create DB job first using existing AiValidationJob model
+  const size = file.size;
+  const userId = request.user?.userId;
+  if (!userId) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  const dbJob = await prisma.aiValidationJob.create({
+    data: {
+      fileName: file.name,
+      originalFileName: file.name,
+      fileSize: size,
+      userId,
+      status: 'queued',
+      progress: 0,
+      instructions: instructions || null,
+      config: { logs: [], stats: {} }
+    },
+    select: { id: true }
+  });
+  const aiId = dbJob.id; // Use DB UUID as session id
   const now = Date.now();
   const sess: AiSession = {
     id: aiId,
@@ -521,11 +592,12 @@ async function postHandler(request: AuthenticatedRequest) {
     stats: { totalRows: 0, mcqRows: 0, processedBatches: 0, totalBatches: 0, logs: [], fixedCount: 0, errorCount: 0, reasonCounts: {} },
     createdAt: now,
     lastUpdated: now,
-    userId: request.user?.userId,
+    userId,
     fileName: file.name,
   };
   activeAiSessions.set(aiId, sess);
-  // Start background
+  void persistSessionToDb(aiId, sess);
+  // Start background job
   runAiSession(file, instructions, aiId).catch(() => {});
   return NextResponse.json({ aiId });
 }
@@ -534,81 +606,145 @@ async function getHandler(request: AuthenticatedRequest) {
   const { searchParams } = new URL(request.url);
   const aiId = searchParams.get('aiId');
   const action = searchParams.get('action');
-  // List all user jobs for background resume
+  const userId = request.user?.userId;
+
+  // LIST: pull from DB (merge with in-memory if running)
   if (action === 'list') {
-    const userId = request.user?.userId;
-    const items = Array.from(activeAiSessions.values())
-      .filter(s => !userId || s.userId === userId)
-      .map(s => ({ id: s.id, phase: s.phase, progress: s.progress, message: s.message, createdAt: s.createdAt, lastUpdated: s.lastUpdated, fileName: s.fileName }))
-      .sort((a,b) => b.createdAt - a.createdAt)
-      .slice(0, 5);
-    return NextResponse.json({ jobs: items });
+    const jobs = await prisma.aiValidationJob.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+      select: { id: true, fileName: true, createdAt: true, updatedAt: true, status: true, progress: true, fixedCount: true, failedAnalyses: true, successfulAnalyses: true }
+    });
+    const mapped = jobs.map(j => {
+      const mem = activeAiSessions.get(j.id);
+      const phase = mem?.phase || (j.status === 'completed' ? 'complete' : j.status === 'failed' ? 'error' : j.status === 'queued' ? 'queued' : 'running');
+      return {
+        id: j.id,
+        fileName: j.fileName,
+        phase,
+        progress: mem?.progress ?? j.progress ?? 0,
+        message: mem?.message || '',
+        createdAt: mem?.createdAt || (j.createdAt ? new Date(j.createdAt).getTime() : Date.now()),
+        lastUpdated: mem?.lastUpdated || (j.updatedAt ? new Date(j.updatedAt).getTime() : Date.now()),
+        stats: {
+          fixedCount: mem?.stats?.fixedCount ?? j.fixedCount ?? 0,
+          errorCount: mem?.stats?.errorCount ?? j.failedAnalyses ?? 0,
+          totalRows: mem?.stats?.totalRows ?? 0,
+          processedBatches: mem?.stats?.processedBatches ?? 0,
+          totalBatches: mem?.stats?.totalBatches ?? 0,
+        }
+      };
+    });
+    return NextResponse.json({ jobs: mapped });
   }
 
   if (!aiId) return NextResponse.json({ error: 'aiId required' }, { status: 400 });
-  const sess = activeAiSessions.get(aiId);
-  if (!sess) return NextResponse.json({ error: 'session not found' }, { status: 404 });
 
-  // Download the result file
-  if (action === 'download') {
-    if (!sess.resultBuffer) return NextResponse.json({ error: 'no result available' }, { status: 404 });
-    return new NextResponse(sess.resultBuffer, {
-      headers: {
-        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition': 'attachment; filename="ai_fixed.xlsx"'
-      }
+  // DETAILS
+  if (action === 'details') {
+    const job = await prisma.aiValidationJob.findFirst({ where: { id: aiId, userId } });
+    if (!job) return NextResponse.json({ error: 'not found' }, { status: 404 });
+    const conf: any = (job as any).config || {};
+    const mem = activeAiSessions.get(aiId);
+    return NextResponse.json({
+      id: job.id,
+      fileName: job.fileName,
+      status: job.status,
+      phase: mem?.phase || (job.status === 'completed' ? 'complete' : job.status === 'failed' ? 'error' : job.status === 'queued' ? 'queued' : 'running'),
+      progress: mem?.progress ?? job.progress ?? 0,
+      message: mem?.message || job.message || '',
+      createdAt: job.createdAt,
+      updatedAt: job.updatedAt,
+      logs: mem?.logs || conf.logs || [],
+      stats: mem?.stats || conf.stats || {},
     });
   }
 
-  // SSE streaming
+  // DOWNLOAD
+  if (action === 'download') {
+    // Try in-memory first (fresh buffer). If not present fall back to DB outputUrl (data URL)
+    const mem = activeAiSessions.get(aiId);
+    if (mem?.resultBuffer) {
+      return new NextResponse(mem.resultBuffer, {
+        headers: {
+          'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'Content-Disposition': 'attachment; filename="ai_fixed.xlsx"'
+        }
+      });
+    }
+    const job = await prisma.aiValidationJob.findFirst({ where: { id: aiId, userId }, select: { outputUrl: true } });
+    if (!job?.outputUrl) return NextResponse.json({ error: 'no result available' }, { status: 404 });
+    try {
+      // outputUrl may be a data URL
+      const b64 = job.outputUrl.split(',')[1];
+      const buf = Buffer.from(b64, 'base64');
+      return new NextResponse(buf, {
+        headers: {
+          'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'Content-Disposition': 'attachment; filename="ai_fixed.xlsx"'
+        }
+      });
+    } catch {
+      return NextResponse.json({ error: 'invalid stored output' }, { status: 500 });
+    }
+  }
+
+  // SSE STREAM
+  const sess = activeAiSessions.get(aiId);
+  if (!sess) {
+    // If not active, return details snapshot so UI can still show
+    const job = await prisma.aiValidationJob.findUnique({ where: { id: aiId } });
+    if (!job) return NextResponse.json({ error: 'session not found' }, { status: 404 });
+    return NextResponse.json({
+      id: job.id,
+      phase: job.status === 'completed' ? 'complete' : job.status === 'failed' ? 'error' : job.status === 'queued' ? 'queued' : 'running',
+      progress: job.progress,
+      message: job.message,
+      fileName: job.fileName,
+      createdAt: job.createdAt,
+      lastUpdated: job.updatedAt,
+    });
+  }
   const stream = new ReadableStream({
     start(controller) {
       const encoder = new TextEncoder();
       let closed = false;
       let timer: ReturnType<typeof setInterval> | null = null;
-
       const safeSend = (data: unknown) => {
         if (closed) return;
-        try {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
-        } catch {
-          // Sink likely closed by client; stop sending
-          closed = true;
-          if (timer) { clearInterval(timer); timer = null; }
-          try { controller.close(); } catch {}
+        try { controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`)); } catch {
+          closed = true; if (timer) { clearInterval(timer); timer = null; } try { controller.close(); } catch {}
         }
       };
-
-      // Send initial snapshot
       safeSend({ ...sess, resultBuffer: undefined });
-
-      // Periodically send updates until complete or client disconnects
       timer = setInterval(() => {
         const s = activeAiSessions.get(aiId);
-        if (!s) {
-          if (timer) { clearInterval(timer); timer = null; }
-          closed = true;
-          try { controller.close(); } catch {}
-          return;
-        }
+        if (!s) { if (timer) { clearInterval(timer); timer = null; } closed = true; try { controller.close(); } catch {}; return; }
         safeSend({ ...s, resultBuffer: undefined });
-        if (s.phase === 'complete' || s.phase === 'error') {
-          if (timer) { clearInterval(timer); timer = null; }
-          closed = true;
-          try { controller.close(); } catch {}
-        }
-      }, 800);
+        if (s.phase === 'complete' || s.phase === 'error') { if (timer) { clearInterval(timer); timer = null; } closed = true; try { controller.close(); } catch {}; }
+      }, 1000);
     }
   });
+  return new NextResponse(stream, { headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' } });
+}
 
-  return new NextResponse(stream, {
-    headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive'
-    }
-  });
+async function deleteHandler(request: AuthenticatedRequest) {
+  const { searchParams } = new URL(request.url);
+  const aiId = searchParams.get('aiId');
+  if (!aiId) return NextResponse.json({ error: 'aiId required' }, { status: 400 });
+  const userId = request.user?.userId;
+  try {
+    const job = await prisma.aiValidationJob.findFirst({ where: { id: aiId, userId }, select: { id: true } });
+    if (!job) return NextResponse.json({ error: 'not found' }, { status: 404 });
+    await prisma.aiValidationJob.delete({ where: { id: aiId } });
+    activeAiSessions.delete(aiId); // remove any memory state
+    return NextResponse.json({ ok: true });
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message || 'delete failed' }, { status: 500 });
+  }
 }
 
 export const POST = requireMaintainerOrAdmin(postHandler);
 export const GET = requireMaintainerOrAdmin(getHandler);
+export const DELETE = requireMaintainerOrAdmin(deleteHandler);

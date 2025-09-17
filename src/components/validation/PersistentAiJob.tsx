@@ -14,8 +14,13 @@ import {
   CheckCircle, 
   XCircle,
   Download,
-  RefreshCw
+  RefreshCw,
+  Trash2,
+  Info,
+  Activity,
+  Terminal
 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 
 interface AiSession {
@@ -52,6 +57,14 @@ export function PersistentAiJob({ onJobCreated }: PersistentAiJobProps) {
   const [currentSession, setCurrentSession] = useState<AiSession | null>(null);
   const [recentSessions, setRecentSessions] = useState<AiSession[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsJobId, setDetailsJobId] = useState<string | null>(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [detailsData, setDetailsData] = useState<any | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const detailsEventRef = useRef<EventSource | null>(null);
+  const autoRefreshRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
 
@@ -71,10 +84,18 @@ export function PersistentAiJob({ onJobCreated }: PersistentAiJobProps) {
     }
   }, []);
 
-  // Load sessions on mount
+  // Load sessions on mount + periodic refresh (when no active running currentSession)
   useEffect(() => {
     loadRecentSessions();
-  }, [loadRecentSessions]);
+    autoRefreshRef.current = setInterval(() => {
+      if (!currentSession || currentSession.phase !== 'running') {
+        loadRecentSessions();
+      }
+    }, 20000);
+    return () => {
+      if (autoRefreshRef.current) clearInterval(autoRefreshRef.current);
+    };
+  }, [loadRecentSessions, currentSession]);
 
   // File drag and drop handlers
   const handleDragEnter = (e: React.DragEvent) => {
@@ -236,14 +257,80 @@ export function PersistentAiJob({ onJobCreated }: PersistentAiJobProps) {
     }
   };
 
-  // Cleanup EventSource on unmount
+  // Cleanup EventSource(s) on unmount
   useEffect(() => {
     return () => {
-      if (eventSourceRef.current) {
-        eventSourceRef.current.close();
-      }
+      if (eventSourceRef.current) eventSourceRef.current.close();
+      if (detailsEventRef.current) detailsEventRef.current.close();
+      if (autoRefreshRef.current) clearInterval(autoRefreshRef.current);
     };
   }, []);
+
+  // Delete job
+  const deleteJob = async (id: string) => {
+    setDeletingId(id);
+    try {
+      const resp = await fetch(`/api/validation/ai-progress?aiId=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.error || 'Suppression échouée');
+      }
+      toast.success('Job supprimé');
+      if (detailsJobId === id) {
+        setDetailsOpen(false);
+        setDetailsJobId(null);
+        setDetailsData(null);
+      }
+      // Optimistic remove
+      setRecentSessions(prev => prev.filter(s => s.id !== id));
+      await loadRecentSessions();
+    } catch (e: any) {
+      toast.error('Erreur suppression', { description: e?.message || 'Erreur inconnue' });
+    } finally {
+      setConfirmDeleteId(null);
+      setDeletingId(null);
+    }
+  };
+
+  // Open details modal
+  const openDetails = async (id: string) => {
+    setDetailsJobId(id);
+    setDetailsOpen(true);
+    setDetailsLoading(true);
+    try {
+      const r = await fetch(`/api/validation/ai-progress?aiId=${encodeURIComponent(id)}&action=details`);
+      if (r.ok) {
+        const d = await r.json();
+        setDetailsData(d);
+        if (d.phase === 'running') {
+          if (detailsEventRef.current) detailsEventRef.current.close();
+          const es = new EventSource(`/api/validation/ai-progress?aiId=${encodeURIComponent(id)}`);
+          detailsEventRef.current = es;
+          es.onmessage = (ev) => {
+            try {
+              const upd = JSON.parse(ev.data);
+              setDetailsData((prev: any) => {
+                if (!prev) return upd;
+                return { ...prev, ...upd, logs: upd.logs || prev.logs || [] };
+              });
+            } catch {}
+          };
+          es.onerror = () => { es.close(); };
+        }
+      } else {
+        toast.error('Impossible de charger les détails');
+      }
+    } finally {
+      setDetailsLoading(false);
+    }
+  };
+
+  const closeDetails = () => {
+    setDetailsOpen(false);
+    setDetailsJobId(null);
+    setDetailsData(null);
+    if (detailsEventRef.current) { detailsEventRef.current.close(); detailsEventRef.current = null; }
+  };
 
   const StatusBadge = ({ phase }: { phase: string }) => {
     const variants: Record<string, { color: string; icon: any }> = {
@@ -268,6 +355,7 @@ export function PersistentAiJob({ onJobCreated }: PersistentAiJobProps) {
   };
 
   return (
+    <>
     <div className="space-y-4">
         {/* File Upload Area */}
         <div
@@ -380,8 +468,8 @@ export function PersistentAiJob({ onJobCreated }: PersistentAiJobProps) {
             </p>
           ) : (
             <div className="space-y-3 max-h-60 overflow-y-auto">
-              {recentSessions.slice(0, 5).map((session) => (
-                <div key={session.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg dark:bg-gray-800/50 dark:border dark:border-gray-700">
+              {recentSessions.slice(0, 10).map((session) => (
+                <div key={session.id} className="flex items-start justify-between p-3 bg-gray-50 rounded-lg dark:bg-gray-800/50 dark:border dark:border-gray-700 gap-2">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <StatusBadge phase={session.phase} />
@@ -408,23 +496,99 @@ export function PersistentAiJob({ onJobCreated }: PersistentAiJobProps) {
                     </p>
                   </div>
                   
-                  <div className="flex gap-1 ml-2">
+                  <div className="flex gap-1 ml-2 flex-shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => openDetails(session.id)}
+                      className="h-8 w-8 p-0"
+                      title="Détails"
+                    >
+                      <Info className="h-4 w-4" />
+                    </Button>
                     {session.phase === 'complete' && (
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => downloadSessionResult(session)}
                         className="h-8 w-8 p-0"
+                        title="Télécharger"
                       >
                         <Download className="h-3 w-3" />
                       </Button>
                     )}
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => setConfirmDeleteId(session.id)}
+                      className="h-8 w-8 p-0"
+                      title="Supprimer"
+                      disabled={deletingId === session.id}
+                    >
+                      {deletingId === session.id ? <span className="h-3 w-3 rounded-full border-2 border-white border-t-transparent animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                    </Button>
                   </div>
                 </div>
               ))}
             </div>
           )}
         </div>
+        {detailsOpen && (
+          <div className="fixed inset-0 z-50 flex items-start justify-center p-4 overflow-y-auto bg-black/40">
+            <div className="bg-white dark:bg-gray-900 shadow-xl rounded-lg w-full max-w-3xl p-5 relative">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-semibold flex items-center gap-2"><Activity className="h-4 w-4"/> Détails Job {detailsData?.fileName && <span className="font-normal text-muted-foreground">({detailsData.fileName})</span>}</h2>
+                <div className="flex gap-2">
+                  {detailsData?.phase === 'complete' && (
+                    <Button size="sm" variant="outline" onClick={() => downloadSessionResult(detailsData)}>
+                      <Download className="h-4 w-4 mr-1"/> Télécharger
+                    </Button>
+                  )}
+                  <Button size="sm" variant="ghost" onClick={closeDetails}>Fermer</Button>
+                </div>
+              </div>
+              {detailsLoading && <p className="text-xs text-muted-foreground">Chargement…</p>}
+              {!detailsLoading && detailsData && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                    <div className="p-2 rounded bg-gray-100 dark:bg-gray-800"><p className="font-medium">Phase</p><p>{detailsData.phase}</p></div>
+                    <div className="p-2 rounded bg-gray-100 dark:bg-gray-800"><p className="font-medium">Progression</p><p>{detailsData.progress}%</p></div>
+                    <div className="p-2 rounded bg-gray-100 dark:bg-gray-800"><p className="font-medium">Corrigées</p><p>{detailsData.stats?.fixedCount ?? 0}</p></div>
+                    <div className="p-2 rounded bg-gray-100 dark:bg-gray-800"><p className="font-medium">Erreurs</p><p>{detailsData.stats?.errorCount ?? 0}</p></div>
+                    <div className="p-2 rounded bg-gray-100 dark:bg-gray-800 col-span-2 md:col-span-4"><p className="font-medium">Lots</p><p>{detailsData.stats?.processedBatches ?? 0} / {detailsData.stats?.totalBatches ?? 0}</p></div>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium flex items-center gap-1"><Terminal className="h-3 w-3"/> Logs</p>
+                    <div className="border rounded h-56 overflow-y-auto bg-gray-50 dark:bg-gray-800 p-2 text-[11px] leading-relaxed font-mono">
+                      {(detailsData.logs || []).length === 0 && <p className="text-muted-foreground">Aucun log</p>}
+                      {(detailsData.logs || []).map((l: string, i: number) => (
+                        <div key={i} className="whitespace-pre-wrap">{l}</div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
     </div>
+    <Dialog open={!!confirmDeleteId} onOpenChange={(o)=>{ if(!o) setConfirmDeleteId(null); }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Supprimer le job ?</DialogTitle>
+          <DialogDescription>
+            Cette action est irréversible. Le job sera supprimé définitivement.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="text-xs text-muted-foreground">ID: <code>{confirmDeleteId}</code></div>
+        <DialogFooter>
+          <Button variant="outline" onClick={()=>setConfirmDeleteId(null)}>Annuler</Button>
+          <Button variant="destructive" disabled={!!deletingId} onClick={()=> confirmDeleteId && deleteJob(confirmDeleteId)}>
+            {deletingId ? 'Suppression...' : 'Supprimer'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
