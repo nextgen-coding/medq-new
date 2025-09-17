@@ -492,11 +492,11 @@ function GroupedQrocContainer({ clinicalCase, answers, answerResults, pinnedQues
           );
         })()}
         <div className="flex flex-wrap justify-end gap-2 mb-4">
-          <Button variant="outline" size="sm" onClick={toggleGroupPin} className="flex items-center gap-1">
+          <Button variant="outline" size="sm" onClick={toggleGroupPin} className="flex items-center gap-1 backdrop-blur-sm bg-white/90 dark:bg-gray-800/90 border border-gray-200/60 dark:border-gray-700/60 rounded-xl shadow-md">
             {groupPinned ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
             <span className="hidden sm:inline">{groupPinned ? 'Unpin' : 'Pin'}</span>
           </Button>
-          <Button variant="outline" size="sm" onClick={() => { window.location.href = `/exercices/${specialtyId}/lecture/${lectureId}?report=${clinicalCase.questions[0].id}`; }} className="flex items-center gap-1">
+          <Button variant="outline" size="sm" onClick={() => { window.location.href = `/exercices/${specialtyId}/lecture/${lectureId}?report=${clinicalCase.questions[0].id}`; }} className="flex items-center gap-1 backdrop-blur-sm bg-white/90 dark:bg-gray-800/90 border border-gray-200/60 dark:border-gray-700/60 rounded-xl shadow-md">
             <Flag className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Signaler</span>
           </Button>
@@ -698,11 +698,11 @@ function GroupedMcqContainer({ clinicalCase, answers, answerResults, pinnedQuest
           );
         })()}
         <div className="flex flex-wrap justify-end gap-2 mb-4">
-          <Button variant="outline" size="sm" onClick={toggleGroupPin} className="flex items-center gap-1">
+          <Button variant="outline" size="sm" onClick={toggleGroupPin} className="flex items-center gap-1 backdrop-blur-sm bg-white/90 dark:bg-gray-800/90 border border-gray-200/60 dark:border-gray-700/60 rounded-xl shadow-md">
             {groupPinned ? <PinOff className="h-3.5 w-3.5" /> : <Pin className="h-3.5 w-3.5" />}
             <span className="hidden sm:inline">{groupPinned ? 'Unpin' : 'Pin'}</span>
           </Button>
-          <Button variant="outline" size="sm" onClick={() => { window.location.href = `/exercices/${specialtyId}/lecture/${lectureId}?report=${clinicalCase.questions[0].id}`; }} className="flex items-center gap-1">
+          <Button variant="outline" size="sm" onClick={() => { window.location.href = `/exercices/${specialtyId}/lecture/${lectureId}?report=${clinicalCase.questions[0].id}`; }} className="flex items-center gap-1 backdrop-blur-sm bg-white/90 dark:bg-gray-800/90 border border-gray-200/60 dark:border-gray-700/60 rounded-xl shadow-md">
             <Flag className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Signaler</span>
           </Button>

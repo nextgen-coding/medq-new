@@ -78,6 +78,7 @@ export function OpenQuestion({
   suppressReminder,
   hideMeta,
   enableAnswerHighlighting = false,
+  disableIndividualSubmit = false,
 }: OpenQuestionProps) {
   const [answer, setAnswer] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -162,8 +163,6 @@ export function OpenQuestion({
 
   // Keyboard shortcuts
   useEffect(() => {
-    if (disableKeyboardHandlers) return;
-    
     const handleKeyDown = (event: KeyboardEvent) => {
       // Enter for next question (only when assessment is completed)
       if (event.key === 'Enter' && assessmentCompleted && !event.altKey && !event.shiftKey && !event.ctrlKey) {
@@ -174,7 +173,7 @@ export function OpenQuestion({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [assessmentCompleted, onNext, disableKeyboardHandlers]);
+  }, [assessmentCompleted, onNext]);
 
   // Pin/Unpin handlers for questions
   const handlePinQuestion = useCallback(async () => {
@@ -330,8 +329,10 @@ export function OpenQuestion({
     setSubmitted(true);
     setHasSubmitted(true);
     
-    // Auto-open notes area on submission
-    setShowNotesArea(true);
+    // Auto-open notes area on submission (only if notes are not hidden)
+    if (!hideNotes) {
+      setShowNotesArea(true);
+    }
     
     // For clinical case questions (hideImmediateResults = true), 
     // call onSubmit immediately with a default result since self-assessment is hidden
@@ -503,8 +504,6 @@ export function OpenQuestion({
 
   // Keyboard shortcuts: Enter to submit (or next), 1/2/3 to rate during self-assessment
   useEffect(() => {
-    if (disableKeyboardHandlers) return;
-    
     const handleKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       const isTyping = !!target && (
@@ -557,12 +556,71 @@ export function OpenQuestion({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
       transition={{ duration: 0.4 }}
-      className="space-y-6 w-full max-w-full"
+      className="space-y-2 w-full max-w-full"
     >
+  {/**
+   * Simple QROC mode: compact single-container layout shown after submission
+   * (non-clinical, immediate results). Grouped/clinical flows are untouched.
+   */}
+      
+      {(() => {
+        // simple (non-clinical) QROC: immediate results, individual submit enabled
+        const isSimpleQroc = !hideImmediateResults && !disableIndividualSubmit;
+        // Can show reference answer under same rules as original logic
+        const correctArr: string[] = (question as any).correctAnswers || (question as any).correct_answers || [];
+        const expectedFromArray = Array.isArray(correctArr) && correctArr.length > 0 ? correctArr.filter(Boolean).join(' / ') : '';
+        const expected = expectedFromArray || (question as any).course_reminder || (question as any).courseReminder || question.explanation || (question as any).correctAnswer || '';
+        const expectedReferenceInline = expected || '';
+        const canShowReferenceInline = submitted && expectedReferenceInline && (!hideImmediateResults || (showSelfAssessment && showDeferredSelfAssessment) || assessmentCompleted);
+
+        if (!(submitted && isSimpleQroc)) return null;
+
+        return (
+          <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-3 sm:p-4 space-y-2">
+            {/* Inline compact question text inside the same container */}
+            <div className="inline-block">
+              <HighlightableQuestionText
+                questionId={question.id}
+                text={question.text}
+                className="mt-0 text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100 leading-relaxed break-words whitespace-pre-wrap inline"
+                confirmMode={highlightConfirm}
+              />
+            </div>
+
+            {/* Reference answer (green card) */}
+            {canShowReferenceInline && (
+              <div className="mt-1">
+                <div className="rounded-xl border border-emerald-300/60 dark:border-emerald-600/70 bg-emerald-50/80 dark:bg-emerald-900/50 px-6 py-2 shadow-sm">
+                  <div className="mb-2">
+                    <h3 className="text-base md:text-lg font-bold tracking-tight text-emerald-800 dark:text-emerald-50">Réponse</h3>
+                  </div>
+                  <div className="prose prose-sm md:prose-base dark:prose-invert max-w-none leading-relaxed text-emerald-800 dark:text-emerald-50">
+                    <RichTextDisplay text={expectedReferenceInline} enableImageZoom={true} />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Self assessment buttons */}
+            {showSelfAssessment && (!hideImmediateResults || showDeferredSelfAssessment) && (
+              <div ref={selfAssessmentRef}>
+                <OpenQuestionSelfAssessment
+                  onAssessment={handleSelfAssessment}
+                  userAnswerText={submitted ? answer : undefined}
+                  questionId={question.id}
+                  enableHighlighting={enableAnswerHighlighting}
+                  highlightConfirm={highlightConfirm}
+                />
+              </div>
+            )}
+          </div>
+        );
+      })()}
       
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
         <div className="flex-1 min-w-0 max-w-3xl">
-          {!hideMeta && (
+          {/* In simple QROC post-submit wrapper we already show the question text inside the container */}
+          {!hideMeta && !(submitted && !hideImmediateResults && !disableIndividualSubmit) && (
             <OpenQuestionHeader 
               questionText={question.text} 
               questionNumber={question.number}
@@ -574,13 +632,15 @@ export function OpenQuestion({
               hideMeta={hideMeta}
             />
           )}
-          {hideMeta && (
-            <HighlightableQuestionText
-              questionId={question.id}
-              text={question.text}
-              className="mt-0 text-xl sm:text-2xl font-semibold text-gray-900 dark:text-gray-100 leading-snug break-words whitespace-pre-wrap"
-              confirmMode={highlightConfirm}
-            />
+          {hideMeta && !(submitted && !hideImmediateResults && !disableIndividualSubmit) && (
+            <div className="inline-block">
+              <HighlightableQuestionText
+                questionId={question.id}
+                text={question.text}
+                className="mt-0 text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100 leading-relaxed break-words whitespace-pre-wrap inline"
+                confirmMode={highlightConfirm}
+              />
+            </div>
           )}
           {/* Inline media attached to the question (not the reminder) */}
           {(() => {
@@ -619,11 +679,14 @@ export function OpenQuestion({
 
   {/* Persistent reference + user answer block (including during self-assessment) */}
   {(() => {
-  const canShowReference = submitted && expectedReference && (!hideImmediateResults || (showSelfAssessment && showDeferredSelfAssessment) || assessmentCompleted);
+    // Avoid duplicate reference/self-assessment when wrapped in simple QROC container
+    const usingWrapper = submitted && !hideImmediateResults && !disableIndividualSubmit;
+    if (usingWrapper) return null;
+    const canShowReference = submitted && expectedReference && (!hideImmediateResults || (showSelfAssessment && showDeferredSelfAssessment) || assessmentCompleted);
     if (!canShowReference) return null;
     return (
-      <div className="mt-3">
-        <div className="rounded-xl border border-emerald-300/60 dark:border-emerald-600/70 bg-emerald-50/80 dark:bg-emerald-900/50 px-6 py-5 shadow-sm">
+      <div className="mt-1">
+        <div className="rounded-xl border border-emerald-300/60 dark:border-emerald-600/70 bg-emerald-50/80 dark:bg-emerald-900/50 px-6 py-2 shadow-sm">
           <div className="mb-2">
             <h3 className="text-base md:text-lg font-bold tracking-tight text-emerald-800 dark:text-emerald-50">Réponse</h3>
           </div>
@@ -635,17 +698,22 @@ export function OpenQuestion({
     );
   })()}
 
-  {showSelfAssessment && (!hideImmediateResults || showDeferredSelfAssessment) && (
-        <div ref={selfAssessmentRef}>
-          <OpenQuestionSelfAssessment
-            onAssessment={handleSelfAssessment}
-            userAnswerText={submitted ? answer : undefined}
-            questionId={question.id}
-            enableHighlighting={enableAnswerHighlighting}
-            highlightConfirm={highlightConfirm}
-          />
-        </div>
-      )}
+  {(() => {
+    const usingWrapper = submitted && !hideImmediateResults && !disableIndividualSubmit;
+    if (usingWrapper) return null;
+    if (!(showSelfAssessment && (!hideImmediateResults || showDeferredSelfAssessment))) return null;
+    return (
+      <div ref={selfAssessmentRef}>
+        <OpenQuestionSelfAssessment
+          onAssessment={handleSelfAssessment}
+          userAnswerText={submitted ? answer : undefined}
+          questionId={question.id}
+          enableHighlighting={enableAnswerHighlighting}
+          highlightConfirm={highlightConfirm}
+        />
+      </div>
+    );
+  })()}
 
       {!hideActions && (
         <OpenQuestionActions
@@ -666,6 +734,9 @@ export function OpenQuestion({
               }
             }, 30);
           }}
+          isPinned={isPinned}
+          onPinQuestion={handlePinQuestion}
+          onUnpinQuestion={handleUnpinQuestion}
         />
       )}
 

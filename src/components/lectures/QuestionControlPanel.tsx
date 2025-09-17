@@ -34,6 +34,7 @@ interface QuestionControlPanelProps {
   isComplete: boolean;
   pinnedIds?: string[]; // optional list of pinned question IDs
   organizerState?: Record<ColumnKey, OrganizerEntry[]> | null; // optional organizer override
+  onQuit?: () => void; // optional quit handler
 }
 
 export function QuestionControlPanel({
@@ -45,7 +46,9 @@ export function QuestionControlPanel({
   onPrevious,
   onNext,
   isComplete,
-  pinnedIds = []
+  pinnedIds = [],
+  organizerState,
+  onQuit
 }: QuestionControlPanelProps) {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -61,9 +64,53 @@ export function QuestionControlPanel({
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const lastScrolledIndex = useRef<number>(-1);
   const hasInitiallyScrolled = useRef<boolean>(false);
+  const [lastPinTime, setLastPinTime] = useState(0);
+  const savedScrollPosition = useRef<number>(0);
 
-  // Auto-scroll to current question when index changes
+  // Listen for pin events to prevent unwanted scrolling
   useEffect(() => {
+    const handlePinUpdate = () => {
+      // Save current scroll position before pin update
+      if (scrollAreaRef.current) {
+        const scrollElement = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]') ||
+                             scrollAreaRef.current.querySelector('div > div') ||
+                             scrollAreaRef.current;
+        if (scrollElement) {
+          savedScrollPosition.current = scrollElement.scrollTop;
+        }
+      }
+      setLastPinTime(Date.now());
+    };
+
+    window.addEventListener('pinned-updated', handlePinUpdate);
+    return () => window.removeEventListener('pinned-updated', handlePinUpdate);
+  }, []);
+
+  // Restore scroll position after pin updates
+  useEffect(() => {
+    const timeSincePinAction = Date.now() - lastPinTime;
+    if (timeSincePinAction < 100 && savedScrollPosition.current > 0) {
+      // Small delay to ensure DOM has updated
+      const timeoutId = setTimeout(() => {
+        if (scrollAreaRef.current) {
+          const scrollElement = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]') ||
+                               scrollAreaRef.current.querySelector('div > div') ||
+                               scrollAreaRef.current;
+          if (scrollElement) {
+            scrollElement.scrollTop = savedScrollPosition.current;
+          }
+        }
+      }, 50);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [lastPinTime, pinnedIds]); // Include pinnedIds to trigger after pin state changes
+
+  // Auto-scroll to current question when index changes (but not during pin actions)
+  useEffect(() => {
+    // Don't scroll if this is triggered right after a pin action (within 1000ms)
+    const timeSincePinAction = Date.now() - lastPinTime;
+    if (timeSincePinAction < 1000) return;
+    
     // Only scroll if the index has actually changed
     if (lastScrolledIndex.current !== currentQuestionIndex) {
       const scrollToCurrentQuestion = () => {
@@ -85,7 +132,7 @@ export function QuestionControlPanel({
       
       return () => clearTimeout(timeoutId);
     }
-  }, [currentQuestionIndex]);
+  }, [currentQuestionIndex, lastPinTime]);
 
   // Initial scroll on component mount (for when page loads with existing progress)
   useEffect(() => {
@@ -172,7 +219,7 @@ export function QuestionControlPanel({
       <DrawerTrigger asChild>
         <Button 
           variant="outline" 
-          className="fixed bottom-6 right-6 lg:hidden z-50 gap-2 shadow-xl backdrop-blur-sm bg-white/90 dark:bg-gray-800/90 border border-gray-200/60 dark:border-gray-700/60 hover:bg-blue-50 dark:hover:bg-blue-900/50 hover:border-blue-300 dark:hover:border-blue-600 rounded-xl"
+          className="fixed bottom-6 right-6 lg:hidden z-50 gap-2 shadow-xl backdrop-blur-sm bg-white/90 dark:bg-gray-900/90 border border-gray-200/60 dark:border-gray-700/60 hover:bg-blue-50 dark:hover:bg-blue-900/50 hover:border-blue-300 dark:hover:border-blue-600 rounded-xl"
         >
           <span className="font-medium">{t('questions.questions')}</span>
           <span className="text-xs bg-blue-600 dark:bg-blue-700 text-white rounded-full px-2 py-0.5 font-medium">
@@ -180,7 +227,7 @@ export function QuestionControlPanel({
           </span>
         </Button>
       </DrawerTrigger>
-      <DrawerContent className="h-[80vh] backdrop-blur-sm bg-white/95 dark:bg-gray-800/95 border-t border-gray-200/60 dark:border-gray-700/60">
+      <DrawerContent className="h-[80vh] backdrop-blur-sm bg-white/95 dark:bg-gray-900/95 border-t border-gray-200/60 dark:border-gray-700/60">
         <div className="p-6">
           <h3 className="font-bold text-xl text-gray-900 dark:text-gray-100 mb-6">{t('questions.questions')}</h3>
           <ScrollArea ref={scrollAreaRef} className="h-[calc(80vh-180px)]">
@@ -194,7 +241,7 @@ export function QuestionControlPanel({
 
   // Desktop panel
   const DesktopPanel = () => (
-    <Card className="hidden lg:block sticky top-6 h-fit max-h-[calc(100vh-8rem)] backdrop-blur-sm bg-white/90 dark:bg-gray-800/90 border border-gray-200/60 dark:border-gray-700/60 shadow-lg rounded-2xl">
+    <Card className="hidden lg:block sticky top-6 h-fit max-h-[calc(100vh-8rem)] backdrop-blur-sm bg-white/90 dark:bg-gray-900/95 border border-gray-200/60 dark:border-gray-700/60 shadow-lg rounded-2xl">
       <CardContent className="p-6">
         <div className="flex items-start mb-3">
           <div className="flex items-start flex-1 min-w-0 gap-2 pr-2">
@@ -202,7 +249,7 @@ export function QuestionControlPanel({
               <Circle className="w-4 h-4 text-blue-600 dark:text-blue-400" />
             </div>
             <div className="min-w-0 leading-tight">
-              <h3 className="font-bold text-[16.5px] sm:text-[17px] text-gray-900 dark:text-gray-100 truncate tracking-tight">{t('questions.questions')} {t('questions.navigator')}</h3>
+              <h3 className="font-bold text-[16.5px] sm:text-[17px] text-gray-900 dark:text-gray-100 truncate tracking-tight">{t('questions.navigator')}</h3>
               <p className="text-[11px] sm:text-[11.5px] text-gray-600 dark:text-gray-400">{questions.length} {questions.length === 1 ? 'question' : 'questions'}</p>
             </div>
           </div>
@@ -210,10 +257,11 @@ export function QuestionControlPanel({
             <Button
               onClick={onQuit}
               variant="destructive"
-              size="icon"
-              className="ml-auto bg-red-600 hover:bg-red-700 text-white h-10 w-10 rounded-lg flex-shrink-0 shadow-sm hover:shadow focus-visible:ring-2 focus-visible:ring-red-400/60"
+              size="sm"
+              className="ml-auto bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800 text-white rounded-lg flex-shrink-0 shadow-sm hover:shadow transition-colors duration-200 flex items-center gap-2 px-3 py-2 h-10"
             >
-              <LogOut className="h-5 w-5" />
+              <LogOut className="h-4 w-4" />
+              <span className="font-medium">Quitter</span>
             </Button>
           )}
         </div>
@@ -301,7 +349,7 @@ export function QuestionControlPanel({
             }}
             variant="outline"
             className={cn(
-              "relative overflow-hidden w-full justify-start h-auto p-3 backdrop-blur-sm bg-white/90 dark:bg-gray-800/90 border border-gray-200/60 dark:border-gray-700/60 hover:bg-blue-50/70 dark:hover:bg-blue-900/30 hover:border-blue-300/80 dark:hover:border-blue-600/70 rounded-xl transition-colors duration-300 will-change-transform",
+              "relative overflow-hidden w-full justify-start h-auto p-3 backdrop-blur-sm bg-white/90 dark:bg-gray-900/90 border border-gray-200/60 dark:border-gray-700/60 hover:bg-blue-50/70 dark:hover:bg-blue-900/30 hover:border-blue-300/80 dark:hover:border-blue-600/70 rounded-xl transition-colors duration-300 will-change-transform",
               isCurrent && "border-blue-500 dark:border-blue-400 bg-blue-50/80 dark:bg-blue-900/40 shadow-[0_6px_18px_-4px_rgba(0,0,0,0.18)]",
               isAnswered && !isCurrent && "bg-gray-50 dark:bg-gray-700/40"
             )}
@@ -563,7 +611,7 @@ export function QuestionControlPanel({
                   ref={(el) => { questionRefs.current[question.originalIndex] = el; }}
                   variant="outline"
                   className={cn(
-                    "relative overflow-hidden w-full justify-start h-auto p-3 backdrop-blur-sm bg-white/90 dark:bg-gray-800/90 border border-gray-200/60 dark:border-gray-700/60 hover:bg-blue-50/70 dark:hover:bg-blue-900/30 hover:border-blue-300/80 dark:hover:border-blue-600/70 rounded-xl transition-colors duration-300 will-change-transform",
+                    "relative overflow-hidden w-full justify-start h-auto p-3 backdrop-blur-sm bg-white/90 dark:bg-gray-900/90 border border-gray-200/60 dark:border-gray-700/60 hover:bg-blue-50/70 dark:hover:bg-blue-900/30 hover:border-blue-300/80 dark:hover:border-blue-600/70 rounded-xl transition-colors duration-300 will-change-transform",
                     isCurrent && "border-blue-500 dark:border-blue-400 bg-blue-50/80 dark:bg-blue-900/40 shadow-[0_6px_18px_-4px_rgba(0,0,0,0.18)]",
                     isAnswered && !isCurrent && "bg-gray-50 dark:bg-gray-700/40"
                   )}
@@ -707,7 +755,7 @@ export function QuestionControlPanel({
                     ref={(el) => { questionRefs.current[clinicalCase.originalIndex] = el; }}
                     variant="outline"
                     className={cn(
-                      "w-full justify-start h-auto p-3 backdrop-blur-sm bg-white/90 dark:bg-gray-800/90 border border-gray-200/60 dark:border-gray-700/60 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:border-blue-300 dark:hover:border-blue-600 rounded-xl transition-all duration-200",
+                      "w-full justify-start h-auto p-3 backdrop-blur-sm bg-white/90 dark:bg-gray-900/90 border border-gray-200/60 dark:border-gray-700/60 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:border-blue-300 dark:hover:border-blue-600 rounded-xl transition-all duration-200",
                       isCurrent && "border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/30 shadow-md",
                       isAnswered && "bg-gray-50 dark:bg-gray-700/50"
                     )}
@@ -763,7 +811,7 @@ export function QuestionControlPanel({
           setIsDrawerOpen(false);
         }}
         disabled={currentQuestionIndex === 0 || isComplete}
-        className="flex-1 backdrop-blur-sm bg-white/90 dark:bg-gray-800/90 border border-gray-200/60 dark:border-gray-700/60 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl"
+        className="flex-1 backdrop-blur-sm bg-white/90 dark:bg-gray-900/90 border border-gray-200/60 dark:border-gray-700/60 hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-xl"
       >
         <ChevronLeft className="h-4 w-4 mr-2" />
         {t('common.previous')}
@@ -776,7 +824,7 @@ export function QuestionControlPanel({
             onNext();
             setIsDrawerOpen(false);
           }}
-          className="flex-1 backdrop-blur-sm bg-white/90 dark:bg-gray-800/90 border border-gray-200/60 dark:border-gray-700/60 hover:bg-blue-50 dark:hover:bg-blue-900/50 hover:border-blue-300 dark:hover:border-blue-600 rounded-xl"
+          className="flex-1 backdrop-blur-sm bg-white/90 dark:bg-gray-900/90 border border-gray-200/60 dark:border-gray-700/60 hover:bg-blue-50 dark:hover:bg-blue-900/50 hover:border-blue-300 dark:hover:border-blue-600 rounded-xl"
         >
           {t('questions.viewSummary')}
         </Button>

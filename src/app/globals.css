@@ -296,3 +296,40 @@
     pointer-events: none;
     z-index: -1;
   }
+
+  /* Custom scrollbar styles for question navigator and other components */
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.3) hsl(var(--muted));
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: hsl(var(--muted));
+    border-radius: 3px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 3px;
+    transition: background-color 0.2s ease;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+  }
+
+  /* Dark mode automatically handled by CSS custom properties */
+  @media (prefers-color-scheme: dark) {
+    .custom-scrollbar {
+      scrollbar-color: hsl(var(--muted-foreground) / 0.4) hsl(var(--background));
+    }
+  }
+
+  .dark .custom-scrollbar {
+    scrollbar-color: hsl(var(--muted-foreground) / 0.4) hsl(var(--background));
+  }

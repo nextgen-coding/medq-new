@@ -1,6 +1,6 @@
 
 import { Button } from '@/components/ui/button'; // updated to include user answer display
-import { ChevronLeft, ChevronRight, Keyboard, StickyNote, SendHorizontal, CheckCircle2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Keyboard, StickyNote, SendHorizontal, CheckCircle2, Pin, PinOff } from 'lucide-react';
 
 interface OpenQuestionActionsProps {
   isSubmitted: boolean;
@@ -15,6 +15,9 @@ interface OpenQuestionActionsProps {
   onToggleNotes?: () => void; // toggle unified notes area
   hideNotesButton?: boolean; // Hide notes button when notes have content
   assessmentCompleted?: boolean; // Track if self-assessment is completed
+  isPinned?: boolean; // Whether the question is pinned
+  onPinQuestion?: () => void; // Handler to pin the question
+  onUnpinQuestion?: () => void; // Handler to unpin the question
 }
 
 export function OpenQuestionActions({
@@ -29,7 +32,10 @@ export function OpenQuestionActions({
   showNotesArea,
   onToggleNotes,
   hideNotesButton = false,
-  assessmentCompleted = false
+  assessmentCompleted = false,
+  isPinned = false,
+  onPinQuestion,
+  onUnpinQuestion
 }: OpenQuestionActionsProps) {
   return (
     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mt-6">
@@ -84,6 +90,18 @@ export function OpenQuestionActions({
               >
                 <StickyNote className="h-4 w-4" />
         <span className="hidden sm:inline">{showNotesArea ? 'Fermer les notes' : 'Prendre une note'}</span>
+              </Button>
+            )}
+            {(onPinQuestion || onUnpinQuestion) && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={isPinned ? onUnpinQuestion : onPinQuestion}
+                className="flex items-center gap-1 backdrop-blur-sm bg-white/90 dark:bg-gray-800/90 border border-gray-200/60 dark:border-gray-700/60 rounded-xl shadow-md"
+              >
+                {isPinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
+                <span className="hidden sm:inline">{isPinned ? 'Détacher' : 'Épingler'}</span>
               </Button>
             )}
             {showNext && (

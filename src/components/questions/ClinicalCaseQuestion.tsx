@@ -18,6 +18,7 @@ import { ClinicalCaseEditDialog } from '@/components/questions/edit/ClinicalCase
 import { GroupedQrocEditDialog } from '@/components/questions/edit/GroupedQrocEditDialog';
 import { GroupedMcqEditDialog } from '@/components/questions/edit/GroupedMcqEditDialog';
 import { useAuth } from '@/contexts/AuthContext';
+import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 
 interface ClinicalCaseQuestionProps {
@@ -69,7 +70,8 @@ export function ClinicalCaseQuestion({
   const [evaluationIndex, setEvaluationIndex] = useState<number>(0); // current evaluation pointer
   const [evaluationComplete, setEvaluationComplete] = useState<boolean>(false);
   // Progressive reveal: -1 = only header/case text; 0..n index of last revealed question
-  const [revealIndex, setRevealIndex] = useState<number>(-1);
+  // For multi QROC, show all questions from start
+  const [revealIndex, setRevealIndex] = useState<number>(displayMode === 'multi_qroc' ? clinicalCase.questions.length - 1 : -1);
   // Removed per-question submission; single global submit after all questions answered
 
   // Auto-close notes when content becomes empty
@@ -100,9 +102,9 @@ export function ClinicalCaseQuestion({
       setQuestionResults({});
       setIsCaseComplete(false);
       setShowResults(false);
-      setRevealIndex(-1);
+      setRevealIndex(displayMode === 'multi_qroc' ? clinicalCase.questions.length - 1 : -1);
     }
-  }, [clinicalCase.caseNumber, isAnswered]);
+  }, [clinicalCase.caseNumber, isAnswered, displayMode, clinicalCase.questions.length]);
 
   // Always reset scroll to top when a clinical case loads (avoid starting mid-page)
   useEffect(() => {
@@ -115,6 +117,22 @@ export function ClinicalCaseQuestion({
       });
     }
   }, [clinicalCase.caseNumber]);
+
+  // Initial focus on first question when it's revealed
+  useEffect(() => {
+    if (revealIndex === 0 && !showResults) {
+      setTimeout(() => {
+        const firstQuestion = clinicalCase.questions[0];
+        if (firstQuestion) {
+          const element = questionRefs.current[firstQuestion.id];
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            setTimeout(() => focusFirstInput(firstQuestion.id), 500);
+          }
+        }
+      }, 300);
+    }
+  }, [revealIndex, showResults, clinicalCase.questions]);
 
   useEffect(() => {
     const fetchPinned = async () => {
@@ -250,6 +268,7 @@ export function ClinicalCaseQuestion({
     if (result !== undefined) {
       setQuestionResults(prev => ({ ...prev, [questionId]: result }));
     }
+    
     // Propagate to parent for global progress/state (works for MCQ and open)
     if (onAnswerUpdate) {
       try { onAnswerUpdate(questionId, answer, result); } catch {}
@@ -328,59 +347,87 @@ export function ClinicalCaseQuestion({
     }
   }, [evaluationIndex, evaluationOrder, showResults, evaluationComplete]);
 
-  // Keyboard navigation: Answer phase (Enter to advance), Evaluation phase disabled (no keyboard shortcuts)
+  // Keyboard navigation: Answer phase only (Enter to advance), Evaluation phase disabled
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Evaluation phase key handling - DISABLED to remove 1/2/3 shortcuts
-      if (showResults && !evaluationComplete) {
-        // Disable all number keys for evaluation - user must click buttons
-        if (["1", "2", "3"].includes(e.key)) {
-          // No longer handle 1/2/3 shortcuts
-          e.preventDefault();
-          return;
-        } else if (e.key === 'Enter') {
-          // Enter disabled during evaluation selection
-          e.preventDefault();
-        }
-        return; // stop further processing during evaluation phase
-      }
-
-      // After evaluation complete & results shown: Enter -> next case
-      if (showResults && evaluationComplete) {
-        if (e.key === 'Enter' && !e.shiftKey) {
-          e.preventDefault();
-          onNext();
-        }
+      // Evaluation phase - ALL keyboard shortcuts disabled, user must use mouse
+      if (showResults) {
+        // Disable all keyboard shortcuts during evaluation and after completion
+        e.preventDefault();
         return;
       }
 
-      // Answering phase
+      // Answering phase - controlled progression through questions
       if (!showResults && e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         
-        // If all questions answered, submit
-        if (answeredQuestions === clinicalCase.totalQuestions) {
-          handleCompleteCase();
+        // For multi QROC mode, all questions are visible, so just scroll between them
+        if (displayMode === 'multi_qroc') {
+          // Find the first unanswered question to scroll to
+          const firstUnansweredIndex = clinicalCase.questions.findIndex(q => answers[q.id] === undefined);
+          if (firstUnansweredIndex !== -1) {
+            const targetQuestion = clinicalCase.questions[firstUnansweredIndex];
+            const element = questionRefs.current[targetQuestion.id];
+            if (element) {
+              element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              setTimeout(() => focusFirstInput(targetQuestion.id), 300);
+            }
+          } else {
+            // All questions answered, submit
+            handleCompleteCase();
+          }
           return;
         }
         
-        // Find next unanswered question in order
-        const nextUnanswered = clinicalCase.questions.find(q => answers[q.id] === undefined);
+        // For clinical cases, use progressive reveal logic
+        // If no questions revealed yet, reveal and focus the first one
+        if (revealIndex === -1) {
+          setRevealIndex(0);
+          return; // Focus will be handled by the useEffect
+        }
         
-        if (nextUnanswered) {
-          const element = questionRefs.current[nextUnanswered.id];
+        // Get current question at revealIndex
+        const currentQuestion = clinicalCase.questions[revealIndex];
+        const isCurrentAnswered = currentQuestion && answers[currentQuestion.id] !== undefined;
+        
+        // If current question is not answered, focus it (don't advance)
+        if (!isCurrentAnswered) {
+          const element = questionRefs.current[currentQuestion.id];
           if (element) {
             element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            setTimeout(() => focusFirstInput(nextUnanswered.id), 300);
+            setTimeout(() => focusFirstInput(currentQuestion.id), 300);
           }
-        } else if (answeredQuestions === clinicalCase.totalQuestions) {
-          // Fallback: if somehow all are answered, submit
+          return;
+        }
+        
+        // If current question is answered and there are more questions, advance to next
+        if (isCurrentAnswered && revealIndex < clinicalCase.questions.length - 1) {
+          const nextIndex = revealIndex + 1;
+          setRevealIndex(nextIndex);
+          // Scroll to and focus the next question
+          setTimeout(() => {
+            const nextQuestion = clinicalCase.questions[nextIndex];
+            if (nextQuestion) {
+              const element = questionRefs.current[nextQuestion.id];
+              if (element) {
+                element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                setTimeout(() => focusFirstInput(nextQuestion.id), 300);
+              }
+            }
+          }, 100);
+          return;
+        }
+        
+        // If we're at the last question and it's answered, submit the case
+        if (isCurrentAnswered && revealIndex === clinicalCase.questions.length - 1) {
           handleCompleteCase();
+          return;
         }
       }
-    };    document.addEventListener('keydown', handleKeyDown);
+    };
+    document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [answers, answeredQuestions, isCaseComplete, showResults, evaluationOrder, evaluationIndex, evaluationComplete, clinicalCase.questions, clinicalCase.totalQuestions]);
+  }, [answers, answeredQuestions, isCaseComplete, showResults, evaluationOrder, evaluationIndex, evaluationComplete, clinicalCase.questions, clinicalCase.totalQuestions, revealIndex]);
   const getQuestionStatus = (question: Question) => {
     if (answers[question.id] !== undefined) {
       if (showResults) {
@@ -418,6 +465,10 @@ export function ClinicalCaseQuestion({
           ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300'
           : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
       : 'bg-muted text-muted-foreground';
+    // Check if this is a question that should use inline layout (compact design)
+    const isInlineLayout = question.type === 'clinic_croq' || 
+                          (displayMode === 'multi_qroc' && question.type === 'croq');
+    
     return (
       <div
         key={question.id}
@@ -428,108 +479,221 @@ export function ClinicalCaseQuestion({
         }`}
         data-question-id={question.id}
       >
-        <div className="flex items-center mb-2">
-          <span
-            className={
-              'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold tracking-wide ' +
-              (!showResults
-                ? (isAnsweredQ ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : 
-                   isNextToAnswer ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300' :
-                   'bg-muted text-muted-foreground')
-                : isAnsweredQ
-                  ? answerResultQ === true
-                    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
-                    : answerResultQ === 'partial'
-                      ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300'
-                      : answerResultQ === false
-                        ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
-                        : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                  : 'bg-muted text-muted-foreground')
-            }
-          >
-            Question {index + 1} {isNextToAnswer && !showResults && '(Suivante)'}
-          </span>
-          {isAnsweredQ && (
-            <span className="ml-auto inline-flex items-center">
-              {showResults ? (
-                <>
-                  {answerResultQ === true && <CheckCircle className="h-4 w-4 text-green-600" />}
-                  {answerResultQ === 'partial' && <AlertCircle className="h-4 w-4 text-yellow-600" />}
-                  {answerResultQ === false && <AlertCircle className="h-4 w-4 text-red-600" />}
-                </>
-              ) : (
-                <Circle className="h-4 w-4 text-blue-600" />
-              )}
+        {isInlineLayout ? (
+          // Inline layout for compact questions: question number and question content on same line
+          <div className="flex items-start gap-3 mb-1">
+            <span
+              className={
+                'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold tracking-wide flex-shrink-0 ' +
+                (!showResults
+                  ? (isAnsweredQ ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : 
+                     isNextToAnswer ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300' :
+                     'bg-muted text-muted-foreground')
+                  : isAnsweredQ
+                    ? answerResultQ === true
+                      ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                      : answerResultQ === 'partial'
+                        ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300'
+                        : answerResultQ === false
+                          ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                          : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                    : 'bg-muted text-muted-foreground')
+              }
+            >
+              {index + 1}
             </span>
-          )}
-        </div>
-        {showResults && question.type === 'clinic_croq' && (
-          <div className="mb-2 flex items-center gap-2 text-xs">
-            {isCurrentEvaluationTarget && !hasEvaluation && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200 font-medium">
-                Évaluer
-              </span>
-            )}
-            {hasEvaluation && (
-              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded font-medium ${evaluationColor}`}>
-                {evaluationLabel}
+            <div className="w-full">
+              {/* Question text line with natural width and evaluation indicator */}
+              <div className="flex items-start flex-wrap gap-2 mb-1">
+                <div className="-mt-1 inline-block">
+                  {/* Just render the question text here inline */}
+                  {(question.type === 'clinic_croq' || (displayMode === 'multi_qroc' && question.type === 'croq')) && (
+                    <div className="inline-block">
+                      <span className="text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100 leading-relaxed">
+                        {question.text}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                {/* Evaluation indicator positioned directly next to question text content */}
+                {showResults && (question.type === 'clinic_croq' || (displayMode === 'multi_qroc' && question.type === 'croq')) && hasEvaluation && (
+                  <div className="flex-shrink-0">
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded font-medium text-xs ${evaluationColor}`}>
+                      {evaluationLabel}
+                    </span>
+                  </div>
+                )}
+                {showResults && (question.type === 'clinic_croq' || (displayMode === 'multi_qroc' && question.type === 'croq')) && isCurrentEvaluationTarget && !hasEvaluation && (
+                  <div className="flex-shrink-0">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200 font-medium text-xs">
+                      Évaluer
+                    </span>
+                  </div>
+                )}
+              </div>
+              
+              {/* Full-width components container */}
+              <div className="w-full">
+                {question.type === 'clinic_mcq' ? (
+                  <MCQQuestion
+                    question={question}
+                    onSubmit={(answer, isCorrect) => handleQuestionAnswer(question.id, answer, isCorrect)}
+                    onAnswerChange={(answer, isCorrect) => handleQuestionAnswer(question.id, answer, isCorrect)}
+                    onNext={() => {}}
+                    lectureId={lectureId}
+                    lectureTitle={lectureTitle}
+                    specialtyName={specialtyName}
+                    isAnswered={showResults ? isAnsweredQ : false}
+                    answerResult={showResults ? answerResultQ : undefined}
+                    userAnswer={userAnswerQ as any}
+                    hideImmediateResults={!showResults}
+                    hideActions
+                    hideNotes={!showResults}
+                    hideComments={true}
+                    highlightConfirm
+                    hideMeta
+                    suppressReminder={true}
+                    enableOptionHighlighting={true}
+                  />
+                ) : (
+                  <OpenQuestion
+                    question={{...question, text: ''}} // Empty text since we render it above
+                    onSubmit={(answer, resultValue) => handleQuestionAnswer(question.id, answer, resultValue)}
+                    onAnswerChange={(answer, hasAnswer) => {
+                      handleQuestionAnswer(question.id, answer);
+                    }}
+                    onNext={() => {}}
+                    lectureId={lectureId}
+                    lectureTitle={lectureTitle}
+                    specialtyName={specialtyName}
+                    isAnswered={showResults ? isAnsweredQ : false}
+                    answerResult={showResults ? answerResultQ : undefined}
+                    userAnswer={userAnswerQ as any}
+                    hideImmediateResults={!showResults}
+                    showDeferredSelfAssessment={showResults && question.type === 'clinic_croq'}
+                    disableIndividualSubmit={!showResults} 
+                    onSelfAssessmentUpdate={handleSelfAssessmentUpdate}
+                    hideNotes={true}
+                    hideComments={true}
+                    hideActions
+                    highlightConfirm
+                    hideMeta={true}
+                    suppressReminder={true}
+                    enableAnswerHighlighting={true}
+                  />
+                )}
+              </div>
+            </div>
+            {isAnsweredQ && (
+              <span className="inline-flex items-center flex-shrink-0">
+                {showResults ? (
+                  <>
+                    {answerResultQ === true && <CheckCircle className="h-4 w-4 text-green-600" />}
+                    {answerResultQ === 'partial' && <AlertCircle className="h-4 w-4 text-yellow-600" />}
+                    {answerResultQ === false && <AlertCircle className="h-4 w-4 text-red-600" />}
+                  </>
+                ) : (
+                  <Circle className="h-4 w-4 text-blue-600" />
+                )}
               </span>
             )}
           </div>
-        )}
-  {question.type === 'clinic_mcq' ? (
-          <MCQQuestion
-            question={question}
-            onSubmit={(answer, isCorrect) => handleQuestionAnswer(question.id, answer, isCorrect)}
-            // Track answers live for group-level submission; no per-question Next
-            onAnswerChange={(answer, isCorrect) => handleQuestionAnswer(question.id, answer, isCorrect)}
-            onNext={() => {}}
-            lectureId={lectureId}
-            lectureTitle={lectureTitle}
-            specialtyName={specialtyName}
-            // Before group submit, keep UI in answering mode (no answered state)
-            isAnswered={showResults ? isAnsweredQ : false}
-            answerResult={showResults ? answerResultQ : undefined}
-            userAnswer={userAnswerQ as any}
-            // Hide immediate results until the whole group is submitted
-            hideImmediateResults={!showResults}
-            // Hide per-question actions; we submit once for all
-            hideActions
-            hideNotes={!showResults}
-            hideComments={true} // Always hide individual question comments in clinical cases
-            highlightConfirm
-            hideMeta
-            suppressReminder={true}
-            enableOptionHighlighting={true}
-          />
         ) : (
-          <OpenQuestion
-            question={question}
-            onSubmit={(answer, resultValue) => handleQuestionAnswer(question.id, answer, resultValue)}
-            onAnswerChange={(answer, hasAnswer) => {
-              // Record answer only (no provisional result). Evaluation happens later.
-              handleQuestionAnswer(question.id, answer);
-            }}
-            onNext={() => {}}
-            lectureId={lectureId}
-            lectureTitle={lectureTitle}
-            specialtyName={specialtyName}
-            isAnswered={showResults ? isAnsweredQ : false}
-            answerResult={showResults ? answerResultQ : undefined}
-            userAnswer={userAnswerQ as any}
-            hideImmediateResults={!showResults}
-            showDeferredSelfAssessment={showResults && question.type === 'clinic_croq'}
-            disableIndividualSubmit={!showResults} 
-            onSelfAssessmentUpdate={handleSelfAssessmentUpdate}
-            hideNotes={!showResults}
-            hideComments={true} // Always hide individual question comments in clinical cases
-            hideActions
-            highlightConfirm
-            hideMeta
-            suppressReminder={true} // Hide "Rappel du cours" in clinical cases
-            enableAnswerHighlighting={true} // Enable highlighting for user answers
-            disableKeyboardHandlers={true} // Disable keyboard navigation in clinical cases
-          />
+          // Standard layout for MCQ questions: question number above, content below  
+          <>
+            <div className="flex items-center mb-2">
+              <span
+                className={
+                  'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold tracking-wide ' +
+                  (!showResults
+                    ? (isAnsweredQ ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : 
+                       isNextToAnswer ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300' :
+                       'bg-muted text-muted-foreground')
+                    : isAnsweredQ
+                      ? answerResultQ === true
+                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                        : answerResultQ === 'partial'
+                          ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300'
+                          : answerResultQ === false
+                            ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                            : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                      : 'bg-muted text-muted-foreground')
+                }
+              >
+                Question {index + 1}
+              </span>
+              {isAnsweredQ && (
+                <span className="ml-auto inline-flex items-center">
+                  {showResults ? (
+                    <>
+                      {answerResultQ === true && <CheckCircle className="h-4 w-4 text-green-600" />}
+                      {answerResultQ === 'partial' && <AlertCircle className="h-4 w-4 text-yellow-600" />}
+                      {answerResultQ === false && <AlertCircle className="h-4 w-4 text-red-600" />}
+                    </>
+                  ) : (
+                    <Circle className="h-4 w-4 text-blue-600" />
+                  )}
+                </span>
+              )}
+            </div>
+          </>
+        )}
+        {!isInlineLayout && (
+          <>
+            {question.type === 'clinic_mcq' ? (
+              <MCQQuestion
+                question={question}
+                onSubmit={(answer, isCorrect) => handleQuestionAnswer(question.id, answer, isCorrect)}
+                // Track answers live for group-level submission; no per-question Next
+                onAnswerChange={(answer, isCorrect) => handleQuestionAnswer(question.id, answer, isCorrect)}
+                onNext={() => {}}
+                lectureId={lectureId}
+                lectureTitle={lectureTitle}
+                specialtyName={specialtyName}
+                // Before group submit, keep UI in answering mode (no answered state)
+                isAnswered={showResults ? isAnsweredQ : false}
+                answerResult={showResults ? answerResultQ : undefined}
+                userAnswer={userAnswerQ as any}
+                // Hide immediate results until the whole group is submitted
+                hideImmediateResults={!showResults}
+                // Hide per-question actions; we submit once for all
+                hideActions
+                hideNotes={!showResults}
+                hideComments={true} // Always hide individual question comments in clinical cases
+                highlightConfirm
+                hideMeta
+                suppressReminder={true}
+                enableOptionHighlighting={true}
+              />
+            ) : (
+              <OpenQuestion
+                question={question}
+                onSubmit={(answer, resultValue) => handleQuestionAnswer(question.id, answer, resultValue)}
+                onAnswerChange={(answer, hasAnswer) => {
+                  // Record answer only (no provisional result). Evaluation happens later.
+                  handleQuestionAnswer(question.id, answer);
+                }}
+                onNext={() => {}}
+                lectureId={lectureId}
+                lectureTitle={lectureTitle}
+                specialtyName={specialtyName}
+                isAnswered={showResults ? isAnsweredQ : false}
+                answerResult={showResults ? answerResultQ : undefined}
+                userAnswer={userAnswerQ as any}
+                hideImmediateResults={!showResults}
+                showDeferredSelfAssessment={showResults && question.type === 'clinic_croq'}
+                disableIndividualSubmit={!showResults} 
+                onSelfAssessmentUpdate={handleSelfAssessmentUpdate}
+                hideNotes={!showResults}
+                hideComments={true} // Always hide individual question comments in clinical cases
+                hideActions
+                highlightConfirm
+                hideMeta
+                suppressReminder={true} // Hide "Rappel du cours" in clinical cases
+                enableAnswerHighlighting={true} // Enable highlighting for user answers
+              />
+            )}
+          </>
         )}
       </div>
     );
@@ -541,98 +705,14 @@ export function ClinicalCaseQuestion({
       data-clinical-case
     >
       <Card>
-        <CardHeader className="pb-3">
-          <div className="space-y-2 w-full">
-            {(() => {
-              const firstQuestion = clinicalCase.questions[0];
-              const session = firstQuestion?.session;
-              
-              // Enhanced session formatting to preserve full session information
-              const formatSession = (sessionValue?: string) => {
-                if (!sessionValue) return '';
-                
-                // Clean up parentheses and extra spaces
-                let cleaned = sessionValue.replace(/^\(|\)$/g, '').trim();
-                
-                // If already contains "Session", use as-is
-                if (/session/i.test(cleaned)) return cleaned;
-                
-                // If it's just a number or year, format as "Session X"
-                if (/^\d+$/.test(cleaned)) return `Session ${cleaned}`;
-                
-                // If it contains "theme" or other descriptive text, use as-is
-                if (/theme|thème/i.test(cleaned)) return cleaned;
-                
-                // For date formats like "JANVIER 2020", "Juin 2016", etc., prefix with "Session"
-                if (/^(janvier|février|mars|avril|mai|juin|juillet|août|septembre|octobre|novembre|décembre)\s+\d{4}/i.test(cleaned) ||
-                    /^(january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{4}/i.test(cleaned)) {
-                  return `Session ${cleaned}`;
-                }
-                
-                // Otherwise, use as-is (for complex formats)
-                return cleaned;
-              };
-
-              // Build the metadata line with better structure
-              const parts: string[] = [];
-              // Title label based on displayMode
-              if (displayMode === 'multi_qcm') {
-                parts.push(`Multi QCM ${clinicalCase.caseNumber}`);
-              } else if (displayMode === 'multi_qroc') {
-                parts.push(`Multi QROC ${clinicalCase.caseNumber}`);
-              } else {
-                parts.push(`Cas Clinique ${clinicalCase.caseNumber}`);
-              }
-              
-              const formattedSession = formatSession(session);
-              if (formattedSession) {
-                parts.push(formattedSession);
-              }
-              
-              // Add evaluation status if in results phase
-              if (showResults && !evaluationComplete) {
-                parts.push(`Phase d'évaluation (${evaluationOrder.filter(id => questionResults[id] !== undefined).length}/${evaluationOrder.length})`);
-              } else if (showResults && evaluationComplete) {
-                parts.push('Évaluation terminée');
-              }
-              
-              return (
-                <div>
-                  <div className="flex items-center gap-2 text-sm sm:text-base font-semibold text-foreground dark:text-gray-100">
-                    <span className="truncate">{parts.join(' • ')}</span>
-                    {groupPinned && <Pin className="h-4 w-4 text-pink-500" />}
-                    {groupHidden && <EyeOff className="h-4 w-4 text-red-500" />}
-                    {isCaseComplete && showResults && (
-                      <span className="flex items-center gap-1">
-                        {answerResult === true && <CheckCircle className="h-4 w-4 text-green-600" />}
-                        {answerResult === 'partial' && <AlertCircle className="h-4 w-4 text-yellow-600" />}
-                        {answerResult === false && <AlertCircle className="h-4 w-4 text-red-600" />}
-                      </span>
-                    )}
-                    {/* Duplicate group action buttons removed per request to avoid second controllers */}
-                  </div>
-                  {/* Keep helper succinct; keyboard shortcuts removed to avoid confusion */}
-                  {showResults && evaluationComplete && (
-                    <div className="text-xs text-muted-foreground mt-1">
-                      Appuyez sur Entrée pour continuer
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-            {(specialtyName || lectureTitle) && (
-              <div className="text-xs sm:text-sm text-muted-foreground">{[specialtyName, lectureTitle].filter(Boolean).join(' • ')}</div>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="pt-2">
-          <div className="mb-4">
-            <div className="flex justify-between text-sm text-muted-foreground mb-2">
-              <span>{answeredQuestions} sur {clinicalCase.totalQuestions} questions répondues</span>
-              <span>{Math.round(progress)}% complété</span>
+        <CardContent className="pt-6">
+          {clinicalCase.caseText && (
+            <div className="mb-4">
+              <div className="text-lg sm:text-xl leading-relaxed whitespace-pre-wrap text-foreground font-medium">
+                <HighlightableCaseText lectureId={lectureId} text={clinicalCase.caseText} className="break-words" />
+              </div>
             </div>
-            <Progress value={progress} className="h-2" />
-          </div>
+          )}
           <div className="flex flex-wrap gap-2 mb-4">
             {clinicalCase.questions.map((question, index) => {
               const status = getQuestionStatus(question);
@@ -648,13 +728,6 @@ export function ClinicalCaseQuestion({
               );
             })}
           </div>
-          {clinicalCase.caseText && (
-            <div className="py-6 border-t border-border">
-              <div className="text-lg sm:text-xl leading-relaxed whitespace-pre-wrap text-foreground font-medium">
-                <HighlightableCaseText lectureId={lectureId} text={clinicalCase.caseText} className="break-words" />
-              </div>
-            </div>
-          )}
           {!showResults && revealIndex === -1 && (
             <div className="mt-4 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 text-sm text-blue-700 dark:text-blue-200 font-medium">
               Appuyez sur <span className="font-semibold">Entrée</span> pour afficher la première question.
@@ -671,19 +744,16 @@ export function ClinicalCaseQuestion({
           <div className="space-y-6 mt-6">
             {clinicalCase.questions.slice(0, revealIndex === -1 ? 0 : revealIndex + 1).map((question, index) => {
               const isCurrentEval = showResults && !evaluationComplete && question.type === 'clinic_croq' && evaluationOrder[evaluationIndex] === question.id;
+              
               return (
-                <div key={question.id} className={isCurrentEval ? 'ring-2 ring-blue-500 rounded-lg transition-shadow' : ''}>
+                <div key={question.id} className={cn(
+                  'transition-all duration-300',
+                  isCurrentEval ? 'ring-2 ring-blue-500 rounded-lg transition-shadow' : ''
+                )}>
                   {renderQuestion(question, index)}
                   {showResults && question.type === 'clinic_croq' && questionResults[question.id] !== undefined && (
                     <div className="mt-2 text-xs font-medium text-muted-foreground">
                       Votre évaluation: {questionResults[question.id] === true ? 'Correct' : questionResults[question.id] === 'partial' ? 'Partiel' : 'Incorrect'}
-                    </div>
-                  )}
-                  {isCurrentEval && (
-                    <div className="mt-2 text-[11px] text-blue-600 dark:text-blue-300 font-medium flex gap-3 flex-wrap">
-                      <span>1 = Correct</span>
-                      <span>2 = Partiel</span>
-                      <span>3 = Incorrect</span>
                     </div>
                   )}
                 </div>
@@ -697,12 +767,12 @@ export function ClinicalCaseQuestion({
               <div className="text-sm text-muted-foreground">
                 {!showResults && (
                   answeredQuestions === clinicalCase.totalQuestions
-                    ? 'Toutes les réponses saisies — Entrée ou Soumettre pour valider'
+                    ? 'Toutes les réponses saisies — Soumettre pour valider'
                     : `${clinicalCase.totalQuestions - answeredQuestions} question(s) restante(s) — répondez puis Soumettre`
                 )}
                 {hasOpen && showResults && !evaluationComplete && `Phase d'évaluation: ${evaluationOrder.filter(id => questionResults[id] !== undefined).length}/${evaluationOrder.length} évaluées`}
-                {hasOpen && showResults && evaluationComplete && 'Évaluation terminée — Entrée ou Suivant pour continuer'}
-                {!hasOpen && showResults && 'Révision terminée — Entrée ou Suivant pour continuer'}
+                {hasOpen && showResults && evaluationComplete && 'Évaluation terminée'}
+                {!hasOpen && showResults && 'Révision terminée'}
               </div>
 
               <div className="flex gap-2 flex-wrap justify-end items-center">

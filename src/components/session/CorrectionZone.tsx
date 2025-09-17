@@ -3401,12 +3401,6 @@ export function CorrectionZone({ sessionId, mode, onQuestionLink, pdfLinks = [],
           <div className="text-xs sm:text-sm font-medium mb-1 sm:mb-2">
             Auto-évaluation QROC {reviewIndex + 1}/{pendingSelfEvalIds.length}
           </div>
-          <div className="text-[10px] sm:text-xs space-y-0.5 sm:space-y-1">
-            <div>1 = Correcte</div>
-            <div>2 = Partielle</div>
-            <div>3 = Incorrecte</div>
-            <div className="border-t border-blue-400 pt-1 mt-1 sm:mt-2 text-[9px] sm:text-xs">Entrée = Suivant</div>
-          </div>
         </div>
       )}
 

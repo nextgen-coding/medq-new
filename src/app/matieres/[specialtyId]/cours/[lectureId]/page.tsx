@@ -226,43 +226,82 @@ export default function CoursPageRoute() {
   const handlePinQuestion = async () => {
     if (!currentQuestion || !user?.id) return;
     
-    // For clinical cases, pin all subquestions
+    // For clinical cases, pin the first subquestion (representing the whole case)
     if ('questions' in currentQuestion) {
       const clinicalCase = currentQuestion as ClinicalCase;
-      for (const question of clinicalCase.questions) {
-        try {
-          await fetch('/api/user-question-state', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({
-              questionId: question.id,
-              pinned: true
-            })
+      const questionId = clinicalCase.questions[0]?.id;
+      if (!questionId) return;
+      
+      try {
+        const response = await fetch('/api/pinned-questions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userId: user.id,
+            questionId,
+          }),
+        });
+
+        if (response.ok) {
+          setIsPinned(true);
+          toast({
+            title: "Question Pinned",
+            description: "This question has been pinned to your collection.",
           });
-        } catch (error) {
-          console.error('Error pinning question:', error);
+          window.dispatchEvent(new Event('pinned-updated'));
+        } else {
+          toast({
+            title: "Error",
+            description: "Failed to pin question.",
+            variant: "destructive",
+          });
         }
+      } catch (error) {
+        console.error('Error pinning question:', error);
+        toast({
+          title: "Error",
+          description: "Failed to pin question.",
+          variant: "destructive",
+        });
       }
-      setIsPinned(true);
     } else {
       // Regular question
       const questionId = (currentQuestion as Question).id;
       try {
-        const res = await fetch('/api/user-question-state', {
+        const response = await fetch('/api/pinned-questions', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
           body: JSON.stringify({
+            userId: user.id,
             questionId,
-            pinned: true
-          })
+          }),
         });
-        if (res.ok) {
+
+        if (response.ok) {
           setIsPinned(true);
+          toast({
+            title: "Question Pinned",
+            description: "This question has been pinned to your collection.",
+          });
+          window.dispatchEvent(new Event('pinned-updated'));
+        } else {
+          toast({
+            title: "Error",
+            description: "Failed to pin question.",
+            variant: "destructive",
+          });
         }
       } catch (error) {
         console.error('Error pinning question:', error);
+        toast({
+          title: "Error",
+          description: "Failed to pin question.",
+          variant: "destructive",
+        });
       }
     }
   };
@@ -270,43 +309,68 @@ export default function CoursPageRoute() {
   const handleUnpinQuestion = async () => {
     if (!currentQuestion || !user?.id) return;
     
-    // For clinical cases, unpin all subquestions
+    // For clinical cases, unpin the first subquestion (representing the whole case)
     if ('questions' in currentQuestion) {
       const clinicalCase = currentQuestion as ClinicalCase;
-      for (const question of clinicalCase.questions) {
-        try {
-          await fetch('/api/user-question-state', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({
-              questionId: question.id,
-              pinned: false
-            })
+      const questionId = clinicalCase.questions[0]?.id;
+      if (!questionId) return;
+      
+      try {
+        const response = await fetch(`/api/pinned-questions?userId=${user.id}&questionId=${questionId}`, {
+          method: 'DELETE',
+        });
+
+        if (response.ok) {
+          setIsPinned(false);
+          toast({
+            title: "Question Unpinned",
+            description: "This question has been removed from your pinned collection.",
           });
-        } catch (error) {
-          console.error('Error unpinning question:', error);
+          window.dispatchEvent(new Event('pinned-updated'));
+        } else {
+          toast({
+            title: "Error",
+            description: "Failed to unpin question.",
+            variant: "destructive",
+          });
         }
+      } catch (error) {
+        console.error('Error unpinning question:', error);
+        toast({
+          title: "Error",
+          description: "Failed to unpin question.",
+          variant: "destructive",
+        });
       }
-      setIsPinned(false);
     } else {
       // Regular question
       const questionId = (currentQuestion as Question).id;
       try {
-        const res = await fetch('/api/user-question-state', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            questionId,
-            pinned: false
-          })
+        const response = await fetch(`/api/pinned-questions?userId=${user.id}&questionId=${questionId}`, {
+          method: 'DELETE',
         });
-        if (res.ok) {
+
+        if (response.ok) {
           setIsPinned(false);
+          toast({
+            title: "Question Unpinned",
+            description: "This question has been removed from your pinned collection.",
+          });
+          window.dispatchEvent(new Event('pinned-updated'));
+        } else {
+          toast({
+            title: "Error",
+            description: "Failed to unpin question.",
+            variant: "destructive",
+          });
         }
       } catch (error) {
         console.error('Error unpinning question:', error);
+        toast({
+          title: "Error",
+          description: "Failed to unpin question.",
+          variant: "destructive",
+        });
       }
     }
   };
@@ -636,7 +700,7 @@ export default function CoursPageRoute() {
                           variant="outline"
                           size="sm"
                           onClick={isPinned ? handleUnpinQuestion : handlePinQuestion}
-                          className="whitespace-nowrap"
+                          className="whitespace-nowrap backdrop-blur-sm bg-white/90 dark:bg-gray-800/90 border border-gray-200/60 dark:border-gray-700/60 rounded-xl shadow-md"
                         >
                           {isPinned ? (
                             <PinOff className="h-4 w-4 mr-2" />
@@ -653,7 +717,7 @@ export default function CoursPageRoute() {
                           variant="outline"
                           size="sm"
                           onClick={() => setIsReportDialogOpen(true)}
-                          className="whitespace-nowrap"
+                          className="whitespace-nowrap backdrop-blur-sm bg-white/90 dark:bg-gray-800/90 border border-gray-200/60 dark:border-gray-700/60 rounded-xl shadow-md"
                         >
                           <Flag className="h-4 w-4 mr-2" />
                           <span className="hidden sm:inline">Signaler</span>
