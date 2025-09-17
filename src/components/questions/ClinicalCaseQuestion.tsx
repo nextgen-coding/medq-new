@@ -280,7 +280,7 @@ export function ClinicalCaseQuestion({
     setShowResults(true); // enter evaluation phase (results visible)
     // Build evaluation order (only open questions that require self assessment)
     const openIds = clinicalCase.questions
-      .filter(q => q.type === 'clinic_croq')
+      .filter(q => (q.type as any) === 'clinic_croq')
       .map(q => q.id);
     setEvaluationOrder(openIds);
     setEvaluationIndex(0);
@@ -446,7 +446,7 @@ export function ClinicalCaseQuestion({
     const answerResultQ = questionResults[question.id];
     const userAnswerQ = answers[question.id];
     const isCurrentEvaluationTarget = showResults && !evaluationComplete && evaluationOrder[evaluationIndex] === question.id;
-    const hasEvaluation = showResults && question.type === 'clinic_croq' && questionResults[question.id] !== undefined;
+    const hasEvaluation = showResults && (question.type as any) === 'clinic_croq' && questionResults[question.id] !== undefined;
     
     // Next to answer is the currently revealed question when not submitted
     const isNextToAnswer = !showResults && revealIndex === index;
@@ -466,8 +466,8 @@ export function ClinicalCaseQuestion({
           : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
       : 'bg-muted text-muted-foreground';
     // Check if this is a question that should use inline layout (compact design)
-    const isInlineLayout = question.type === 'clinic_croq' || 
-                          (displayMode === 'multi_qroc' && question.type === 'croq');
+    const isInlineLayout = (question.type as any) === 'clinic_croq' || 
+                          (displayMode === 'multi_qroc' && (question.type as any) === 'clinic_croq');
     
     return (
       <div
@@ -507,7 +507,7 @@ export function ClinicalCaseQuestion({
               <div className="flex items-start flex-wrap gap-2 mb-1">
                 <div className="-mt-1 inline-block">
                   {/* Just render the question text here inline */}
-                  {(question.type === 'clinic_croq' || (displayMode === 'multi_qroc' && question.type === 'croq')) && (
+                  {((question.type as any) === 'clinic_croq' || (displayMode === 'multi_qroc' && (question.type as any) === 'clinic_croq')) && (
                     <div className="inline-block">
                       <span className="text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100 leading-relaxed">
                         {question.text}
@@ -516,14 +516,14 @@ export function ClinicalCaseQuestion({
                   )}
                 </div>
                 {/* Evaluation indicator positioned directly next to question text content */}
-                {showResults && (question.type === 'clinic_croq' || (displayMode === 'multi_qroc' && question.type === 'croq')) && hasEvaluation && (
+                {showResults && ((question.type as any) === 'clinic_croq' || (displayMode === 'multi_qroc' && (question.type as any) === 'clinic_croq')) && hasEvaluation && (
                   <div className="flex-shrink-0">
                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded font-medium text-xs ${evaluationColor}`}>
                       {evaluationLabel}
                     </span>
                   </div>
                 )}
-                {showResults && (question.type === 'clinic_croq' || (displayMode === 'multi_qroc' && question.type === 'croq')) && isCurrentEvaluationTarget && !hasEvaluation && (
+                {showResults && ((question.type as any) === 'clinic_croq' || (displayMode === 'multi_qroc' && (question.type as any) === 'clinic_croq')) && isCurrentEvaluationTarget && !hasEvaluation && (
                   <div className="flex-shrink-0">
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200 font-medium text-xs">
                       Évaluer
@@ -570,7 +570,7 @@ export function ClinicalCaseQuestion({
                     answerResult={showResults ? answerResultQ : undefined}
                     userAnswer={userAnswerQ as any}
                     hideImmediateResults={!showResults}
-                    showDeferredSelfAssessment={showResults && question.type === 'clinic_croq'}
+                    showDeferredSelfAssessment={showResults && (question.type as any) === 'clinic_croq'}
                     disableIndividualSubmit={!showResults} 
                     onSelfAssessmentUpdate={handleSelfAssessmentUpdate}
                     hideNotes={true}
@@ -681,7 +681,7 @@ export function ClinicalCaseQuestion({
                 answerResult={showResults ? answerResultQ : undefined}
                 userAnswer={userAnswerQ as any}
                 hideImmediateResults={!showResults}
-                showDeferredSelfAssessment={showResults && question.type === 'clinic_croq'}
+                showDeferredSelfAssessment={showResults && (question.type as any) === 'clinic_croq'}
                 disableIndividualSubmit={!showResults} 
                 onSelfAssessmentUpdate={handleSelfAssessmentUpdate}
                 hideNotes={!showResults}
@@ -737,13 +737,13 @@ export function ClinicalCaseQuestion({
       </Card>
 
       {(() => {
-        const hasOpen = clinicalCase.questions.some(q => q.type === 'clinic_croq');
+        const hasOpen = clinicalCase.questions.some(q => (q.type as any) === 'clinic_croq');
         return (
       <Card>
         <CardContent>
           <div className="space-y-6 mt-6">
             {clinicalCase.questions.slice(0, revealIndex === -1 ? 0 : revealIndex + 1).map((question, index) => {
-              const isCurrentEval = showResults && !evaluationComplete && question.type === 'clinic_croq' && evaluationOrder[evaluationIndex] === question.id;
+              const isCurrentEval = showResults && !evaluationComplete && (question.type as any) === 'clinic_croq' && evaluationOrder[evaluationIndex] === question.id;
               
               return (
                 <div key={question.id} className={cn(
@@ -751,7 +751,7 @@ export function ClinicalCaseQuestion({
                   isCurrentEval ? 'ring-2 ring-blue-500 rounded-lg transition-shadow' : ''
                 )}>
                   {renderQuestion(question, index)}
-                  {showResults && question.type === 'clinic_croq' && questionResults[question.id] !== undefined && (
+                  {showResults && (question.type as any) === 'clinic_croq' && questionResults[question.id] !== undefined && (
                     <div className="mt-2 text-xs font-medium text-muted-foreground">
                       Votre évaluation: {questionResults[question.id] === true ? 'Correct' : questionResults[question.id] === 'partial' ? 'Partiel' : 'Incorrect'}
                     </div>
