@@ -11,6 +11,8 @@ import { QuestionControlPanel } from '@/components/lectures/QuestionControlPanel
 import { MCQQuestion } from '@/components/questions/MCQQuestion'
 import { OpenQuestion } from '@/components/questions/OpenQuestion'
 import { ClinicalCaseQuestion } from '@/components/questions/ClinicalCaseQuestion'
+// ProgressiveClinicalCase temporarily disabled in favor of legacy ClinicalCaseQuestion UI
+// import ProgressiveClinicalCase from '@/components/questions/ProgressiveClinicalCase'
 import { QuestionNotes } from '@/components/questions/QuestionNotes'
 import { QuestionComments } from '@/components/questions/QuestionComments'
 import { Button } from '@/components/ui/button'
@@ -27,6 +29,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { QuestionManagementDialog } from '@/components/questions/QuestionManagementDialog'
 import { QuestionEditDialog } from '@/components/questions/QuestionEditDialog'
 import { ReportQuestionDialog } from '@/components/questions/ReportQuestionDialog'
+import { OrganizerProvider } from '@/contexts/OrganizerContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { toast } from '@/hooks/use-toast'
 // import ZoomableImage from '@/components/questions/ZoomableImage'
@@ -435,83 +438,39 @@ export default function CoursPageRoute() {
       return null;
     }
 
-    // Check if current question is a clinical case or a grouped blocks (multi-QROC or multi-MCQ)
+    // Use original ClinicalCaseQuestion UI for clinical/grouped cases
     if ('caseNumber' in currentQuestion && 'questions' in currentQuestion) {
-      const clinicalCase = currentQuestion as ClinicalCase;
-      const isGroupedQrocOnly = clinicalCase.questions.every(q => q.type === 'qroc');
-      const isGroupedMcqOnly = clinicalCase.questions.every(q => q.type === 'mcq');
-      
-      // Add null checks for questions array
-      if (!clinicalCase.questions || !Array.isArray(clinicalCase.questions)) {
-        console.error('Invalid clinical case structure:', clinicalCase);
-        return null;
+      let clinicalCase = currentQuestion as ClinicalCase;
+      // Normalize sub-question types to legacy 'clinic_mcq' / 'clinic_croq' expected by ClinicalCaseQuestion
+      if (clinicalCase.questions.some(q => q.type === 'mcq' || q.type === 'qroc')) {
+        clinicalCase = {
+          ...clinicalCase,
+          questions: clinicalCase.questions.map(q => {
+            if (q.type === 'mcq') return { ...q, type: 'clinic_mcq' } as any;
+            if (q.type === 'qroc' || (q.type as any) === 'open') return { ...q, type: 'clinic_croq' } as any;
+            return q;
+          })
+        } as ClinicalCase;
       }
-      
-      const isAnswered = clinicalCase.questions.every(q => answers[q.id] !== undefined);
-      const caseAnswerResult = isAnswered ? 
-        (clinicalCase.questions.every(q => answerResults[q.id] === true) ? true : 
-         clinicalCase.questions.some(q => answerResults[q.id] === true || answerResults[q.id] === 'partial') ? 'partial' : false) : 
-        undefined;
-      
-      const caseUserAnswers: Record<string, any> = {};
-      const caseAnswerResults: Record<string, boolean | 'partial'> = {};
-      clinicalCase.questions.forEach(q => {
-        if (answers[q.id] !== undefined) {
-          caseUserAnswers[q.id] = answers[q.id];
-        }
-        if (answerResults[q.id] !== undefined) {
-          caseAnswerResults[q.id] = answerResults[q.id];
-        }
-      });
-
-      if (!isGroupedQrocOnly && !isGroupedMcqOnly) {
-        return (
-          <ClinicalCaseQuestion
-            clinicalCase={clinicalCase}
-            onSubmit={handleClinicalCaseComplete}
-            onNext={handleNext}
-            lectureId={lectureId}
-            lectureTitle={lecture?.title}
-            specialtyName={lecture?.specialty?.name}
-            displayMode="clinical"
-            isAnswered={isAnswered}
-            answerResult={caseAnswerResult}
-            userAnswers={caseUserAnswers}
-            answerResults={caseAnswerResults}
-            onAnswerUpdate={handleAnswerSubmit}
-          />
-        );
-      }
-      // Use ClinicalCase UI for grouped QROC or MCQ by synthesizing a clinical case with clinic_* types
-      const pickCaseText = () => {
-        const has = (clinicalCase as any).caseText && (clinicalCase as any).caseText.trim().length > 0;
-        if (has) return (clinicalCase as any).caseText as string;
-        const sub = clinicalCase.questions.find((q: any) => !!(q.caseText && q.caseText.trim()));
-        return sub ? (sub as any).caseText as string : '';
-      };
-      const synth: ClinicalCase = {
-        caseNumber: clinicalCase.caseNumber,
-        totalQuestions: clinicalCase.totalQuestions,
-        caseText: pickCaseText() || '',
-        questions: clinicalCase.questions.map((q: any, idx: number) => ({
-          ...q,
-          type: isGroupedQrocOnly ? 'clinic_croq' : 'clinic_mcq',
-          number: idx + 1
-        })) as any
-      };
       return (
         <ClinicalCaseQuestion
-          clinicalCase={synth}
+          clinicalCase={clinicalCase}
           onSubmit={handleClinicalCaseComplete}
           onNext={handleNext}
           lectureId={lectureId}
           lectureTitle={lecture?.title}
           specialtyName={lecture?.specialty?.name}
-          displayMode={isGroupedQrocOnly ? 'multi_qroc' : 'multi_qcm'}
-          isAnswered={clinicalCase.questions.every(q => answers[q.id] !== undefined)}
-          answerResult={undefined}
-          userAnswers={Object.fromEntries(clinicalCase.questions.map(q => [q.id, answers[q.id]])) as any}
-          answerResults={Object.fromEntries(clinicalCase.questions.map(q => [q.id, answerResults[q.id]])) as any}
+          displayMode={(clinicalCase.questions.every(q=> q.type==='clinic_croq') ? 'multi_qroc' : clinicalCase.questions.every(q=> q.type==='clinic_mcq') ? 'multi_qcm' : 'clinical') as any}
+          isAnswered={clinicalCase.questions.every(q=> answers[q.id] !== undefined)}
+          answerResult={(() => {
+            const resVals = clinicalCase.questions.map(q => answerResults[q.id]).filter(r => r !== undefined);
+            if (!resVals.length) return undefined;
+            if (resVals.every(r => r === true)) return true;
+            if (resVals.some(r => r === true || r === 'partial')) return 'partial';
+            return false;
+          })() as any}
+          userAnswers={answers}
+          answerResults={answerResults}
           onAnswerUpdate={(qid, ans, res) => handleAnswerSubmit(qid, ans as any, res as any)}
         />
       );
@@ -575,10 +534,11 @@ export default function CoursPageRoute() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-gradient-to-br from-blue-50/50 via-white to-blue-50/50 dark:from-blue-950/20 dark:via-gray-900 dark:to-blue-950/20">
-        <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6">
-          <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 pb-10 lg:pb-0">
-            <div className="flex-1 space-y-4 sm:space-y-6 min-w-0 w-full max-w-full">
+      <OrganizerProvider>
+        <div className="min-h-screen bg-gradient-to-br from-blue-50/50 via-white to-blue-50/50 dark:from-blue-950/20 dark:via-gray-900 dark:to-blue-950/20">
+          <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6">
+            <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 pb-10 lg:pb-0">
+              <div className="flex-1 space-y-4 sm:space-y-6 min-w-0 w-full max-w-full">
               {currentQuestion && (
                 <div className="space-y-2">
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-4">
@@ -956,6 +916,7 @@ export default function CoursPageRoute() {
           onOpenChange={setIsReportDialogOpen}
         />
       )}
+      </OrganizerProvider>
     </ProtectedRoute>
   )
 }
@@ -1106,110 +1067,4 @@ function GroupedQrocContainer({ clinicalCase, answers, answerResults, pinnedQues
   );
 }
 
-// Local helper component: grouped MCQ block with shared actions and per-question reminders inside items
-function GroupedMcqContainer({ clinicalCase, answers, answerResults, pinnedQuestionIds, user, lecture, lectureId, specialtyId, onAnswerSubmit, onNext, onQuestionUpdate, setOpenQuestionsDialog }: any) {
-  const [openNotes, setOpenNotes] = useState(false);
-  const [notesHasContent, setNotesHasContent] = useState(false);
-  const notesRef = useRef<HTMLDivElement | null>(null);
-  // Duplicate group-level controls (pin/hide/edit/report/delete) removed to avoid redundancy with header actions
-
-  const groupAnswered = clinicalCase.questions.every((q: any) => Array.isArray(answers[q.id]) ? (answers[q.id] as string[]).length > 0 : answers[q.id] !== undefined);
-
-  return (
-    <div className="space-y-2" data-grouped-mcq>
-      <div className="rounded-xl border bg-white/90 dark:bg-gray-800/90 p-3 shadow-sm">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Multi QCM #{clinicalCase.caseNumber}</h2>
-          <div className="text-xs text-gray-500 dark:text-gray-400">{clinicalCase.totalQuestions} QCM</div>
-        </div>
-        {/* Optional case text if any sub-question carries it */}
-        {(() => {
-          const hasCaseText = clinicalCase.caseText && clinicalCase.caseText.trim().length > 0;
-          const subCase = clinicalCase.questions.find((q: any) => !!(q.caseText && q.caseText.trim()));
-          const caseText = hasCaseText ? clinicalCase.caseText : (subCase ? subCase.caseText : '');
-          if (!caseText) return null;
-          return (
-            <div className="mb-4 p-3 rounded-md border bg-muted/30">
-              <div className="text-sm text-muted-foreground whitespace-pre-wrap">{caseText}</div>
-            </div>
-          );
-        })()}
-        {/* Group-level action buttons removed; use global header Admin/Pin/Report */}
-        <div className="grid gap-2">
-          {clinicalCase.questions.map((q: any, idx: number) => {
-            const answered = Array.isArray(answers[q.id]) && (answers[q.id] as string[]).length > 0;
-            const resultVal = answerResults[q.id];
-            const userAnswerVal = answers[q.id] as string[] | undefined;
-            const displayQ = { ...q, number: idx + 1 };
-            return (
-              <MCQQuestion
-                key={q.id}
-                question={displayQ as any}
-                onSubmit={(sel, isCorrect) => {
-                  onAnswerSubmit(q.id, sel, isCorrect);
-                  try {
-                    fetch('/api/user-activity', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ type: 'mcq_attempt' })
-                    }).catch(()=>{});
-                  } catch {}
-                }}
-                onNext={onNext}
-                lectureId={lectureId}
-                lectureTitle={lecture?.title}
-                specialtyName={lecture?.specialty?.name}
-                isAnswered={answered}
-                answerResult={resultVal}
-                userAnswer={userAnswerVal}
-                hideNotes
-                hideComments
-                hideActions
-                highlightConfirm
-                onQuestionUpdate={onQuestionUpdate}
-                suppressReminder
-                enableOptionHighlighting={true}
-              />
-            );
-          })}
-        </div>
-        {groupAnswered && (
-          <div className="mt-8 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2 flex-wrap">
-              <div className="flex gap-2 flex-wrap justify-end">
-                {groupAnswered && !notesHasContent && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setOpenNotes(p => !p);
-                      if (!openNotes) setTimeout(() => { notesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 30);
-                    }}
-                    className="flex items-center gap-1"
-                  >
-                    <StickyNote className="h-4 w-4" />
-                    <span className="hidden sm:inline">{openNotes ? 'Fermer les notes' : 'Prendre une note'}</span>
-                  </Button>
-                )}
-                <Button onClick={onNext} size="sm" className="flex items-center gap-1">
-                  <span className="hidden sm:inline">Suivant</span>
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-            <div ref={notesRef} className="space-y-6">
-              {(openNotes || (groupAnswered && notesHasContent)) && (
-                <QuestionNotes 
-                  questionId={`group-mcq-${clinicalCase.caseNumber}`} 
-                  onHasContentChange={setNotesHasContent}
-                  autoEdit={openNotes && !notesHasContent}
-                />
-              )}
-              <QuestionComments questionId={`group-mcq-${clinicalCase.caseNumber}`} />
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+// (GroupedMcqContainer removed: legacy ProgressiveClinicalCase disabled)

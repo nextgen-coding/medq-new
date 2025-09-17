@@ -71,7 +71,8 @@ export function useLecture(lectureId: string | undefined, mode?: string | null) 
 
     // First pass: distribute questions based on niveau rules
     questions.forEach(orig => {
-      const baseType = orig.type === 'clinic_mcq' ? 'mcq' : orig.type === 'clinic_croq' ? 'qroc' : orig.type;
+      const origType = orig.type; // preserve original to distinguish clinical variants
+      const baseType = origType === 'clinic_mcq' ? 'mcq' : origType === 'clinic_croq' ? 'qroc' : origType;
       const hasText = norm(orig.caseText).length > 0;
       const caseNum = orig.caseNumber;
 
@@ -108,20 +109,25 @@ export function useLecture(lectureId: string | undefined, mode?: string | null) 
           qrocSingles.push(orig);
         }
       } else {
-        // Non-preclinical (e.g., DCSEM 1/2/3): any item with caseText is part of a true clinical case (mix allowed)
-        if (hasText) {
-          // Prefer grouping by identical caseText. Assign a stable caseNumber per distinct text.
-          const keyText = norm(orig.caseText);
-          if (!textCaseMap.has(keyText)) {
-            // Reuse explicit caseNumber if available, else assign synthetic
-            textCaseMap.set(keyText, typeof caseNum === 'number' ? caseNum : nextSyntheticCase++);
+        // Non-preclinical (e.g., DCSEM 1/2/3)
+        // Explicit clinical types with caseNumber should ALWAYS go to clinical, regardless of caseText
+        if (origType === 'clinic_mcq' || origType === 'clinic_croq') {
+          let keyNum: number;
+          if (typeof caseNum === 'number') {
+            keyNum = caseNum;
+          } else if (hasText) {
+            const keyText = norm(orig.caseText);
+            if (!textCaseMap.has(keyText)) {
+              textCaseMap.set(keyText, nextSyntheticCase++);
+            }
+            keyNum = textCaseMap.get(keyText)!;
+          } else {
+            keyNum = nextSyntheticCase++;
           }
-          const keyNum = textCaseMap.get(keyText)!;
           const arr = clinicalCaseMap.get(keyNum) || [];
-          // Clone and coerce base types to clinical variants for rendering
-          const coerced = baseType === 'mcq' ? ({ ...orig, type: 'clinic_mcq', caseNumber: keyNum as any } as Question)
-                          : baseType === 'qroc' ? ({ ...orig, type: 'clinic_croq', caseNumber: keyNum as any } as Question)
-                          : ({ ...orig, caseNumber: keyNum as any } as Question);
+          const coerced = origType === 'clinic_mcq'
+            ? ({ ...orig, type: 'clinic_mcq', caseNumber: keyNum as any } as Question)
+            : ({ ...orig, type: 'clinic_croq', caseNumber: keyNum as any } as Question);
           arr.push(coerced);
           clinicalCaseMap.set(keyNum, arr);
         } else if (baseType === 'mcq') {
@@ -227,23 +233,37 @@ export function useLecture(lectureId: string | undefined, mode?: string | null) 
   multiQrocCases.sort((a,b)=> a.caseNumber - b.caseNumber);
   multiMcqCases.sort((a,b)=> a.caseNumber - b.caseNumber);
 
-    // Convert clinical case groups to ClinicalCase objects and sort by case number (non-preclinical only)
-  const clinicalCases: ClinicalCase[] = [];
+    // Convert clinical case groups to ClinicalCase objects (only keep true multi-question clinical blocks)
+    const clinicalCases: ClinicalCase[] = [];
     if (!isPreclinical) {
       Array.from(clinicalCaseMap.entries())
-        .sort(([a], [b]) => a - b) // Sort by case number
+        .sort(([a], [b]) => a - b)
         .forEach(([caseNumber, caseQuestions]) => {
-          // Sort questions within each case by caseQuestionNumber
-          const sortedQuestions = caseQuestions.sort((a, b) => 
-            (a.caseQuestionNumber || 0) - (b.caseQuestionNumber || 0)
-          );
-          const clinicalCase: ClinicalCase = {
+          // Ignore empty safety
+          if (!caseQuestions.length) return;
+          // If only ONE clinical question in this synthetic group, unwrap it back to its base type
+          if (caseQuestions.length === 1) {
+            const single = caseQuestions[0];
+            const baseType = single.type === 'clinic_mcq' ? 'mcq' : single.type === 'clinic_croq' ? 'qroc' : single.type;
+            const unwrapped: Question = {
+              ...single,
+              type: baseType as any,
+              // Remove synthetic clinical grouping metadata so it behaves like a normal single
+              caseNumber: undefined,
+              caseText: undefined,
+              caseQuestionNumber: undefined,
+            } as any;
+            if (baseType === 'mcq') mcqSingles.push(unwrapped); else qrocSingles.push(unwrapped);
+            return; // Do not create a ClinicalCase wrapper
+          }
+          // Multi-question clinical case retained
+          const sortedQuestions = caseQuestions.sort((a, b) => (a.caseQuestionNumber || 0) - (b.caseQuestionNumber || 0));
+          clinicalCases.push({
             caseNumber,
             caseText: (sortedQuestions[0]?.caseText || '').trim(),
             questions: sortedQuestions,
             totalQuestions: sortedQuestions.length
-          };
-          clinicalCases.push(clinicalCase);
+          });
         });
     }
 

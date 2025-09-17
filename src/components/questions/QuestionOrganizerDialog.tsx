@@ -10,6 +10,7 @@ import { Lecture, Question } from '@/types';
 import { GripVertical, Save, Undo2, Package, MoveLeft, Pencil } from 'lucide-react';
 import { GroupedQrocEditDialog } from './edit/GroupedQrocEditDialog';
 import { RichTextDisplay, extractPlainText } from '@/components/ui/rich-text-display';
+import { useOrganizer } from '@/contexts/OrganizerContext';
 
 // Base types we organize into 3 high-level columns:
 // 1. mcq (single QCM)
@@ -27,7 +28,7 @@ interface OrganizerProps {
 
 type OrganizerEntry =
   | { kind: 'single'; question: Question }
-  | { kind: 'group'; groupKind: 'grouped_qroc' | 'clinical_case'; caseNumber: number; questions: Question[] };
+  | { kind: 'group'; groupKind: 'grouped_qroc' | 'grouped_mcq' | 'clinical_case'; caseNumber: number; questions: Question[] };
 
 type GroupEntry = Extract<OrganizerEntry, { kind: 'group' }>;
 
@@ -39,6 +40,8 @@ interface DragToken {
 }
 
 export function QuestionOrganizerDialog({ lecture, isOpen, onOpenChange, onSaved }: OrganizerProps) {
+  const { setIsOrganizerOpen, setOrganizerState } = useOrganizer();
+  
   // Determine niveau: PCEM1/PCEM2 => preclinical (no clinical cases)
   const niveauName = (lecture?.specialty as any)?.niveau?.name?.toLowerCase?.() || '';
   const isPreclinical = niveauName.includes('pcem 1') || niveauName.includes('pcem1') || niveauName.includes('pcem 2') || niveauName.includes('pcem2');
@@ -61,7 +64,7 @@ export function QuestionOrganizerDialog({ lecture, isOpen, onOpenChange, onSaved
   const overAfter = useRef<boolean>(false);
 
   // In-group drag (reordering questions inside a group)
-  const groupDrag = useRef<{ caseNumber: number; groupKind: 'grouped_qroc' | 'clinical_case'; questionId: string } | null>(null);
+  const groupDrag = useRef<{ caseNumber: number; groupKind: 'grouped_qroc' | 'grouped_mcq' | 'clinical_case'; questionId: string } | null>(null);
   const groupOverQuestionId = useRef<string | null>(null);
   const groupOverAfter = useRef<boolean>(false);
 
@@ -72,7 +75,7 @@ export function QuestionOrganizerDialog({ lecture, isOpen, onOpenChange, onSaved
     entry: OrganizerEntry;
     targetEntryId: string | null;
     after: boolean;
-    fromGroup?: { groupKind: 'grouped_qroc' | 'clinical_case'; caseNumber: number; questionId: string };
+  fromGroup?: { groupKind: 'grouped_qroc' | 'grouped_mcq' | 'clinical_case'; caseNumber: number; questionId: string };
     clinicalCaseNumber?: number;
   }>(null);
 
@@ -92,6 +95,72 @@ export function QuestionOrganizerDialog({ lecture, isOpen, onOpenChange, onSaved
     }
   }, [pendingTypeChange]);
 
+  // Update organizer context when dialog opens/closes and columns change
+  useEffect(() => {
+    setIsOrganizerOpen(isOpen);
+    if (!isOpen) {
+      setOrganizerState(null);
+    }
+  }, [isOpen, setIsOrganizerOpen, setOrganizerState]);
+
+  // Update organizer context when columns change
+  useEffect(() => {
+    if (isOpen) {
+      // Convert columns to the format expected by QuestionControlPanel
+      const organizerState: Record<ColumnKey, Array<{
+        id: string;
+        type: string;
+        text: string;
+        number?: number;
+        caseNumber?: number;
+        originalIndex: number;
+      }>> = { mcq: [], qroc: [], clinical: [] };
+
+      (['mcq', 'qroc', 'clinical'] as ColumnKey[]).forEach(columnKey => {
+        const columnEntries = columns[columnKey] || [];
+        columnEntries.forEach((entry, index) => {
+          if (entry.kind === 'single') {
+            // For single questions, find their index in the original questions array
+            const originalIndex = questions.findIndex(q => q.id === entry.question.id);
+            organizerState[columnKey].push({
+              id: entry.question.id,
+              type: entry.question.type,
+              text: extractPlainText(entry.question.text),
+              number: entry.question.number,
+              caseNumber: entry.question.caseNumber,
+              originalIndex: originalIndex
+            });
+          } else if (entry.kind === 'group') {
+            // For groups, we need to represent them as they appear in the navigation
+            if (entry.questions.length > 0) {
+              // Use the caseNumber to identify the group
+              const caseNumber = entry.caseNumber;
+              
+              // Create group representation that matches what navigation expects
+              const groupText = entry.groupKind === 'clinical_case' 
+                ? `Cas Clinique ${caseNumber}` 
+                : entry.groupKind === 'grouped_qroc' 
+                ? `Groupe QROC ${caseNumber}` 
+                : `Groupe MCQ ${caseNumber}`;
+                
+              organizerState[columnKey].push({
+                id: `group-${entry.groupKind}-${caseNumber}`,
+                type: entry.groupKind === 'clinical_case' ? 'clinical_case' : entry.groupKind,
+                text: groupText,
+                number: caseNumber,
+                caseNumber: caseNumber,
+                // For groups, we'll use a special marker and let the navigation handle the mapping
+                originalIndex: -1 // Special marker for groups
+              });
+            }
+          }
+        });
+      });
+
+      setOrganizerState(organizerState);
+    }
+  }, [isOpen, columns, questions, setOrganizerState]);
+
   const fetchQuestions = async () => {
     try {
       setLoading(true);
@@ -102,12 +171,19 @@ export function QuestionOrganizerDialog({ lecture, isOpen, onOpenChange, onSaved
   // Removed auto-flatten of clinical cases so they can always be organized explicitly
       // Build groups
       const groupedQrocMap = new Map<number, Question[]>();
+      const groupedMcqMap = new Map<number, Question[]>();
       data.filter(q => q.type === 'qroc' && q.caseNumber).forEach(q => {
         const arr = groupedQrocMap.get(q.caseNumber!) || [];
         arr.push(q);
         groupedQrocMap.set(q.caseNumber!, arr);
       });
+      data.filter(q => q.type === 'mcq' && q.caseNumber).forEach(q => {
+        const arr = groupedMcqMap.get(q.caseNumber!) || [];
+        arr.push(q);
+        groupedMcqMap.set(q.caseNumber!, arr);
+      });
   const groupedQrocEntries: GroupEntry[] = [];
+      const groupedMcqEntries: GroupEntry[] = [];
       const singleQroc: Question[] = [];
       for (const q of data.filter(q => q.type === 'qroc')) {
         if (q.caseNumber && groupedQrocMap.get(q.caseNumber)?.length! > 1) {
@@ -122,6 +198,12 @@ export function QuestionOrganizerDialog({ lecture, isOpen, onOpenChange, onSaved
           // stable order by caseQuestionNumber then id
             arr.sort((a,b)=> (a.caseQuestionNumber||0)-(b.caseQuestionNumber||0) || a.id.localeCompare(b.id));
           groupedQrocEntries.push({ kind: 'group', groupKind: 'grouped_qroc', caseNumber: cn, questions: arr });
+        }
+      }
+      for (const [cn, arr] of groupedMcqMap.entries()) {
+        if (arr.length > 1) {
+          arr.sort((a,b)=> (a.caseQuestionNumber||0)-(b.caseQuestionNumber||0) || a.id.localeCompare(b.id));
+          groupedMcqEntries.push({ kind: 'group', groupKind: 'grouped_mcq', caseNumber: cn, questions: arr });
         }
       }
   // Clinical cases grouping (disabled for preclinical niveaux)
@@ -182,17 +264,21 @@ export function QuestionOrganizerDialog({ lecture, isOpen, onOpenChange, onSaved
       }
 
       // Build base columns, excluding questions already shown as clinical
-      const mcqEntries: OrganizerEntry[] = data
+      const mcqSinglesRaw = data
         .filter(q => q.type === 'mcq' && !clinicalIdSet.has(q.id))
-        .sort((a,b)=>(a.number??0)-(b.number??0) || a.id.localeCompare(b.id))
+        .sort((a,b)=>(a.number??0)-(b.number??0) || a.id.localeCompare(b.id));
+      const mcqEntries: OrganizerEntry[] = mcqSinglesRaw
+        .filter(q => !(q.caseNumber && groupedMcqMap.get(q.caseNumber)?.length! > 1))
         .map(q => ({ kind: 'single', question: q }));
+      // append grouped mcq blocks
+      groupedMcqEntries.sort((a,b)=> a.caseNumber - b.caseNumber);
       const qrocSingles: OrganizerEntry[] = singleQroc
         .filter(q => !clinicalIdSet.has(q.id))
         .sort((a,b)=>(a.number??0)-(b.number??0) || a.id.localeCompare(b.id))
         .map(q => ({ kind: 'single', question: q }));
       // Combine singles + groups for qroc column (groups appear after singles by default)
   const qrocColumn: OrganizerEntry[] = [...qrocSingles, ...groupedQrocEntries.sort((a,b)=> a.caseNumber - b.caseNumber)];
-  setColumns({ mcq: mcqEntries, qroc: qrocColumn, clinical: clinicalEntries.sort((a,b)=> a.caseNumber - b.caseNumber) });
+  setColumns({ mcq: [...mcqEntries, ...groupedMcqEntries.sort((a,b)=> a.caseNumber - b.caseNumber)], qroc: qrocColumn, clinical: clinicalEntries.sort((a,b)=> a.caseNumber - b.caseNumber) });
   setDirty(false);
     } catch (e) {
       console.error(e);
@@ -218,7 +304,25 @@ export function QuestionOrganizerDialog({ lecture, isOpen, onOpenChange, onSaved
 
   // Sanitize columns: remove duplicate question ids inside a group, dissolve invalid groups
   const sanitizeColumns = (cols: Record<ColumnKey, OrganizerEntry[]>): Record<ColumnKey, OrganizerEntry[]> => {
-    const clone: Record<ColumnKey, OrganizerEntry[]> = { mcq: [...cols.mcq], qroc: [], clinical: [] } as any;
+    const clone: Record<ColumnKey, OrganizerEntry[]> = { mcq: [], qroc: [], clinical: [] } as any;
+    // process mcq groups
+    for (const entry of cols.mcq) {
+      if (entry.kind === 'group' && entry.groupKind === 'grouped_mcq') {
+        const seen = new Set<string>();
+        const cleaned: Question[] = [];
+        for (const q of entry.questions) {
+          if (!seen.has(q.id)) { seen.add(q.id); cleaned.push(q); }
+        }
+        if (cleaned.length <= 1) {
+          cleaned.forEach(q => { q.caseNumber = null as any; q.caseQuestionNumber = null as any; clone.mcq.push({ kind:'single', question: q }); });
+          continue;
+        }
+        cleaned.forEach((q,i)=> { q.caseNumber = entry.caseNumber as any; q.caseQuestionNumber = i+1 as any; });
+        clone.mcq.push({ ...entry, questions: cleaned });
+      } else if (entry.kind === 'single') {
+        clone.mcq.push(entry);
+      }
+    }
     // process qroc groups
     for (const entry of cols.qroc) {
       if (entry.kind === 'group') {
@@ -298,7 +402,7 @@ export function QuestionOrganizerDialog({ lecture, isOpen, onOpenChange, onSaved
       const g = groupDrag.current;
       const targetCol = overColumn.current;
       // Only allow extraction of grouped_qroc questions for now
-      if (g.groupKind === 'grouped_qroc') {
+  if (g.groupKind === 'grouped_qroc') {
         const targetEntryId = overEntryId.current; // could be null or group/single id
         const after = overAfter.current;
         // If target column is qroc: extract as single (type remains qroc)
@@ -312,6 +416,19 @@ export function QuestionOrganizerDialog({ lecture, isOpen, onOpenChange, onSaved
               const tempEntry: OrganizerEntry = { kind:'single', question: { ...question } };
               setPendingTypeChange({ sourceCol: null, targetCol: 'mcq', entry: tempEntry, targetEntryId, after, fromGroup: { ...g } });
             }
+        }
+      } else if (g.groupKind === 'grouped_mcq') {
+        const targetEntryId = overEntryId.current; // could be null
+        const after = overAfter.current;
+        if (targetCol === 'mcq') {
+          extractFromGroupAndInsert(g, targetCol, targetEntryId, after);
+        } else if (targetCol === 'qroc') {
+          const grp = findGroup('mcq', g.caseNumber, g.groupKind);
+          const question = grp?.questions.find(q => q.id === g.questionId);
+          if (question) {
+            const tempEntry: OrganizerEntry = { kind:'single', question: { ...question } };
+            setPendingTypeChange({ sourceCol: null, targetCol: 'qroc', entry: tempEntry, targetEntryId, after, fromGroup: { ...g } });
+          }
         }
       } else if (g.groupKind === 'clinical_case') {
         // Support two behaviors:
@@ -377,18 +494,90 @@ export function QuestionOrganizerDialog({ lecture, isOpen, onOpenChange, onSaved
       let entry: OrganizerEntry = sourceArr[sourceIdx];
       sourceArr.splice(sourceIdx, 1);
 
+      // First handle direct grouped -> clinical conversions
+      if (entry.kind === 'group' && (entry.groupKind === 'grouped_qroc' || entry.groupKind === 'grouped_mcq') && targetCol === 'clinical') {
+        const groupedQuestions = entry.questions;
+        // Derive a consolidated caseText: prefer first non-empty courseReminder or existing caseText, else empty.
+        const sharedCaseText = ((groupedQuestions.find(q => (q as any).caseText && String((q as any).caseText).trim().length > 0) as any)?.caseText
+          || (groupedQuestions.find(q => (q as any)['courseReminder'] && String((q as any)['courseReminder']).trim().length > 0) as any)?.courseReminder
+          || (groupedQuestions.find(q => (q as any)['course_reminder'] && String((q as any)['course_reminder']).trim().length > 0) as any)?.course_reminder
+          || '') as any;
+        const existingClinical = next.clinical.filter(e => e.kind==='group' && (e as any).groupKind==='clinical_case').map(e => (e as any).caseNumber as number);
+        const newCaseNumber = (existingClinical.length ? Math.max(...existingClinical) : 0) + 1;
+        groupedQuestions.forEach((q, idx) => {
+          q.type = entry.groupKind === 'grouped_qroc' ? 'clinic_croq' as any : 'clinic_mcq' as any;
+          q.caseNumber = newCaseNumber as any;
+          q.caseQuestionNumber = idx + 1 as any;
+          // Ensure caseText is set so fetch logic in use-lecture classifies them as clinical on next load
+          (q as any).caseText = sharedCaseText;
+        });
+        const clinicalEntry: OrganizerEntry = { kind:'group', groupKind:'clinical_case', caseNumber: newCaseNumber, questions: groupedQuestions } as any;
+        const targetArr = next.clinical;
+        let insertionIndex = targetEntryId ? targetArr.findIndex(e => buildToken(e,'clinical').id===targetEntryId) : targetArr.length;
+        if (insertionIndex < 0) insertionIndex = targetArr.length;
+        if (targetEntryId && overAfter.current) insertionIndex = Math.min(insertionIndex+1,targetArr.length);
+        targetArr.splice(insertionIndex,0,clinicalEntry);
+        safeToast({ title: entry.groupKind==='grouped_qroc' ? 'Bloc QROC converti' : 'Bloc QCM converti', description:`Transformé en Cas Clinique #${newCaseNumber}.` });
+        dragItem.current = null; overEntryId.current = null; overColumn.current = null; overAfter.current = false;
+        return sanitizeColumns(next);
+      }
       if (entry.kind === 'group' && entry.groupKind === 'clinical_case' && targetCol !== 'clinical') {
-        // Convert whole clinical case to base singles
         const clinicalQuestions = entry.questions;
+        const allCroq = clinicalQuestions.every(q => q.type === 'clinic_croq');
+        const allMcq = clinicalQuestions.every(q => q.type === 'clinic_mcq');
+        // If dropping into QROC column and all subquestions are clinic_croq => convert to grouped_qroc block
+        if (targetCol === 'qroc' && allCroq) {
+          // Determine new case number for QROC groups (ensure uniqueness)
+          const existingCaseNumbers = next.qroc
+            .filter(e => e.kind === 'group' && (e as any).groupKind === 'grouped_qroc')
+            .map(e => (e as any).caseNumber as number);
+          const newCaseNumber = (existingCaseNumbers.length ? Math.max(...existingCaseNumbers) : 0) + 1;
+          // Convert each question to plain qroc inside grouped block
+            clinicalQuestions.forEach((q, idx) => {
+              q.type = 'qroc' as any;
+              q.caseNumber = newCaseNumber as any;
+              q.caseQuestionNumber = idx + 1 as any;
+              // Clinical specific caseText stays on each sub for now (renderer can show once); optional future: lift to reminder
+            });
+          // Build grouped_qroc entry
+          const groupedEntry: OrganizerEntry = { kind: 'group', groupKind: 'grouped_qroc', caseNumber: newCaseNumber, questions: clinicalQuestions } as any;
+          const targetArrForDrop = next.qroc;
+          let insertionIndex = targetEntryId ? targetArrForDrop.findIndex(e => buildToken(e, 'qroc').id === targetEntryId) : targetArrForDrop.length;
+          if (insertionIndex < 0) insertionIndex = targetArrForDrop.length;
+          if (targetEntryId && overAfter.current) insertionIndex = Math.min(insertionIndex + 1, targetArrForDrop.length);
+          targetArrForDrop.splice(insertionIndex, 0, groupedEntry);
+          safeToast({ title: 'Cas clinique converti', description: `Transformé en bloc QROC (#${newCaseNumber}).`, variant: 'default' });
+          dragItem.current = null; overEntryId.current = null; overColumn.current = null; overAfter.current = false;
+          return sanitizeColumns(next);
+        }
+        // If dropping into MCQ column and all subquestions are clinic_mcq => convert to grouped_mcq block
+        if (targetCol === 'mcq' && allMcq) {
+          const existingCaseNumbers = next.mcq
+            .filter(e => e.kind === 'group' && (e as any).groupKind === 'grouped_mcq')
+            .map(e => (e as any).caseNumber as number);
+          const newCaseNumber = (existingCaseNumbers.length ? Math.max(...existingCaseNumbers) : 0) + 1;
+          clinicalQuestions.forEach((q, idx) => {
+            q.type = 'mcq' as any;
+            q.caseNumber = newCaseNumber as any;
+            q.caseQuestionNumber = idx + 1 as any;
+          });
+          const groupedEntry: OrganizerEntry = { kind: 'group', groupKind: 'grouped_mcq', caseNumber: newCaseNumber, questions: clinicalQuestions } as any;
+          const targetArrForDrop = next.mcq;
+          let insertionIndex = targetEntryId ? targetArrForDrop.findIndex(e => buildToken(e, 'mcq').id === targetEntryId) : targetArrForDrop.length;
+          if (insertionIndex < 0) insertionIndex = targetArrForDrop.length;
+          if (targetEntryId && overAfter.current) insertionIndex = Math.min(insertionIndex + 1, targetArrForDrop.length);
+          targetArrForDrop.splice(insertionIndex, 0, groupedEntry);
+          safeToast({ title: 'Cas clinique converti', description: `Transformé en bloc QCM (#${newCaseNumber}).`, variant: 'default' });
+          dragItem.current = null; overEntryId.current = null; overColumn.current = null; overAfter.current = false;
+          return sanitizeColumns(next);
+        }
+        // Fallback: original behavior (dissolve into singles across base columns)
         const counts = { clinic_mcq: 0, clinic_croq: 0 };
         clinicalQuestions.forEach(q => { if (q.type === 'clinic_mcq') counts.clinic_mcq++; else if (q.type === 'clinic_croq') counts.clinic_croq++; });
-        // Decide insertion index in target column for those mapping to targetCol
         const targetArrForDrop = next[targetCol];
         let insertionIndex = targetEntryId ? targetArrForDrop.findIndex(e => buildToken(e, targetCol).id === targetEntryId) : targetArrForDrop.length;
         if (insertionIndex < 0) insertionIndex = targetArrForDrop.length;
         if (targetEntryId && overAfter.current) insertionIndex = Math.min(insertionIndex + 1, targetArrForDrop.length);
-        // Remove group fully (already spliced out of sourceArr earlier)
-        // Insert converted questions maintaining original order
         let offset = 0;
         clinicalQuestions.forEach(q => {
           const baseCol: ColumnKey = q.type === 'clinic_mcq' ? 'mcq' : 'qroc';
@@ -398,7 +587,6 @@ export function QuestionOrganizerDialog({ lecture, isOpen, onOpenChange, onSaved
             targetArrForDrop.splice(insertionIndex + offset, 0, entryObj);
             offset++;
           } else {
-            // push to its own base column end
             next[baseCol].push(entryObj);
           }
         });
@@ -479,7 +667,7 @@ export function QuestionOrganizerDialog({ lecture, isOpen, onOpenChange, onSaved
     }
   setColumns(prev => {
       const next: Record<ColumnKey, OrganizerEntry[]> = { mcq: [...prev.mcq], qroc: [...prev.qroc], clinical: [...prev.clinical] };
-      const colKey: ColumnKey = group.groupKind === 'clinical_case' ? 'clinical' : 'qroc';
+  const colKey: ColumnKey = group.groupKind === 'clinical_case' ? 'clinical' : group.groupKind === 'grouped_qroc' ? 'qroc' : 'mcq';
       const groupIdx = next[colKey].findIndex(e => e.kind==='group' && (e as any).caseNumber === group.caseNumber && (e as any).groupKind === group.groupKind);
       if (groupIdx < 0) return prev;
       const grp = next[colKey][groupIdx] as GroupEntry;
@@ -509,7 +697,7 @@ export function QuestionOrganizerDialog({ lecture, isOpen, onOpenChange, onSaved
   const extractQuestion = (group: GroupEntry, q: Question) => {
   setColumns(prev => {
       const next: Record<ColumnKey, OrganizerEntry[]> = { mcq:[...prev.mcq], qroc:[...prev.qroc], clinical:[...prev.clinical] };
-      const colKey: ColumnKey = group.groupKind==='clinical_case' ? 'clinical' : 'qroc';
+  const colKey: ColumnKey = group.groupKind==='clinical_case' ? 'clinical' : group.groupKind==='grouped_qroc' ? 'qroc' : 'mcq';
       const gIdx = next[colKey].findIndex(e => e.kind==='group' && (e as any).caseNumber===group.caseNumber && (e as any).groupKind===group.groupKind);
       if (gIdx<0) return prev;
       const grp = next[colKey][gIdx] as GroupEntry;
@@ -522,10 +710,13 @@ export function QuestionOrganizerDialog({ lecture, isOpen, onOpenChange, onSaved
         // insert after group
         const insertAt = gIdx+1;
         next.qroc.splice(insertAt,0,{ kind:'single', question: removed });
+      } else if (group.groupKind==='grouped_mcq') {
+        const insertAt = gIdx+1;
+        next.mcq.splice(insertAt,0,{ kind:'single', question: removed });
       } else {
   safeToast({ title:'Info', description:'Extraction depuis cas clinique non supportée.' });
       }
-      if (grp.questions.length <=1 && group.groupKind==='grouped_qroc') {
+      if (grp.questions.length <=1 && (group.groupKind==='grouped_qroc' || group.groupKind==='grouped_mcq')) {
         if (grp.questions.length===1){
           const last = grp.questions[0];
           last.caseNumber = null as any; last.caseQuestionNumber = null as any;
@@ -542,16 +733,16 @@ export function QuestionOrganizerDialog({ lecture, isOpen, onOpenChange, onSaved
   };
 
   // Helper to find group entry in current state (read-only)
-  const findGroup = (col: ColumnKey, caseNumber: number, groupKind: 'grouped_qroc' | 'clinical_case') => {
+  const findGroup = (col: ColumnKey, caseNumber: number, groupKind: 'grouped_qroc' | 'grouped_mcq' | 'clinical_case') => {
     const list = columns[col];
     return list.find(e => e.kind==='group' && e.groupKind===groupKind && e.caseNumber===caseNumber) as GroupEntry | undefined;
   };
 
   // Extract via drag drop: remove from group and insert as single at chosen position in target column
-  const extractFromGroupAndInsert = (g: { groupKind:'grouped_qroc'|'clinical_case'; caseNumber:number; questionId:string }, targetCol: ColumnKey, targetEntryId: string | null, after: boolean) => {
+  const extractFromGroupAndInsert = (g: { groupKind:'grouped_qroc'|'grouped_mcq'|'clinical_case'; caseNumber:number; questionId:string }, targetCol: ColumnKey, targetEntryId: string | null, after: boolean) => {
   setColumns(prev => {
       const next: Record<ColumnKey, OrganizerEntry[]> = { mcq:[...prev.mcq], qroc:[...prev.qroc], clinical:[...prev.clinical] };
-      const sourceCol: ColumnKey = g.groupKind==='clinical_case' ? 'clinical' : 'qroc';
+  const sourceCol: ColumnKey = g.groupKind==='clinical_case' ? 'clinical' : g.groupKind==='grouped_qroc' ? 'qroc' : 'mcq';
       const arr = next[sourceCol];
       const grpIdx = arr.findIndex(e => e.kind==='group' && (e as any).groupKind===g.groupKind && (e as any).caseNumber===g.caseNumber);
       if (grpIdx<0) return prev;
@@ -561,7 +752,7 @@ export function QuestionOrganizerDialog({ lecture, isOpen, onOpenChange, onSaved
       const [removed] = grp.questions.splice(qIdx,1);
       removed.caseNumber = null as any; removed.caseQuestionNumber = null as any;
       // Dissolve if needed (grouped_qroc only)
-      if (grp.groupKind==='grouped_qroc' && grp.questions.length <=1) {
+      if ((grp.groupKind==='grouped_qroc' || grp.groupKind==='grouped_mcq') && grp.questions.length <=1) {
         if (grp.questions.length===1) {
           const last = grp.questions[0];
           last.caseNumber = null as any; last.caseQuestionNumber = null as any;
@@ -715,10 +906,10 @@ export function QuestionOrganizerDialog({ lecture, isOpen, onOpenChange, onSaved
           caseText: (q.type === 'clinic_mcq' || q.type === 'clinic_croq') ? q.caseText ?? null : null,
           caseQuestionNumber: (q.type === 'clinic_mcq' || q.type === 'clinic_croq' || q.type === 'qroc') ? q.caseQuestionNumber ?? null : null,
         };
-        tasks.push(fetch('/api/questions', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }));
+  tasks.push(fetch(`/api/questions/${q.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }));
       };
       // Iterate columns
-      columns.mcq.forEach(e => { if (e.kind==='single') addUpdate(e.question); });
+  columns.mcq.forEach(e => { if (e.kind==='single') addUpdate(e.question); else if (e.kind==='group') e.questions.forEach(addUpdate); });
       columns.qroc.forEach(e => { if (e.kind==='single') addUpdate(e.question); else if (e.kind==='group') e.questions.forEach(addUpdate); });
       columns.clinical.forEach(e => { if (e.kind==='group') e.questions.forEach(addUpdate); });
 
@@ -834,7 +1025,7 @@ export function QuestionOrganizerDialog({ lecture, isOpen, onOpenChange, onSaved
                       <GripVertical className="h-4 w-4" />
                     </span>
                     <Package className="h-3.5 w-3.5 text-blue-500" />
-                    <span className="text-xs font-medium">{entry.groupKind === 'grouped_qroc' ? `Bloc QROC #${entry.caseNumber}` : `Cas Clinique #${entry.caseNumber}`}</span>
+                    <span className="text-xs font-medium">{entry.groupKind === 'grouped_qroc' ? `Bloc QROC #${entry.caseNumber}` : entry.groupKind === 'grouped_mcq' ? `Bloc QCM #${entry.caseNumber}` : `Cas Clinique #${entry.caseNumber}`}</span>
                     <span className="ml-auto flex items-center gap-2">
                       <span className="text-[10px] text-muted-foreground">{entry.questions.length} éléments</span>
                       {entry.groupKind === 'grouped_qroc' && (

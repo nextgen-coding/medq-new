@@ -51,6 +51,7 @@ interface OpenQuestionProps {
   suppressReminder?: boolean; // hide reminder section (grouped QROC shows one shared)
   hideMeta?: boolean;
   enableAnswerHighlighting?: boolean; // enable highlighting for user answers
+  disableIndividualSubmit?: boolean; // when true (grouped clinical case), block per-question submit & reference reveal until parent submit
 }
 
 export function OpenQuestion({ 
@@ -77,6 +78,7 @@ export function OpenQuestion({
   suppressReminder,
   hideMeta,
   enableAnswerHighlighting = false,
+  disableIndividualSubmit = false,
 }: OpenQuestionProps) {
   const [answer, setAnswer] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -253,6 +255,28 @@ export function OpenQuestion({
   setShowNotesArea(false);
   }, [question.id]);
 
+  // In grouped clinical case mode (disableIndividualSubmit) propagate answer live ONLY when it actually changes
+  // to avoid infinite update loops (parent state update -> re-render -> effect firing again).
+  const lastPropagatedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!(disableIndividualSubmit && hideImmediateResults && !submitted && onAnswerChange)) return;
+    const trimmed = answer.trim();
+    const parentValue = userAnswer ?? '';
+    // Avoid re-sending same value
+    if (lastPropagatedRef.current === answer) return;
+    if (trimmed.length > 0) {
+      if (parentValue !== answer) {
+        onAnswerChange(answer, true);
+        lastPropagatedRef.current = answer;
+      }
+    } else {
+      if (parentValue !== '') {
+        onAnswerChange('', false);
+        lastPropagatedRef.current = '';
+      }
+    }
+  }, [answer, userAnswer, disableIndividualSubmit, hideImmediateResults, submitted, onAnswerChange]);
+
   // Handle userAnswer changes separately to avoid reinitialization loops
   useEffect(() => {
     if (userAnswer) {
@@ -262,35 +286,42 @@ export function OpenQuestion({
 
 
 
-  // Initialize component state based on whether question is already answered
+  // Initialize / sync when parent indicates answered state changes.
+  // For deferred clinical case flow: show self-assessment ONLY while awaiting evaluation (answerResult undefined).
   useEffect(() => {
-    if (isAnswered && answerResult !== undefined) {
+    if (isAnswered) {
       setAnswer(userAnswer || '');
       setSubmitted(true);
-      setHasSubmitted(true); // Question has been submitted
-      hasSubmittedRef.current = true; // Also set ref for answered questions
-      
-      // For deferred self-assessment, don't mark as completed and show self-assessment
+      setHasSubmitted(true);
+      hasSubmittedRef.current = true;
       if (showDeferredSelfAssessment) {
-        setAssessmentCompleted(false);
-        setShowSelfAssessment(true);
+        if (answerResult === undefined) {
+          // Pending self-evaluation
+            setAssessmentCompleted(false);
+            setShowSelfAssessment(true);
+        } else {
+          // Evaluation done – hide buttons
+          setAssessmentCompleted(true);
+          setShowSelfAssessment(false);
+        }
       } else {
-        setAssessmentCompleted(true);
+        // Immediate mode
+        setAssessmentCompleted(answerResult !== undefined);
         setShowSelfAssessment(false);
       }
     } else {
-      if (!userAnswer) {
-        setAnswer('');
-      }
+      if (!userAnswer) setAnswer('');
       setSubmitted(false);
       setShowSelfAssessment(false);
       setAssessmentCompleted(false);
-      setHasSubmitted(false); // Question has not been submitted
-      hasSubmittedRef.current = false; // Reset ref as well
+      setHasSubmitted(false);
+      hasSubmittedRef.current = false;
     }
   }, [question.id, isAnswered, answerResult, showDeferredSelfAssessment, userAnswer]);
 
   const handleSubmit = async () => {
+    // In grouped clinical case mode we disable individual submission until parent submits
+    if (disableIndividualSubmit && hideImmediateResults) return;
     if (hasSubmittedRef.current) return; // Prevent double submission with immediate synchronous check
     
     // Mark that this question is being submitted IMMEDIATELY
@@ -492,6 +523,7 @@ export function OpenQuestion({
 
       // Submit with Enter (only when not typing in inputs, textarea handles its own Enter)
       if (!submitted && !isTyping && event.key === 'Enter' && !event.shiftKey) {
+        if (disableIndividualSubmit && hideImmediateResults) return; // blocked in grouped mode
         event.preventDefault();
         if (answer.trim()) {
           handleSubmit();
@@ -511,7 +543,7 @@ export function OpenQuestion({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [showSelfAssessment, hideImmediateResults, showDeferredSelfAssessment, submitted, assessmentCompleted, answer]);
+  }, [showSelfAssessment, hideImmediateResults, showDeferredSelfAssessment, submitted, assessmentCompleted, answer, disableIndividualSubmit]);
 
   return (
     <motion.div
@@ -581,7 +613,7 @@ export function OpenQuestion({
 
   {/* Persistent reference + user answer block (including during self-assessment) */}
   {(() => {
-    const canShowReference = submitted && expectedReference && (!hideImmediateResults || (showSelfAssessment && showDeferredSelfAssessment) || assessmentCompleted);
+  const canShowReference = submitted && expectedReference && (!hideImmediateResults || (showSelfAssessment && showDeferredSelfAssessment) || assessmentCompleted);
     if (!canShowReference) return null;
     return (
       <div className="mt-3">

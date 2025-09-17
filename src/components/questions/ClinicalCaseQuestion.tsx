@@ -68,6 +68,9 @@ export function ClinicalCaseQuestion({
   const [evaluationOrder, setEvaluationOrder] = useState<string[]>([]); // ordered list of open question ids needing evaluation
   const [evaluationIndex, setEvaluationIndex] = useState<number>(0); // current evaluation pointer
   const [evaluationComplete, setEvaluationComplete] = useState<boolean>(false);
+  // Progressive reveal: -1 = only header/case text; 0..n index of last revealed question
+  const [revealIndex, setRevealIndex] = useState<number>(-1);
+  // Removed per-question submission; single global submit after all questions answered
 
   // Auto-close notes when content becomes empty
   useEffect(() => {
@@ -97,6 +100,7 @@ export function ClinicalCaseQuestion({
       setQuestionResults({});
       setIsCaseComplete(false);
       setShowResults(false);
+      setRevealIndex(-1);
     }
   }, [clinicalCase.caseNumber, isAnswered]);
 
@@ -263,20 +267,8 @@ export function ClinicalCaseQuestion({
     setEvaluationIndex(0);
     setEvaluationComplete(openIds.length === 0); // if no open questions, evaluation instantly complete
     onSubmit(clinicalCase.caseNumber, answers, questionResults); // results will be updated as user evaluates
-    
-    // Scroll to first evaluation question after a brief delay, or to top if no evaluation needed
-    setTimeout(() => {
-      if (openIds.length > 0) {
-        const firstEvalId = openIds[0];
-        const element = questionRefs.current[firstEvalId];
-        if (element) {
-          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-      } else {
-        // If no evaluation needed, scroll to top of case
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      }
-    }, 300);
+    // Always scroll to top after submit per request (then user can scroll down to evaluate)
+    setTimeout(() => { window.scrollTo({ top: 0, behavior: 'smooth' }); }, 120);
   };
   // Allow resubmission: keep current answers, hide results, reset evaluation state and per-question results
   const handleResubmit = () => {
@@ -336,59 +328,75 @@ export function ClinicalCaseQuestion({
     }
   }, [evaluationIndex, evaluationOrder, showResults, evaluationComplete]);
 
-  // Keyboard navigation: Answer phase (Enter to advance), Evaluation phase disabled (no keyboard shortcuts)
+  // Keyboard navigation & progressive reveal (Enter driven)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Evaluation phase key handling - DISABLED to remove 1/2/3 shortcuts
-      if (showResults && !evaluationComplete) {
-        // Disable all number keys for evaluation - user must click buttons
-        if (["1", "2", "3"].includes(e.key)) {
-          // No longer handle 1/2/3 shortcuts
-          e.preventDefault();
-          return;
-        } else if (e.key === 'Enter') {
-          // Enter disabled during evaluation selection
-          e.preventDefault();
-        }
-        return; // stop further processing during evaluation phase
-      }
-
-      // After evaluation complete & results shown: Enter -> next case
+      // Evaluation phase (after submission) - Enter to go next when fully complete
       if (showResults && evaluationComplete) {
-        if (e.key === 'Enter' && !e.shiftKey) {
-          e.preventDefault();
-          onNext();
-        }
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onNext(); }
         return;
       }
-
-      // Answering phase
+      if (showResults && !evaluationComplete) {
+        if (["1","2","3","Enter"].includes(e.key)) e.preventDefault();
+        return;
+      }
+      // Progressive answering phase
       if (!showResults && e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        
-        // If all questions answered, submit
-        if (answeredQuestions === clinicalCase.totalQuestions) {
-          handleCompleteCase();
+        const active = document.activeElement as HTMLElement | null;
+        if (active && active.tagName === 'TEXTAREA') {
+          // Allow Shift+Enter newline
+          e.preventDefault();
+        } else { e.preventDefault(); }
+        // Step 1: reveal first question
+        if (revealIndex === -1) {
+          setRevealIndex(0);
+          setTimeout(()=>focusFirstInput(clinicalCase.questions[0].id), 60);
           return;
         }
-        
-        // Find next unanswered question in order
-        const nextUnanswered = clinicalCase.questions.find(q => answers[q.id] === undefined);
-        
-        if (nextUnanswered) {
-          const element = questionRefs.current[nextUnanswered.id];
-          if (element) {
-            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            setTimeout(() => focusFirstInput(nextUnanswered.id), 300);
-          }
-        } else if (answeredQuestions === clinicalCase.totalQuestions) {
-          // Fallback: if somehow all are answered, submit
-          handleCompleteCase();
+        // Ensure current revealed question answered before advancing
+        const currentQ = clinicalCase.questions[revealIndex];
+        if (!currentQ) return;
+        const val = answers[currentQ.id];
+        const isAnsweredCurrent = Array.isArray(val) ? val.length>0 : (typeof val === 'string' ? val.trim().length>0 : val !== undefined && val !== null);
+        if (!isAnsweredCurrent) return; // block until answered
+        if (revealIndex < clinicalCase.questions.length - 1) {
+          // Move to next question immediately
+            setRevealIndex(r=>r+1);
+            const nextId = clinicalCase.questions[revealIndex+1].id;
+            setTimeout(()=>focusFirstInput(nextId),80);
+            return;
         }
+        // Last question reached: if all answered trigger global submit
+        if (answeredQuestions === clinicalCase.totalQuestions) handleCompleteCase();
       }
-    };    document.addEventListener('keydown', handleKeyDown);
+    };
+    document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [answers, answeredQuestions, isCaseComplete, showResults, evaluationOrder, evaluationIndex, evaluationComplete, clinicalCase.questions, clinicalCase.totalQuestions]);
+  }, [showResults, evaluationComplete, onNext, revealIndex, clinicalCase.questions, answers, answeredQuestions, clinicalCase.totalQuestions]);
+
+  // When a new question is revealed (revealIndex increments) gently scroll it into view
+  useEffect(() => {
+    if (showResults) return; // only during answering phase
+    if (revealIndex < 0) return; // nothing revealed yet
+    if (revealIndex >= clinicalCase.questions.length) return;
+    const qid = clinicalCase.questions[revealIndex].id;
+    if (typeof window === 'undefined') return;
+    // Wait a frame so the DOM has rendered the newly revealed block
+    requestAnimationFrame(() => {
+      const el = questionRefs.current[qid];
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      // Determine if we need to scroll: if the element's bottom is below viewport or its top is too low
+      const needsScroll = rect.bottom > window.innerHeight || rect.top < 80 || rect.top > window.innerHeight * 0.6;
+      if (needsScroll) {
+        const targetTop = window.scrollY + rect.top - 100; // offset so the question isn't flush with the top
+        window.scrollTo({ top: Math.max(targetTop, 0), behavior: 'smooth' });
+      } else {
+        // Provide a tiny upward nudge so user context includes previous question tail
+        window.scrollBy({ top: -40, behavior: 'smooth' });
+      }
+    });
+  }, [revealIndex, showResults, clinicalCase.questions]);
   const getQuestionStatus = (question: Question) => {
     if (answers[question.id] !== undefined) {
       if (showResults) {
@@ -409,10 +417,8 @@ export function ClinicalCaseQuestion({
     const isCurrentEvaluationTarget = showResults && !evaluationComplete && evaluationOrder[evaluationIndex] === question.id;
     const hasEvaluation = showResults && question.type === 'clinic_croq' && questionResults[question.id] !== undefined;
     
-    // Check if this is the next question to answer (first unanswered)
-    const isNextToAnswer = !showResults && !isAnsweredQ && 
-      clinicalCase.questions.findIndex(q => answers[q.id] === undefined) === 
-      clinicalCase.questions.findIndex(q => q.id === question.id);
+    // Next to answer is the currently revealed question when not submitted
+    const isNextToAnswer = !showResults && revealIndex === index;
     
     const evaluationLabel = hasEvaluation
       ? questionResults[question.id] === true
@@ -501,7 +507,7 @@ export function ClinicalCaseQuestion({
             isAnswered={showResults ? isAnsweredQ : false}
             answerResult={showResults ? answerResultQ : undefined}
             userAnswer={userAnswerQ as any}
-            // Hide immediate results until the group is submitted once
+            // Hide immediate results until the whole group is submitted
             hideImmediateResults={!showResults}
             // Hide per-question actions; we submit once for all
             hideActions
@@ -529,6 +535,7 @@ export function ClinicalCaseQuestion({
             userAnswer={userAnswerQ as any}
             hideImmediateResults={!showResults}
             showDeferredSelfAssessment={showResults && question.type === 'clinic_croq'}
+            disableIndividualSubmit={!showResults} 
             onSelfAssessmentUpdate={handleSelfAssessmentUpdate}
             hideNotes={!showResults}
             hideComments={true} // Always hide individual question comments in clinical cases
@@ -663,6 +670,11 @@ export function ClinicalCaseQuestion({
               </div>
             </div>
           )}
+          {!showResults && revealIndex === -1 && (
+            <div className="mt-4 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 text-sm text-blue-700 dark:text-blue-200 font-medium">
+              Appuyez sur <span className="font-semibold">Entrée</span> pour afficher la première question.
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -672,7 +684,7 @@ export function ClinicalCaseQuestion({
       <Card>
         <CardContent>
           <div className="space-y-6 mt-6">
-            {clinicalCase.questions.map((question, index) => {
+            {clinicalCase.questions.slice(0, revealIndex === -1 ? 0 : revealIndex + 1).map((question, index) => {
               const isCurrentEval = showResults && !evaluationComplete && question.type === 'clinic_croq' && evaluationOrder[evaluationIndex] === question.id;
               return (
                 <div key={question.id} className={isCurrentEval ? 'ring-2 ring-blue-500 rounded-lg transition-shadow' : ''}>
@@ -715,10 +727,8 @@ export function ClinicalCaseQuestion({
                     onClick={handleCompleteCase}
                     size="sm"
                     disabled={answeredQuestions !== clinicalCase.totalQuestions || isCaseComplete}
-                    className={`font-semibold ${answeredQuestions === clinicalCase.totalQuestions && !isCaseComplete ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-600/50 text-white cursor-not-allowed'}`}
-                  >
-                    Soumettre la réponse
-                  </Button>
+                    className={`${revealIndex < clinicalCase.questions.length -1 ? 'hidden' : ''} font-semibold ${answeredQuestions === clinicalCase.totalQuestions && !isCaseComplete ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-600/50 text-white cursor-not-allowed'}`}
+                  >Soumettre</Button>
                 )}
 
                 {/* Resubmit button visible after submission (for both MCQ-only and open cases) */}
@@ -741,10 +751,10 @@ export function ClinicalCaseQuestion({
                   </Button>
                 )}
 
-                {/* Notes toggle: immediately after submit for Multi QROC; after evaluation for clinical open */}
+                {/* Notes toggle: immediately after submit for Multi QROC + Multi QCM; after evaluation for mixed clinical with open */}
                 {(() => {
                   const canShowNotesToggle = (
-                    (displayMode === 'multi_qroc' && isCaseComplete && showResults) ||
+                    ((displayMode === 'multi_qroc' || displayMode === 'multi_qcm') && isCaseComplete && showResults) ||
                     (hasOpen && isCaseComplete && showResults && evaluationComplete)
                   );
                   if (!canShowNotesToggle) return null;
@@ -765,17 +775,17 @@ export function ClinicalCaseQuestion({
                 })()}
               </div>
             </div>
-            {hasOpen && (
+            {(hasOpen || displayMode === 'multi_qcm') && (
             <div id={`clinical-case-notes-${clinicalCase.caseNumber}`} className="space-y-6">
               {(showNotesArea || notesHasContent) && (
                 <QuestionNotes 
-                  questionId={displayMode === 'multi_qroc' ? `group-qroc-${clinicalCase.caseNumber}` : `clinical-case-${clinicalCase.caseNumber}`}
+                  questionId={displayMode === 'multi_qroc' ? `group-qroc-${clinicalCase.caseNumber}` : displayMode === 'multi_qcm' ? `group-qcm-${clinicalCase.caseNumber}` : `clinical-case-${clinicalCase.caseNumber}`}
                   onHasContentChange={setNotesHasContent}
                   autoEdit={showNotesArea && !notesHasContent}
                 />
               )}
               {isCaseComplete && (
-                <QuestionComments questionId={displayMode === 'multi_qroc' ? `group-qroc-${clinicalCase.caseNumber}` : `clinical-case-${clinicalCase.caseNumber}`} />
+                <QuestionComments questionId={displayMode === 'multi_qroc' ? `group-qroc-${clinicalCase.caseNumber}` : displayMode === 'multi_qcm' ? `group-qcm-${clinicalCase.caseNumber}` : `clinical-case-${clinicalCase.caseNumber}`} />
               )}
             </div>)}
           </div>
