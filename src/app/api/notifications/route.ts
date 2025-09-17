@@ -1,82 +1,82 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
+import { requireAuth, AuthenticatedRequest } from '@/lib/auth-middleware';
 
-// GET /api/notifications - Get user's notifications
-export async function GET(request: NextRequest) {
+// GET /api/notifications - list current user's notifications
+async function getHandler(request: AuthenticatedRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    const userId = searchParams.get('userId')
+    const userId = request.user!.userId;
+    const url = new URL(request.url);
+    const limit = Math.min(parseInt(url.searchParams.get('limit') || '50', 10), 100);
+    const onlyUnread = url.searchParams.get('unread') === '1';
 
-    if (!userId) {
-      return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
-    }
+    const where: any = { userId };
+    if (onlyUnread) where.isRead = false;
 
     const notifications = await prisma.notification.findMany({
-      where: {
-        userId,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      take: 50, // Limit to 50 notifications
-    })
-
-    return NextResponse.json(notifications)
-  } catch (error) {
-    console.error('Error fetching notifications:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
-  }
-}
-
-// POST /api/notifications - Create a new notification
-export async function POST(request: NextRequest) {
-  try {
-    const { userId, title, message, type = 'info' } = await request.json()
-
-    if (!userId || !title || !message) {
-      return NextResponse.json({ error: 'User ID, title, and message are required' }, { status: 400 })
-    }
-
-    const notification = await prisma.notification.create({
-      data: {
-        userId,
-        title,
-        message,
-        type,
-      },
-    })
-
-    return NextResponse.json(notification, { status: 201 })
-  } catch (error) {
-    console.error('Error creating notification:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
-  }
-}
-
-// PUT /api/notifications - Mark notifications as read
-export async function PUT(request: NextRequest) {
-  try {
-    const { userId, notificationIds } = await request.json()
-
-    if (!userId) {
-      return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
-    }
-
-    const whereClause: Record<string, unknown> = { userId }
-    if (notificationIds && notificationIds.length > 0) {
-      whereClause.id = { in: notificationIds }
-    }
-
-    await prisma.notification.updateMany({
-      where: whereClause,
-      data: {
+      where,
+      select: {
+        id: true,
+        userId: true,
+        title: true,
+        message: true,
         isRead: true,
+        createdAt: true,
+        // include type if exists in current client
+        // @ts-ignore - tolerate missing field in older schema
+        type: true,
       },
-    })
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    });
 
-    return NextResponse.json({ message: 'Notifications marked as read' })
+    return NextResponse.json({ notifications });
   } catch (error) {
-    console.error('Error updating notifications:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    console.error('Error listing notifications:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
+
+// PATCH /api/notifications?id=... - mark a notification as read
+async function patchHandler(request: AuthenticatedRequest) {
+  try {
+    const userId = request.user!.userId;
+    const url = new URL(request.url);
+    const id = url.searchParams.get('id');
+    if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
+
+    // Ensure ownership
+    const notif = await prisma.notification.findUnique({ select: { id: true, userId: true }, where: { id } });
+    if (!notif || notif.userId !== userId) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+    await prisma.notification.update({ where: { id }, data: { isRead: true } });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error marking notification as read:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+// DELETE /api/notifications?id=... - delete a notification
+async function deleteHandler(request: AuthenticatedRequest) {
+  try {
+    const userId = request.user!.userId;
+    const url = new URL(request.url);
+    const id = url.searchParams.get('id');
+    if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
+
+    // Ensure ownership
+    const notif = await prisma.notification.findUnique({ select: { id: true, userId: true }, where: { id } });
+    if (!notif || notif.userId !== userId) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+    await prisma.notification.delete({ where: { id } });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting notification:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+export const GET = requireAuth(getHandler);
+export const PATCH = requireAuth(patchHandler);
+export const DELETE = requireAuth(deleteHandler);

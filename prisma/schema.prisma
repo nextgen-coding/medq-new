@@ -52,6 +52,7 @@ model User {
   pinnedQuestions       PinnedQuestion[]
   comments              Comment[]
   notifications         Notification[]
+  createdNotifications  Notification[] @relation("AdminNotifications")
   questionUserData      QuestionUserData[]
   questionComments      QuestionComment[]
   commentLikes          CommentLike[]
@@ -197,15 +198,30 @@ model CommentLike {
 
 model Notification {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId    String   @map("user_id") @db.Uuid
+  userId    String?  @map("user_id") @db.Uuid
   title     String
   message   String
   type      String   @default("info") // info, success, warning, error
+  category  String   @default("system") // system, progress, lecture, achievement, question, reminder
   isRead    Boolean  @default(false) @map("is_read")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Admin notification targeting fields
+  isAdminNotification Boolean @default(false) @map("is_admin_notification")
+  targetAll          Boolean @default(false) @map("target_all")
+  targetNiveauIds    String[] @map("target_niveau_ids") @db.Uuid
+  targetSemesterIds  String[] @map("target_semester_ids") @db.Uuid
+  targetPaidUsers    Boolean? @map("target_paid_users")
+  targetUnpaidUsers  Boolean? @map("target_unpaid_users")
+  targetVerifiedUsers Boolean? @map("target_verified_users")
+  targetUnverifiedUsers Boolean? @map("target_unverified_users")
+  createdByAdminId   String?  @map("created_by_admin_id") @db.Uuid
+  
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdBy User?    @relation("AdminNotifications", fields: [createdByAdminId], references: [id], onDelete: SetNull)
 
   @@index([userId, isRead], map: "idx_notifications_user_read")
+  @@index([isAdminNotification, createdAt], map: "idx_notifications_admin_created")
   @@map("notifications")
 }
 

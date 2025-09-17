@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,10 +36,39 @@ export function PageHeader({
   const { user, logout } = useAuth();
   const router = useRouter();
   const { t } = useTranslation();
-  const [notifications] = useState([
-    { id: 1, title: 'New course available', time: '2m ago' },
-    { id: 2, title: 'Progress updated', time: '1h ago' },
-  ]);
+  const [notifications, setNotifications] = useState<Array<{ id: string; title: string; time: string; read?: boolean }>>([]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const formatTime = (d: string | Date) => {
+      const date = typeof d === 'string' ? new Date(d) : d;
+      const diff = (Date.now() - date.getTime()) / 1000;
+      if (diff < 60) return `${Math.floor(diff)}s`;
+      if (diff < 3600) return `${Math.floor(diff/60)}m`;
+      if (diff < 86400) return `${Math.floor(diff/3600)}h`;
+      return date.toLocaleDateString();
+    };
+    const load = async () => {
+      try {
+        const res = await fetch('/api/notifications?limit=5', { credentials: 'include' });
+        if (!res.ok) return;
+        const json = await res.json();
+        const stripAdmin = (s: string) => s?.replace(/^\[ADMIN\]\s*/i, '') ?? s;
+        const list = (json.notifications || []).map((n: any) => ({
+          id: n.id,
+          title: stripAdmin(n.title),
+          time: n.createdAt ? formatTime(n.createdAt) : '',
+          read: !!n.isRead,
+        }));
+        if (isMounted) setNotifications(list);
+      } catch {}
+    };
+    // Only try if logged in
+    if (user) load();
+    return () => { isMounted = false; };
+  }, [user]);
+
+  const unreadCount = useMemo(() => notifications.filter(n => !n.read).length, [notifications]);
 
   const handleSignOut = async () => {
     try {
@@ -67,9 +96,9 @@ export function PageHeader({
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="icon" className="relative">
                   <Bell className="h-4 w-4" />
-                  {notifications.length > 0 && (
+                  {unreadCount > 0 && (
                     <span className="absolute -top-1 -right-1 h-3 w-3 bg-blue-600 rounded-full text-[10px] text-white flex items-center justify-center">
-                      {notifications.length}
+                      {unreadCount}
                     </span>
                   )}
                 </Button>

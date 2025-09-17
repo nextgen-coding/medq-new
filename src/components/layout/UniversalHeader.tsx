@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -62,7 +62,9 @@ export function UniversalHeader({
   const { user, logout } = useAuth();
   const router = useRouter();
   const { t } = useTranslation();
-  const [notificationCount] = useState(3); // Mock notification count
+  const [notificationCount, setNotificationCount] = useState(0);
+  type RecentNotification = { id: string; title: string; time: string; read?: boolean };
+  const [recentNotifications, setRecentNotifications] = useState<RecentNotification[]>([]);
   const { toggleSidebar, open, openMobile, isMobile } = useSidebar();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
 
@@ -88,6 +90,47 @@ export function UniversalHeader({
       .toUpperCase()
       .slice(0, 2);
   };
+
+  useEffect(() => {
+    let isMounted = true;
+    const formatTime = (d: string | Date) => {
+      const date = typeof d === 'string' ? new Date(d) : d;
+      const diff = (Date.now() - date.getTime()) / 1000;
+      if (diff < 60) return `${Math.floor(diff)}s`;
+      if (diff < 3600) return `${Math.floor(diff/60)}m`;
+      if (diff < 86400) return `${Math.floor(diff/3600)}h`;
+      return date.toLocaleDateString();
+    };
+    const stripAdmin = (s: string) => s?.replace(/^\[ADMIN\]\s*/i, '') ?? s;
+    const load = async () => {
+      try {
+        if (!user) {
+          if (isMounted) {
+            setNotificationCount(0);
+            setRecentNotifications([]);
+          }
+          return;
+        }
+        const res = await fetch('/api/notifications?limit=5', { credentials: 'include' });
+        if (!res.ok) return;
+        const json = await res.json();
+        const list = (json.notifications || []).map((n: any) => ({
+          id: n.id,
+          title: stripAdmin(n.title),
+          time: n.createdAt ? formatTime(n.createdAt) : '',
+          read: !!n.isRead,
+        }));
+        if (isMounted) {
+          setRecentNotifications(list);
+          setNotificationCount(list.filter((n: RecentNotification) => !n.read).length);
+        }
+      } catch {
+        // ignore transient failures
+      }
+    };
+    load();
+    return () => { isMounted = false; };
+  }, [user]);
 
   return (
     // Rolled back to earlier gray background scheme
@@ -165,24 +208,18 @@ export function UniversalHeader({
               <DropdownMenuContent align="end" className="w-80 sm:w-96">
                 <DropdownMenuLabel className="text-base font-semibold">Notifications</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="p-4">
-                  <div className="flex flex-col space-y-1 w-full">
-                    <p className="text-sm font-medium">New question added</p>
-                    <p className="text-xs text-muted-foreground">Cardiology - 2 minutes ago</p>
-                  </div>
-                </DropdownMenuItem>
-                <DropdownMenuItem className="p-4">
-                  <div className="flex flex-col space-y-1 w-full">
-                    <p className="text-sm font-medium">Progress updated</p>
-                    <p className="text-xs text-muted-foreground">General Surgery - 1 hour ago</p>
-                  </div>
-                </DropdownMenuItem>
-                <DropdownMenuItem className="p-4">
-                  <div className="flex flex-col space-y-1 w-full">
-                    <p className="text-sm font-medium">New lecture available</p>
-                    <p className="text-xs text-muted-foreground">Endocrinology - 3 hours ago</p>
-                  </div>
-                </DropdownMenuItem>
+                {recentNotifications.length > 0 ? (
+                  recentNotifications.map((n) => (
+                    <DropdownMenuItem key={n.id} className="p-4">
+                      <div className="flex flex-col space-y-1 w-full">
+                        <p className="text-sm font-medium">{n.title}</p>
+                        <p className="text-xs text-muted-foreground">{n.time}</p>
+                      </div>
+                    </DropdownMenuItem>
+                  ))
+                ) : (
+                  <div className="p-4 text-sm text-muted-foreground text-center">No new notifications</div>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="p-0">
                   <div 

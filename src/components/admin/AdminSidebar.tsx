@@ -29,7 +29,8 @@ import {
   ArrowLeft,
   GraduationCap,
   Brain,
-  CheckCircle
+  CheckCircle,
+  Bell
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useTranslation } from 'react-i18next';
@@ -68,6 +69,7 @@ export function AdminSidebar() {
     { label: t('admin.management') || 'Management', icon: BookOpen, href: '/admin/management', description: 'Manage specialties, courses, and questions' },
     { label: 'Validation', icon: CheckCircle, href: '/admin/validation', description: 'AI validation system' },
     { label: 'Sessions', icon: FileText, href: '/admin/sessions', description: 'Manage/import sessions' },
+    { label: 'Notifications', icon: Bell, href: '/admin/notifications', description: 'Send targeted notifications to users' },
     { label: t('admin.users'), icon: Users, href: '/admin/users', description: 'Manage users' },
     { label: t('admin.importQuestions'), icon: Upload, href: '/admin/import', description: 'Import QROC questions' },
     { label: t('admin.reports'), icon: AlertTriangle, href: '/admin/reports', description: 'View reports' },

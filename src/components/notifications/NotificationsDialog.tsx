@@ -1,5 +1,5 @@
 'use client';
-import { useState, useCallback, useMemo, memo } from 'react';
+import React, { useState, useCallback, useMemo, memo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -15,10 +15,10 @@ interface Notification {
   id: string;
   title: string;
   message: string;
-  time: string;
-  type: 'info' | 'success' | 'warning' | 'error';
+  time?: string;
+  type?: 'info' | 'success' | 'warning' | 'error';
   read: boolean;
-  category: 'question' | 'progress' | 'lecture' | 'reminder' | 'achievement' | 'system';
+  category?: 'question' | 'progress' | 'lecture' | 'reminder' | 'achievement' | 'system';
 }
 
 interface NotificationsDialogProps {
@@ -26,63 +26,7 @@ interface NotificationsDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-// Enhanced mock notifications data in French
-const mockNotifications: Notification[] = [
-  {
-    id: '1',
-    title: 'Nouvelle question ajoutée',
-    message: 'Une nouvelle question a été ajoutée à la spécialité Cardiologie',
-    time: 'Il y a 2 minutes',
-    type: 'info',
-    read: false,
-    category: 'question',
-  },
-  {
-    id: '2',
-    title: 'Étape de progression atteinte',
-    message: 'Félicitations ! Vous avez terminé 75% de la Chirurgie Générale',
-    time: 'Il y a 1 heure',
-    type: 'success',
-    read: false,
-    category: 'progress',
-  },
-  {
-    id: '3',
-    title: 'Nouveau cours disponible',
-    message: 'Le cours d\'Endocrinologie Avancée est maintenant disponible',
-    time: 'Il y a 3 heures',
-    type: 'info',
-    read: false,
-    category: 'lecture',
-  },
-  {
-    id: '4',
-    title: 'Rappel d\'étude',
-    message: "Vous n'avez pas étudié aujourd'hui. Continuez votre série !",
-    time: 'Il y a 1 jour',
-    type: 'warning',
-    read: true,
-    category: 'reminder',
-  },
-  {
-    id: '5',
-    title: 'Succès débloqué : Érudit',
-    message: 'Vous avez terminé 100 questions en une seule journée',
-    time: 'Il y a 2 jours',
-    type: 'success',
-    read: true,
-    category: 'achievement',
-  },
-  {
-    id: '6',
-    title: 'Maintenance programmée',
-    message: 'Maintenance de la plateforme prévue ce soir de 2h à 4h du matin',
-    time: 'Il y a 3 jours',
-    type: 'warning',
-    read: true,
-    category: 'system',
-  },
-];
+// No mock data; notifications are fetched from the API
 
 // Memoized notification item component for better performance
 const NotificationItem = memo(({ 
@@ -227,7 +171,39 @@ NotificationItem.displayName = 'NotificationItem';
 
 // Main component with performance optimizations
 export function NotificationsDialog({ open, onOpenChange }: NotificationsDialogProps) {
-  const [notifications, setNotifications] = useState<Notification[]>(mockNotifications);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+
+  const formatTime = (d: string | Date) => {
+    const date = typeof d === 'string' ? new Date(d) : d;
+    const diff = (Date.now() - date.getTime()) / 1000;
+    if (diff < 60) return `Il y a ${Math.floor(diff)} sec`;
+    if (diff < 3600) return `Il y a ${Math.floor(diff/60)} min`;
+    if (diff < 86400) return `Il y a ${Math.floor(diff/3600)} h`;
+    return date.toLocaleString();
+  };
+
+  React.useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await fetch('/api/notifications?limit=50', { credentials: 'include' });
+        if (!res.ok) return;
+        const json = await res.json();
+        const stripAdmin = (s: string) => s?.replace(/^\[ADMIN\]\s*/i, '') ?? s;
+        const list = (json.notifications || []).map((n: any) => ({
+          id: n.id,
+          title: stripAdmin(n.title),
+          message: stripAdmin(n.message),
+          read: !!n.isRead,
+          type: n.type,
+          time: n.createdAt ? formatTime(n.createdAt) : undefined,
+        } as Notification));
+        setNotifications(list);
+      } catch (e) {
+        // ignore errors
+      }
+    };
+    if (open) load();
+  }, [open]);
 
   // Memoized calculations for better performance
   const unreadCount = useMemo(() => 
@@ -248,20 +224,30 @@ export function NotificationsDialog({ open, onOpenChange }: NotificationsDialogP
   }), [notifications.length, unreadCount]);
 
   // Optimized callback functions using useCallback
-  const markAsRead = useCallback((id: string) => {
-    setNotifications(prev =>
-      prev.map(n => n.id === id ? { ...n, read: true } : n)
-    );
+  const markAsRead = useCallback(async (id: string) => {
+    try {
+      const res = await fetch(`/api/notifications?id=${id}`, { method: 'PATCH', credentials: 'include' });
+      if (res.ok) {
+        setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+      }
+    } catch {}
   }, []);
 
-  const markAllAsRead = useCallback(() => {
-    setNotifications(prev =>
-      prev.map(n => ({ ...n, read: true }))
-    );
-  }, []);
+  const markAllAsRead = useCallback(async () => {
+    try {
+      const unread = notifications.filter(n => !n.read);
+      // Optimistically update UI
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+      // Best-effort: call PATCH individually (no bulk endpoint yet)
+      await Promise.all(unread.map(n => fetch(`/api/notifications?id=${n.id}`, { method: 'PATCH', credentials: 'include' })));
+    } catch {}
+  }, [notifications]);
 
-  const deleteNotification = useCallback((id: string) => {
-    setNotifications(prev => prev.filter(n => n.id !== id));
+  const deleteNotification = useCallback(async (id: string) => {
+    try {
+      const res = await fetch(`/api/notifications?id=${id}`, { method: 'DELETE', credentials: 'include' });
+      if (res.ok) setNotifications(prev => prev.filter(n => n.id !== id));
+    } catch {}
   }, []);
 
   const handleClose = useCallback(() => {
