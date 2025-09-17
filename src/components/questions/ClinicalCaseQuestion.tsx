@@ -267,8 +267,28 @@ export function ClinicalCaseQuestion({
     setEvaluationIndex(0);
     setEvaluationComplete(openIds.length === 0); // if no open questions, evaluation instantly complete
     onSubmit(clinicalCase.caseNumber, answers, questionResults); // results will be updated as user evaluates
+<<<<<<< HEAD
     // Always scroll to top after submit per request (then user can scroll down to evaluate)
     setTimeout(() => { window.scrollTo({ top: 0, behavior: 'smooth' }); }, 120);
+=======
+    
+    // Auto-open notes area when case is completed
+    setShowNotesArea(true);
+    
+    // Scroll to first evaluation question after a brief delay, or to top if no evaluation needed
+    setTimeout(() => {
+      if (openIds.length > 0) {
+        const firstEvalId = openIds[0];
+        const element = questionRefs.current[firstEvalId];
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      } else {
+        // If no evaluation needed, scroll to top of case
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }, 300);
+>>>>>>> origin/master
   };
   // Allow resubmission: keep current answers, hide results, reset evaluation state and per-question results
   const handleResubmit = () => {
@@ -328,6 +348,7 @@ export function ClinicalCaseQuestion({
     }
   }, [evaluationIndex, evaluationOrder, showResults, evaluationComplete]);
 
+<<<<<<< HEAD
   // Keyboard navigation & progressive reveal (Enter driven)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -397,6 +418,8 @@ export function ClinicalCaseQuestion({
       }
     });
   }, [revealIndex, showResults, clinicalCase.questions]);
+=======
+>>>>>>> origin/master
   const getQuestionStatus = (question: Question) => {
     if (answers[question.id] !== undefined) {
       if (showResults) {
@@ -544,6 +567,7 @@ export function ClinicalCaseQuestion({
             hideMeta
             suppressReminder={true} // Hide "Rappel du cours" in clinical cases
             enableAnswerHighlighting={true} // Enable highlighting for user answers
+            disableKeyboardHandlers={true} // Disable keyboard navigation in clinical cases
           />
         )}
       </div>

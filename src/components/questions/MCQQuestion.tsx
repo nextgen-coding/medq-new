@@ -46,6 +46,7 @@ interface MCQQuestionProps {
   hideMeta?: boolean;
   suppressReminder?: boolean; // hide reminder section (for clinical cases)
   enableOptionHighlighting?: boolean; // enable highlighting for MCQ options (for clinical cases)
+  disableKeyboardHandlers?: boolean; // disable Enter/keyboard shortcuts (for clinical cases)
 }
 
 export function MCQQuestion({ 
@@ -67,7 +68,8 @@ export function MCQQuestion({
   highlightConfirm,
   hideMeta,
   suppressReminder,
-  enableOptionHighlighting = false
+  enableOptionHighlighting = false,
+  disableKeyboardHandlers = false
 }: MCQQuestionProps) {
   const [selectedOptionIds, setSelectedOptionIds] = useState<string[]>([]);
   const [submitted, setSubmitted] = useState(false);
@@ -371,6 +373,8 @@ export function MCQQuestion({
     if (!hideImmediateResults) {
       setSubmitted(true);
     }
+    // Auto-open notes area on submission regardless of result visibility
+    setShowNotesArea(true);
     // If hideImmediateResults is true, keep submitted as false to show checkboxes
     
     // Compute detailed scoring (fractional credit)
@@ -568,10 +572,13 @@ export function MCQQuestion({
   }, [normalizedOptions, submitted, selectedOptionIds, onNext, handleSubmit]);
 
   useEffect(() => {
+    // Don't add keyboard handlers if disabled (for clinical cases)
+    if (disableKeyboardHandlers) return;
+    
     // Use capture to ensure we get the event early
     window.addEventListener('keydown', shortcutHandler, { capture: true });
     return () => window.removeEventListener('keydown', shortcutHandler, { capture: true } as any);
-  }, [shortcutHandler]);
+  }, [shortcutHandler, disableKeyboardHandlers]);
 
   return (
     <motion.div

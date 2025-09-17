@@ -109,13 +109,18 @@ export const QuickCommentBox: React.FC = () => {
       </CardHeader>
       <CardContent className="flex flex-col gap-3 pt-0 pb-4">
         {initialLoading ? (
-          <div className="flex flex-col gap-4 py-4">
-            <div className="flex gap-2">
-              <div className="h-8 flex-1 rounded bg-muted/40 animate-pulse" />
-              <div className="h-8 flex-1 rounded bg-muted/40 animate-pulse" />
+          <div className="flex flex-col gap-3 py-4">
+            <div className="flex flex-col gap-2">
+              <div className="h-8 rounded bg-muted/40 animate-pulse" />
             </div>
-            <div className="h-24 rounded bg-muted/40 animate-pulse" />
-            <div className="space-y-2">
+            {/* Match editor min-height and controls area */}
+            <div className="h-[90px] rounded bg-muted/40 animate-pulse" />
+            <div className="h-8 rounded bg-muted/40 animate-pulse" />
+            <div className="flex items-center justify-between gap-3">
+              <div className="h-4 w-24 rounded bg-muted/30 animate-pulse" />
+              <div className="h-8 w-20 rounded bg-muted/30 animate-pulse" />
+            </div>
+            <div className="space-y-2 mt-1">
               {[1,2,3].map(i=> <div key={i} className="h-10 rounded-md bg-muted/30 animate-pulse" />)}
             </div>
           </div>

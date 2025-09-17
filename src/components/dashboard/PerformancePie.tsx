@@ -72,12 +72,13 @@ export const PerformancePie: React.FC = () => {
             Performance
           </CardTitle>
         </CardHeader>
-        <CardContent className="pt-0 flex flex-col items-center justify-center min-h-[350px] gap-4">
-          <div className="relative w-52 h-52">
+        {/* Match loaded layout: chart area ~220x220 + legend area */}
+        <CardContent className="pt-0 flex flex-col md:flex-row gap-6 md:gap-12 items-center justify-center py-2">
+          <div className="relative" style={{width:220, height:208}}>
             <div className="absolute inset-0 rounded-full bg-muted/40 animate-pulse" />
           </div>
-          <div className="space-y-2 w-full max-w-xs">
-            {[1,2,3].map(i=> <div key={i} className="h-8 w-full rounded-xl bg-muted/40 animate-pulse" />)}
+          <div className="space-y-3 w-full max-w-sm">
+            {[1,2,3].map(i=> <div key={i} className="h-10 w-full rounded-xl bg-muted/40 animate-pulse" />)}
           </div>
         </CardContent>
       </Card>

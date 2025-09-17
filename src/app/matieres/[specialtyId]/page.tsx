@@ -740,8 +740,12 @@ export default function SpecialtyPageRoute() {
                             {(() => {
                               const note = lecture.culmonNote;
                               if (note == null || isNaN(note)) return <span className="text-xs text-gray-400">-</span>;
-                              const color = note >= 16 ? 'bg-green-100 text-green-700 border-green-300' : note >= 12 ? 'bg-blue-100 text-blue-700 border-blue-300' : note >= 8 ? 'bg-yellow-100 text-yellow-700 border-yellow-300' : 'bg-red-100 text-red-700 border-red-300';
-                              return <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${color}`}>{note.toFixed(2)}</span>;
+                              // Plain, larger red text (no background, no border)
+                              return (
+                                <span className="inline-flex items-center font-semibold tabular-nums text-red-600 dark:text-red-400 text-sm sm:text-base leading-none">
+                                  {note.toFixed(2)}
+                                </span>
+                              );
                             })()}
                           </TableCell>
                           <TableCell className="w-64">
@@ -863,8 +867,12 @@ export default function SpecialtyPageRoute() {
                               {(() => {
                                 const note = (lecture as any).culmonNote;
                                 if (note == null || isNaN(note)) return <span className="text-xs text-gray-400">-</span>;
-                                const color = note >= 16 ? 'bg-green-100 text-green-700 border-green-300' : note >= 12 ? 'bg-blue-100 text-blue-700 border-blue-300' : note >= 8 ? 'bg-yellow-100 text-yellow-700 border-yellow-300' : 'bg-red-100 text-red-700 border-red-300';
-                                return <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${color}`}>{note.toFixed(2)}</span>;
+                                // Plain, larger red text (no background, no border)
+                                return (
+                                  <span className="inline-flex items-center font-semibold tabular-nums text-red-600 dark:text-red-400 text-sm sm:text-base leading-none">
+                                    {note.toFixed(2)}
+                                  </span>
+                                );
                               })()}
                             </TableCell>
                             <TableCell className="w-64">

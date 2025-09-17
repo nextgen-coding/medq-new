@@ -92,11 +92,12 @@ export const SpecialtyAverageSlider: React.FC = () => {
         {/* Removed centered pinned toggle; now an icon button in header */}
         {isLoading && (
           <div className="flex flex-col items-center gap-5 py-4">
-            <div className="relative w-40 h-40">
+            {/* Match loaded circle size 48x48 (tailwind w-48 h-48) */}
+            <div className="relative w-48 h-48">
               <div className="absolute inset-0 rounded-full bg-muted/40 animate-pulse" />
             </div>
             <div className="space-y-2 w-full flex flex-col items-center">
-              <div className="h-3 w-32 rounded bg-muted/40 animate-pulse" />
+              <div className="h-4 w-36 rounded bg-muted/40 animate-pulse" />
               <div className="h-3 w-20 rounded bg-muted/40 animate-pulse" />
             </div>
           </div>

@@ -78,7 +78,6 @@ export function OpenQuestion({
   suppressReminder,
   hideMeta,
   enableAnswerHighlighting = false,
-  disableIndividualSubmit = false,
 }: OpenQuestionProps) {
   const [answer, setAnswer] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -163,6 +162,8 @@ export function OpenQuestion({
 
   // Keyboard shortcuts
   useEffect(() => {
+    if (disableKeyboardHandlers) return;
+    
     const handleKeyDown = (event: KeyboardEvent) => {
       // Enter for next question (only when assessment is completed)
       if (event.key === 'Enter' && assessmentCompleted && !event.altKey && !event.shiftKey && !event.ctrlKey) {
@@ -173,7 +174,7 @@ export function OpenQuestion({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [assessmentCompleted, onNext]);
+  }, [assessmentCompleted, onNext, disableKeyboardHandlers]);
 
   // Pin/Unpin handlers for questions
   const handlePinQuestion = useCallback(async () => {
@@ -328,6 +329,9 @@ export function OpenQuestion({
     hasSubmittedRef.current = true;
     setSubmitted(true);
     setHasSubmitted(true);
+    
+    // Auto-open notes area on submission
+    setShowNotesArea(true);
     
     // For clinical case questions (hideImmediateResults = true), 
     // call onSubmit immediately with a default result since self-assessment is hidden
@@ -499,6 +503,8 @@ export function OpenQuestion({
 
   // Keyboard shortcuts: Enter to submit (or next), 1/2/3 to rate during self-assessment
   useEffect(() => {
+    if (disableKeyboardHandlers) return;
+    
     const handleKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       const isTyping = !!target && (
@@ -543,7 +549,7 @@ export function OpenQuestion({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [showSelfAssessment, hideImmediateResults, showDeferredSelfAssessment, submitted, assessmentCompleted, answer, disableIndividualSubmit]);
+  }, [showSelfAssessment, hideImmediateResults, showDeferredSelfAssessment, submitted, assessmentCompleted, answer]);
 
   return (
     <motion.div
