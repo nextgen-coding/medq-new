@@ -31,7 +31,8 @@ export function ContinueLearning({ lastLecture, isLoading = false }: ContinueLea
         <CardHeader className="pb-4">
           <div className="h-6 w-48 bg-muted/50 dark:bg-muted/40 rounded animate-pulse" />
         </CardHeader>
-        <CardContent className="pt-1 pb-5 flex flex-col gap-3">
+        {/* Match loaded state exact content height */}
+        <CardContent className="pt-1 pb-5 flex flex-col gap-4 min-h-[210px]">
           <div className="h-4 w-40 bg-muted/50 rounded animate-pulse" />
           <div className="h-3 w-full bg-muted/50 rounded animate-pulse" />
           <div className="h-8 w-28 bg-muted/50 rounded animate-pulse" />

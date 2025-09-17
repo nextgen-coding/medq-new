@@ -5,7 +5,7 @@ import { Question, ClinicalCase } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ChevronLeft, ChevronRight, CheckCircle, Circle, XCircle, MinusCircle, Stethoscope, EyeOff, StickyNote, Pin, Flag, Pencil } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CheckCircle, Circle, XCircle, MinusCircle, Stethoscope, EyeOff, StickyNote, Pin, Flag, Pencil, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Drawer, DrawerContent, DrawerTrigger } from '@/components/ui/drawer';
 import { useTranslation } from 'react-i18next';
@@ -21,6 +21,8 @@ interface QuestionControlPanelProps {
   onNext: () => void;
   isComplete: boolean;
   pinnedIds?: string[]; // optional list of pinned question IDs
+  onQuit?: () => void; // optional handler to show a Quit button in header
+  quitLabel?: string; // optional label for quit button (default: 'Quitter')
 }
 
 export function QuestionControlPanel({
@@ -32,7 +34,9 @@ export function QuestionControlPanel({
   onPrevious,
   onNext,
   isComplete,
-  pinnedIds = []
+  pinnedIds = [],
+  onQuit,
+  quitLabel = 'Quitter'
 }: QuestionControlPanelProps) {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -179,18 +183,26 @@ export function QuestionControlPanel({
   const DesktopPanel = () => (
     <Card className="hidden lg:block sticky top-6 h-fit max-h-[calc(100vh-8rem)] backdrop-blur-sm bg-white/90 dark:bg-gray-800/90 border border-gray-200/60 dark:border-gray-700/60 shadow-lg rounded-2xl">
       <CardContent className="p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="flex items-center justify-center w-10 h-10 bg-blue-100 dark:bg-blue-900/50 rounded-xl">
-            <Circle className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+        <div className="flex items-start mb-3">
+          <div className="flex items-start flex-1 min-w-0 gap-2 pr-2">
+            <div className="flex items-center justify-center w-8 h-8 bg-blue-100 dark:bg-blue-900/50 rounded-lg flex-shrink-0 mt-0.5">
+              <Circle className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div className="min-w-0 leading-tight">
+              <h3 className="font-bold text-[16.5px] sm:text-[17px] text-gray-900 dark:text-gray-100 truncate tracking-tight">{t('questions.questions')} {t('questions.navigator')}</h3>
+              <p className="text-[11px] sm:text-[11.5px] text-gray-600 dark:text-gray-400">{questions.length} {questions.length === 1 ? 'question' : 'questions'}</p>
+            </div>
           </div>
-          <div>
-            <h3 className="font-bold text-lg text-gray-900 dark:text-gray-100">
-              {t('questions.questions')} {t('questions.navigator')}
-            </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              {questions.length} {questions.length === 1 ? 'question' : 'questions'}
-            </p>
-          </div>
+          {onQuit && (
+            <Button
+              onClick={onQuit}
+              variant="destructive"
+              size="icon"
+              className="ml-auto bg-red-600 hover:bg-red-700 text-white h-10 w-10 rounded-lg flex-shrink-0 shadow-sm hover:shadow focus-visible:ring-2 focus-visible:ring-red-400/60"
+            >
+              <LogOut className="h-5 w-5" />
+            </Button>
+          )}
         </div>
         <ScrollArea ref={scrollAreaRef} className="h-[calc(100vh-20rem)]">
           {renderQuestionsList()}

@@ -15,7 +15,7 @@ import { QuestionNotes } from '@/components/questions/QuestionNotes'
 import { QuestionComments } from '@/components/questions/QuestionComments'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { ArrowLeft, PlusCircle, ListOrdered, Pin, PinOff, Flag, Pencil, Eye, EyeOff, Trash2, StickyNote, ChevronRight, BookOpen, Settings } from 'lucide-react'
+import { Clock, ArrowLeft, ArrowRight, Eye, EyeOff, Settings, RotateCcw, X, Pin, Flag, Pencil, Trash2, StickyNote, ChevronRight, PinOff, CheckCircle, Circle, AlertCircle, FileText, PlusCircle, Loader2, ChevronDown, ChevronUp, Download, Upload, MoreVertical, Play, Pause, Save, Edit, Share, Copy, Check, ListOrdered, List, Grid, Filter, Search, Home, User, Menu, Info, Star, BookOpen, Book, ArrowUp, ArrowDown, RefreshCw, Plus, Minus } from 'lucide-react'
 import { GroupedQrocEditDialog } from '@/components/questions/edit/GroupedQrocEditDialog'
 import { useTranslation } from 'react-i18next'
 import { ClinicalCase, Question } from '@/types'
@@ -136,7 +136,7 @@ export default function CoursPageRoute() {
                     onClick={handleBackToSpecialtyNested} 
                     className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800"
                   >
-                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    <X className="w-4 h-4 mr-2" />
                     Retour
                   </Button>
                 </div>
@@ -798,17 +798,6 @@ export default function CoursPageRoute() {
             </div>
 
             <div className="hidden lg:block lg:w-80 lg:flex-shrink-0">
-              {/* Back button positioned directly above the Questions Navigator for all question types */}
-              {currentQuestion && (
-                <Button
-                  onClick={handleBackToSpecialtyNested}
-                  variant="ghost"
-                  className="mb-3 w-full justify-start gap-2 text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  <span>Retour à la matière</span>
-                </Button>
-              )}
               <QuestionControlPanel
                 questions={questions}
                 currentQuestionIndex={currentQuestionIndex}
@@ -819,6 +808,7 @@ export default function CoursPageRoute() {
                 onNext={handleNext}
                 isComplete={isComplete}
                 pinnedIds={pinnedQuestionIds}
+                onQuit={handleBackToSpecialtyNested}
               />
             </div>
           </div>
@@ -835,6 +825,7 @@ export default function CoursPageRoute() {
               onNext={handleNext}
               isComplete={isComplete}
               pinnedIds={pinnedQuestionIds}
+              onQuit={handleBackToSpecialtyNested}
             />
           </div>
             

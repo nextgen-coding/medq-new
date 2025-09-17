@@ -239,6 +239,9 @@ export function ClinicalCaseQuestion({
     setEvaluationComplete(openIds.length === 0); // if no open questions, evaluation instantly complete
     onSubmit(clinicalCase.caseNumber, answers, questionResults); // results will be updated as user evaluates
     
+    // Auto-open notes area when case is completed
+    setShowNotesArea(true);
+    
     // Scroll to first evaluation question after a brief delay, or to top if no evaluation needed
     setTimeout(() => {
       if (openIds.length > 0) {
@@ -290,59 +293,6 @@ export function ClinicalCaseQuestion({
     }
   }, [evaluationIndex, evaluationOrder, showResults, evaluationComplete]);
 
-  // Keyboard navigation: Answer phase (Enter to advance), Evaluation phase disabled (no keyboard shortcuts)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Evaluation phase key handling - DISABLED to remove 1/2/3 shortcuts
-      if (showResults && !evaluationComplete) {
-        // Disable all number keys for evaluation - user must click buttons
-        if (["1", "2", "3"].includes(e.key)) {
-          // No longer handle 1/2/3 shortcuts
-          e.preventDefault();
-          return;
-        } else if (e.key === 'Enter') {
-          // Enter disabled during evaluation selection
-          e.preventDefault();
-        }
-        return; // stop further processing during evaluation phase
-      }
-
-      // After evaluation complete & results shown: Enter -> next case
-      if (showResults && evaluationComplete) {
-        if (e.key === 'Enter' && !e.shiftKey) {
-          e.preventDefault();
-          onNext();
-        }
-        return;
-      }
-
-      // Answering phase
-      if (!showResults && e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        
-        // If all questions answered, submit
-        if (answeredQuestions === clinicalCase.totalQuestions) {
-          handleCompleteCase();
-          return;
-        }
-        
-        // Find next unanswered question in order
-        const nextUnanswered = clinicalCase.questions.find(q => answers[q.id] === undefined);
-        
-        if (nextUnanswered) {
-          const element = questionRefs.current[nextUnanswered.id];
-          if (element) {
-            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            setTimeout(() => focusFirstInput(nextUnanswered.id), 300);
-          }
-        } else if (answeredQuestions === clinicalCase.totalQuestions) {
-          // Fallback: if somehow all are answered, submit
-          handleCompleteCase();
-        }
-      }
-    };    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [answers, answeredQuestions, isCaseComplete, showResults, evaluationOrder, evaluationIndex, evaluationComplete, clinicalCase.questions, clinicalCase.totalQuestions]);
   const getQuestionStatus = (question: Question) => {
     if (answers[question.id] !== undefined) {
       if (showResults) {
@@ -461,6 +411,7 @@ export function ClinicalCaseQuestion({
             hideMeta
             suppressReminder={true} // Hide "Rappel du cours" in clinical cases
             enableOptionHighlighting={true} // Enable highlighting for MCQ options
+            disableKeyboardHandlers={true} // Disable keyboard navigation in clinical cases
           />
         ) : (
           <OpenQuestion
@@ -487,6 +438,7 @@ export function ClinicalCaseQuestion({
             hideMeta
             suppressReminder={true} // Hide "Rappel du cours" in clinical cases
             enableAnswerHighlighting={true} // Enable highlighting for user answers
+            disableKeyboardHandlers={true} // Disable keyboard navigation in clinical cases
           />
         )}
       </div>

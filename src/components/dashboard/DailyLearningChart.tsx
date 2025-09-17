@@ -119,7 +119,17 @@ export function DailyLearningChart({ data, isLoading: extLoading=false, streak }
   };
 
   if(isLoading){
-    return <Card className="border-border/50 bg-white/50 dark:bg-muted/30 backdrop-blur-sm shadow-lg"><CardHeader><div className="h-6 w-40 bg-muted/60 rounded animate-pulse"/></CardHeader><CardContent><div className="h-[300px] bg-muted/60 rounded animate-pulse"/></CardContent></Card>;
+    return (
+      <Card className="border-border/50 bg-white/50 dark:bg-muted/30 backdrop-blur-sm shadow-lg">
+        <CardHeader className="pb-3">
+          <div className="h-6 w-40 bg-muted/60 rounded animate-pulse"/>
+        </CardHeader>
+        <CardContent className="pb-[2px]">
+          {/* Match loaded chart container height exactly */}
+          <div className="w-full h-[280px] bg-muted/60 rounded animate-pulse" style={{ minWidth: '300px', minHeight: '280px' }} />
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
