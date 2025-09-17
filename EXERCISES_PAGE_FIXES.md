@@ -10,7 +10,7 @@
 ✅ **Better Progress Logic** - Fixed double-counting in completed questions calculation
 ✅ **Enhanced Progress Data** - Added detailed progress metrics for color-coded displays
 ✅ **_count Field** - Added proper _count object to match Specialty type
-✅ **Percentage Rounding** - All percentages properly rounded for display
+✅ **Percentage Rounding** - All percessntages properly rounded for display
 
 ## API Enhancements
 ✅ **Icon Field Included** - Specialties API returns icon field for proper display
