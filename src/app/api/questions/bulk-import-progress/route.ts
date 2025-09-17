@@ -3,7 +3,7 @@ import { read, utils } from 'xlsx';
 import { prisma } from '@/lib/prisma';
 import { requireAuth, AuthenticatedRequest } from '@/lib/auth-middleware';
 import type { Prisma } from '@prisma/client';
-import { rehostImageIfConfigured } from '@/lib/services/media';
+// Images: we keep links as-is in the text; no upload/rehost is performed.
 
 // Store active imports with their progress
 type ImportStats = {
@@ -126,54 +126,8 @@ const canonicalizeHeader = (h: string): string => {
   return headerAliases[n] ?? n;
 };
 
-// Function to extract image URLs from text and clean the text
-function extractImageUrlAndCleanText(text: string): { cleanedText: string; mediaUrl: string | null; mediaType: string | null } {
-  // Regular expression to match URLs and allow trailing punctuation/paren
-  const imageUrlRegex = /(https?:\/\/[^\s)]+?\.(?:jpg|jpeg|png|gif|webp|svg|bmp|tiff|ico))(?:[)\s.,;:!?]|$)/i;
-  
-  let cleanedText = text;
-  let mediaUrl: string | null = null;
-  let mediaType: string | null = null;
-  const match = text.match(imageUrlRegex);
-  if (match) {
-    mediaUrl = match[1];
-    cleanedText = text.replace(match[0], ' ').trim();
-    
-    // Determine media type based on file extension
-    const extension = mediaUrl.split('.').pop()?.toLowerCase();
-    switch (extension) {
-      case 'jpg':
-      case 'jpeg':
-        mediaType = 'image/jpeg';
-        break;
-      case 'png':
-        mediaType = 'image/png';
-        break;
-      case 'gif':
-        mediaType = 'image/gif';
-        break;
-      case 'webp':
-        mediaType = 'image/webp';
-        break;
-      case 'svg':
-        mediaType = 'image/svg+xml';
-        break;
-      case 'bmp':
-        mediaType = 'image/bmp';
-        break;
-      case 'tiff':
-        mediaType = 'image/tiff';
-        break;
-      case 'ico':
-        mediaType = 'image/x-icon';
-        break;
-      default:
-        mediaType = 'image';
-    }
-  }
-  
-  return { cleanedText, mediaUrl, mediaType };
-}
+// Deprecated: we no longer extract/remove image URLs from text.
+// Images embedded as URLs remain in the question text and will be rendered on the frontend.
 
 // Function to parse MCQ options from canonicalized Excel row
 function parseMCQOptions(rowData: Record<string, unknown>): { options: string[], correctAnswers: string[] } {
@@ -369,7 +323,11 @@ async function processFile(file: File, importId: string) {
 
   updateProgress(importId, 25, `Found ${dataRows.length} rows in ${sheetName}...`);
 
-      // Process each row
+  // Track last seen specialty and course to forward-fill missing cells
+  let lastSpecialtyName: string = '';
+  let lastLectureTitle: string = '';
+
+  // Process each row
       for (let i = 0; i < dataRows.length; i++) {
         const sessionLoop = activeImports.get(importId);
         if (!sessionLoop || sessionLoop.cancelled) break; // cancellation check
@@ -384,20 +342,30 @@ async function processFile(file: File, importId: string) {
             rowData[h] = String((row as unknown[])[idx] ?? '').trim();
           });
 
-          // Build basic fields
-          const specialtyName = rowData['matiere'];
-          const lectureTitle = rowData['cours'];
+          // Build basic fields with forward-fill: use last seen values if cells are empty
+          let specialtyName = rowData['matiere'] || lastSpecialtyName;
+          let lectureTitle = rowData['cours'] || lastLectureTitle;
+          if (rowData['matiere']) lastSpecialtyName = rowData['matiere'];
+          if (rowData['cours']) lastLectureTitle = rowData['cours'];
 
-          // Determine question text and extract image URL
+          // Determine question text (keep any image URLs inline inside the text)
           // Note: headers are canonicalized, and 'texte de question' maps to 'texte de la question'
-          const questionText = rowData['texte de la question'] || '';
-          const { cleanedText, mediaUrl, mediaType } = extractImageUrlAndCleanText(questionText);
+          let questionText = rowData['texte de la question'] || '';
+          // Fallback for cas_*: use case text when question text is empty
+          if ((sheetName === 'cas_qcm' || sheetName === 'cas_qroc') && !questionText) {
+            questionText = rowData['texte du cas'] || '';
+          }
+          const imageUrlRegex = /(https?:\/\/[^\s)]+?\.(?:jpg|jpeg|png|gif|webp|svg|bmp|tiff|ico))(?:[)\s.,;:!?]|$)/i;
+          const hasInlineImage = imageUrlRegex.test(questionText);
 
           if (!specialtyName || !lectureTitle) {
             throw new Error('Missing specialty or lecture information');
           }
-          if (!cleanedText || cleanedText.trim().length === 0) {
-            throw new Error('Missing question text');
+          // Allow questions that consist only of an image URL
+          if (!questionText || questionText.trim().length === 0) {
+            if (!hasInlineImage) {
+              throw new Error('Missing question text');
+            }
           }
 
           // Resolve optional niveau/semestre
@@ -506,7 +474,14 @@ async function processFile(file: File, importId: string) {
             caseText = rowData['texte du cas'] || null;
             caseQuestionNumber = parseInt(rowData['question n']) || null;
 
-            if (caseNumber && caseText) {
+            // Only count created cases when clinical is enabled (DCEM)
+            const isPreclinical = ((): boolean => {
+              const nvRaw = rowData['niveau'] || '';
+              const norm = nvRaw ? normalizeNiveauName(nvRaw) : '';
+              return /^PCEM\s*1$/i.test(norm) || /^PCEM\s*2$/i.test(norm) || /^PCEM[12]$/i.test(norm);
+            })();
+
+            if (!isPreclinical && caseNumber && caseText) {
               // Check if this case already exists in our tracking
               const caseKey = `${lecture.id}_${caseNumber}`;
               if (!createdCases.has(caseKey)) {
@@ -517,15 +492,13 @@ async function processFile(file: File, importId: string) {
             }
           }
 
-          let hostedUrl: string | null = mediaUrl;
-          let hostedType: string | null = mediaType;
-          if (mediaUrl) {
-            // Rehost if configured (currently no-op returning same url)
-            const hosted = await rehostImageIfConfigured(mediaUrl);
-            hostedUrl = hosted.url;
-            hostedType = hosted.type;
+          // We no longer extract image URLs from text; keep them inline and let frontend render.
+          // Count presence of inline image for stats only.
+          let hostedUrl: string | null = null;
+          let hostedType: string | null = null;
+          if (hasInlineImage) {
             importStats.questionsWithImages++;
-            updateProgress(importId, progress, `Extracted image from question`, `🖼️ Extracted image: ${hostedUrl}`);
+            updateProgress(importId, progress, `Found inline image link in text`, `🖼️ Inline image URL detected in question text`);
           }
 
           // Prepare question data based on sheet type
@@ -547,7 +520,7 @@ async function processFile(file: File, importId: string) {
 
           let questionData: MutableQuestionData = {
             lectureId: lecture.id,
-            text: cleanedText,
+            text: questionText,
             courseReminder: null,
             number: Number.isFinite(parseInt(rowData['question n'])) ? parseInt(rowData['question n']) : null,
             session: rowData['source'] || null,
@@ -564,7 +537,7 @@ async function processFile(file: File, importId: string) {
           }
 
           // If no media extracted from text and an explicit image column exists, use it
-          if (!questionData.mediaUrl && rowData['image']) {
+          if (!hasInlineImage && !questionData.mediaUrl && rowData['image']) {
             const rawImg = String(rowData['image']).trim();
             if (rawImg) {
               questionData.mediaUrl = rawImg;
@@ -601,7 +574,13 @@ async function processFile(file: File, importId: string) {
 
             case 'cas_qcm': {
               const casQcmOptions = parseMCQOptions(rowData);
-              questionData.type = 'clinic_mcq';
+              // Niveau-aware normalization: in PCEM 1/2, persist as base MCQ (no clinical type)
+              const isPreclinical = ((): boolean => {
+                const nvRaw = rowData['niveau'] || '';
+                const norm = nvRaw ? normalizeNiveauName(nvRaw) : '';
+                return /^PCEM\s*1$/i.test(norm) || /^PCEM\s*2$/i.test(norm) || /^PCEM[12]$/i.test(norm);
+              })();
+              questionData.type = isPreclinical ? 'mcq' : 'clinic_mcq';
               questionData.options = casQcmOptions.options;
               questionData.correctAnswers = casQcmOptions.correctAnswers;
               questionData.caseNumber = caseNumber;
@@ -613,7 +592,13 @@ async function processFile(file: File, importId: string) {
             }
 
             case 'cas_qroc': {
-              questionData.type = 'clinic_croq';
+              // Niveau-aware normalization: in PCEM 1/2, persist as base QROC (no clinical type)
+              const isPreclinical = ((): boolean => {
+                const nvRaw = rowData['niveau'] || '';
+                const norm = nvRaw ? normalizeNiveauName(nvRaw) : '';
+                return /^PCEM\s*1$/i.test(norm) || /^PCEM\s*2$/i.test(norm) || /^PCEM[12]$/i.test(norm);
+              })();
+              questionData.type = isPreclinical ? 'qroc' : 'clinic_croq';
               {
                 const ans = String(rowData['reponse'] || '').trim();
                 if (!ans) throw new Error('Clinical QROC missing answer');
@@ -653,7 +638,7 @@ async function processFile(file: File, importId: string) {
           });
 
           importStats.imported++;
-          updateProgress(importId, progress, `Imported question ${i + 1}`, `✅ Imported ${sheetName} question: ${cleanedText.substring(0, 50)}...`);
+          updateProgress(importId, progress, `Imported question ${i + 1}`, `✅ Imported ${sheetName} question: ${questionText.substring(0, 50)}...`);
 
         } catch (error) {
           importStats.failed++;

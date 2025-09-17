@@ -788,11 +788,11 @@ export function QuestionComments({ questionId }: QuestionCommentsProps) {
                       style={{ 
                         minHeight: '24px', 
                         maxHeight: '120px', 
-                        direction: 'ltr !important', 
-                        textAlign: 'left !important', 
-                        unicodeBidi: 'plaintext !important',
-                        writingMode: 'horizontal-tb !important',
-                        textOrientation: 'mixed !important'
+                        direction: 'ltr', 
+                        textAlign: 'left', 
+                        unicodeBidi: 'plaintext',
+                        writingMode: 'horizontal-tb',
+                        textOrientation: 'mixed'
                       }}
                       rows={1}
                       dir="ltr"

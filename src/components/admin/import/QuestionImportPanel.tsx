@@ -20,6 +20,57 @@ const SUPPORTED_MIME = [
 const MAX_FILE_SIZE_MB = 8;
 const PREVIEW_LIMIT = 10;
 
+// Canonicalize header names similar to server-side import logic
+const normalizeHeader = (h: string): string =>
+  String(h || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+
+const headerAliases: Record<string, string> = {
+  'matiere': 'matiere',
+  'cours': 'cours',
+  'question n': 'question n',
+  'question no': 'question n',
+  'question n°': 'question n',
+  'source': 'source',
+  'texte de la question': 'texte de la question',
+  'texte question': 'texte de la question',
+  'texte de question': 'texte de la question',
+  'texte du cas': 'texte du cas',
+  'texte cas': 'texte du cas',
+  'option a': 'option a',
+  'option b': 'option b',
+  'option c': 'option c',
+  'option d': 'option d',
+  'option e': 'option e',
+  'reponse': 'reponse',
+  'reponse(s)': 'reponse',
+  'cas n': 'cas n',
+  'cas no': 'cas n',
+  'cas n°': 'cas n',
+  'explication': 'explication',
+  'explication a': 'explication a',
+  'explication b': 'explication b',
+  'explication c': 'explication c',
+  'explication d': 'explication d',
+  'explication e': 'explication e',
+  'niveau': 'niveau',
+  'level': 'niveau',
+  'semestre': 'semestre',
+  'semester': 'semestre',
+  'image': 'image',
+  'image url': 'image',
+  'image_url': 'image'
+};
+
+const canonicalizeHeader = (h: string): string => {
+  const n = normalizeHeader(h);
+  return headerAliases[n] ?? n;
+};
+
 const safeParseInt = (value: string): number | null => {
   if (value === undefined || value === null) return null;
   const n = parseInt(value, 10);
@@ -112,22 +163,32 @@ export function QuestionImportPanel() {
         const jsonData = utils.sheet_to_json(worksheet, { header: 1 });
         if (jsonData.length < 2) continue;
         const headerRow = jsonData[0] as string[];
-        const header = headerRow.map(h => h?.toString().trim().toLowerCase() || '');
+        const header = headerRow.map(h => canonicalizeHeader(h?.toString() || ''));
         let expectedHeaders: string[] = []; let questionType = '';
         switch (sheetName) {
           case 'qcm': expectedHeaders = ['matiere', 'cours', 'question n', 'source', 'texte de la question', 'option a', 'option b', 'option c', 'option d', 'option e', 'reponse']; questionType = 'QCM'; break;
           case 'qroc': expectedHeaders = ['matiere', 'cours', 'question n', 'source', 'texte de la question', 'reponse']; questionType = 'QROC'; break;
-          case 'cas_qcm': expectedHeaders = ['matiere', 'cours', 'cas n', 'source', 'texte du cas', 'question n', 'texte de question', 'option a', 'option b', 'option c', 'option d', 'option e', 'reponse']; questionType = 'Cas clinique QCM'; break;
-          case 'cas_qroc': expectedHeaders = ['matiere', 'cours', 'cas n', 'source', 'texte du cas', 'question n', 'texte de question', 'reponse']; questionType = 'Cas clinique QROC'; break; }
+          case 'cas_qcm':
+            // For cas_*, require 'texte du cas'; question column is optional and will fallback
+            expectedHeaders = ['matiere', 'cours', 'cas n', 'source', 'texte du cas', 'question n', 'option a', 'option b', 'option c', 'option d', 'option e', 'reponse'];
+            questionType = 'Cas clinique QCM';
+            break;
+          case 'cas_qroc':
+            expectedHeaders = ['matiere', 'cours', 'cas n', 'source', 'texte du cas', 'question n', 'reponse'];
+            questionType = 'Cas clinique QROC';
+            break; }
         const missingHeaders = expectedHeaders.filter(h => !header.includes(h)); if (missingHeaders.length > 0) { newSheetErrors.push({ sheet: sheetName, missingHeaders, message: `En-têtes manquants: ${missingHeaders.join(', ')}` }); continue; }
-        const previewData: any[] = []; let validQuestionCount = 0; const questionTextColumn = (sheetName === 'cas_qcm' || sheetName === 'cas_qroc') ? 'texte de question' : 'texte de la question';
+        const previewData: any[] = []; let validQuestionCount = 0; const questionTextColumn = 'texte de la question';
         for (let i = 1; i < jsonData.length; i++) {
           const row = jsonData[i] as unknown[]; if (!row || row.length === 0) continue; const values = row.map(cell => cell?.toString().trim() || '');
           const rowData: Record<string, string> = {}; header.forEach((h, idx) => { rowData[h] = values[idx] || ''; });
-          const hasCore = rowData['matiere'] && rowData['cours'] && rowData[questionTextColumn]; if (!hasCore) continue; validQuestionCount++;
+          // Fallback to case text for cas_* if question text is empty
+          const rawQuestion = rowData[questionTextColumn] || '';
+          const fallbackQuestion = (sheetName === 'cas_qcm' || sheetName === 'cas_qroc') && !rawQuestion ? (rowData['texte du cas'] || '') : rawQuestion;
+          const hasCore = rowData['matiere'] && rowData['cours'] && fallbackQuestion; if (!hasCore) continue; validQuestionCount++;
           uniqueSpecialties.add(rowData['matiere']); const lectureKey = `${rowData['matiere']}:${rowData['cours']}`; const matchedLecture = findMatchingLecture(rowData['matiere'], rowData['cours']); if (matchedLecture) matchedLectures.add(lectureKey); else unmatchedLectures.add(lectureKey);
           if (previewData.length < PREVIEW_LIMIT) {
-            const { cleanedText, mediaUrl, mediaType } = extractImageUrlAndCleanText(rowData[questionTextColumn]);
+            const { cleanedText, mediaUrl, mediaType } = extractImageUrlAndCleanText(fallbackQuestion);
             const questionNumber = safeParseInt(rowData['question n']);
             const previewItem: any = { matiere: rowData['matiere'], cours: rowData['cours'], questionNumber: questionNumber ?? 0, questionText: cleanedText, matchedLecture, mediaUrl, mediaType, explanation: rowData['explication'] || undefined, niveau: rowData['niveau'] || undefined, semestre: rowData['semestre'] || undefined };
             if (rowData['rappel']) previewItem.rappel = rowData['rappel'];
@@ -220,6 +281,7 @@ export function QuestionImportPanel() {
                       <p className="font-medium">CAS QCM :</p>
                       <ul className="text-xs space-y-1 mt-1">
                         <li>• <code>texte du cas</code> ou <code>case</code></li>
+                        <li>• <em>Optionnel</em>: <code>texte de la question</code> (si vide, on utilisera le texte du cas)</li>
                         <li>• + toutes les colonnes QCM</li>
                       </ul>
                     </div>
@@ -227,6 +289,7 @@ export function QuestionImportPanel() {
                       <p className="font-medium">CAS QROC :</p>
                       <ul className="text-xs space-y-1 mt-1">
                         <li>• <code>texte du cas</code> ou <code>case</code></li>
+                        <li>• <em>Optionnel</em>: <code>texte de la question</code> (si vide, on utilisera le texte du cas)</li>
                         <li>• + toutes les colonnes QROC</li>
                       </ul>
                     </div>

@@ -23,6 +23,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 // Card/collapsible also reused for grouped QROC shared reminder
 import { QuestionManagementDialog } from '@/components/questions/QuestionManagementDialog'
 import { useAuth } from '@/contexts/AuthContext'
+import { OrganizerProvider } from '@/contexts/OrganizerContext'
 // import ZoomableImage from '@/components/questions/ZoomableImage'
 // import { LectureComments } from '@/components/lectures/LectureComments'
 
@@ -333,20 +334,21 @@ export default function LecturePageRoute() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-gradient-to-br from-blue-50/50 via-white to-blue-50/50 dark:from-blue-950/20 dark:via-gray-900 dark:to-blue-950/20">
-        <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6">
-          <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 pb-10 lg:pb-0">
-            <div className="flex-1 space-y-4 sm:space-y-6 min-w-0 w-full max-w-full">
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-3">
-                {/* Back to specialty button */}
-                <Button
-                  onClick={handleBackToSpecialtyNested}
-                  variant="ghost"
-                  className="flex items-center gap-2 text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 w-fit"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  <span className="hidden sm:inline">Back to Specialty</span>
-                </Button>
+      <OrganizerProvider>
+        <div className="min-h-screen bg-gradient-to-br from-blue-50/50 via-white to-blue-50/50 dark:from-blue-950/20 dark:via-gray-900 dark:to-blue-950/20">
+          <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6">
+            <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 pb-10 lg:pb-0">
+              <div className="flex-1 space-y-4 sm:space-y-6 min-w-0 w-full max-w-full">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-3">
+                  {/* Back to specialty button */}
+                  <Button
+                    onClick={handleBackToSpecialtyNested}
+                    variant="ghost"
+                    className="flex items-center gap-2 text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 w-fit"
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                    <span className="hidden sm:inline">Back to Specialty</span>
+                  </Button>
                 <div className="flex items-center gap-2 flex-wrap justify-end">
                   {(user?.role === 'admin' || user?.role === 'maintainer') && (
                     <>
@@ -413,16 +415,17 @@ export default function LecturePageRoute() {
             
         </div>
       </div>
-    {/* Admin and Maintainer: Maintainers can create/edit, but not organizer */}
-    {(user?.role === 'admin' || user?.role === 'maintainer') && lecture && (
-        <QuestionManagementDialog
-          lecture={lecture}
-          isOpen={openQuestionsDialog}
-      onOpenChange={(o)=>{ setOpenQuestionsDialog(o); if(!o) setOpenOrganizer(false); }}
-      initialOrganizerOpen={user?.role === 'admin' ? openOrganizer : false}
-          initialCreateOpen
-        />
-      )}
+      {/* Admin and Maintainer: Maintainers can create/edit, but not organizer */}
+      {(user?.role === 'admin' || user?.role === 'maintainer') && lecture && (
+          <QuestionManagementDialog
+            lecture={lecture}
+            isOpen={openQuestionsDialog}
+        onOpenChange={(o)=>{ setOpenQuestionsDialog(o); if(!o) setOpenOrganizer(false); }}
+        initialOrganizerOpen={user?.role === 'admin' ? openOrganizer : false}
+            initialCreateOpen
+          />
+        )}
+      </OrganizerProvider>
     </ProtectedRoute>
   )
 }

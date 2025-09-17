@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from 'react';
-import { useRef } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { AdminRoute } from '@/components/auth/AdminRoute';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
@@ -15,16 +14,19 @@ import {
   Clock, 
   CheckCircle, 
   XCircle, 
-  Users, 
   FileText, 
   Download, 
-  MoreHorizontal,
   ChevronLeft,
   ChevronRight,
   Filter as FilterIcon,
-  Bug as BugIcon
+  Bug as BugIcon,
+  Info,
+  Trash2,
+  Activity,
+  Terminal
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 
 interface AiJob {
   id: string;
@@ -37,10 +39,7 @@ interface AiJob {
   createdAt: string;
   startedAt?: string;
   completedAt?: string;
-  user?: {
-    name?: string;
-    email?: string;
-  };
+  user?: { name?: string; email?: string };
 }
 
 interface StatsData {
@@ -63,6 +62,8 @@ export default function AdminValidationPage() {
     bad: BadRow[];
     goodCount: number;
     badCount: number;
+    sessionId?: string;
+    fileName?: string;
   } | null>(null);
 
   const [allJobs, setAllJobs] = useState<AiJob[]>([]);
@@ -74,7 +75,16 @@ export default function AdminValidationPage() {
     activeJobs: 0,
     failedJobs: 0
   });
+  const [confirmDeleteJob, setConfirmDeleteJob] = useState<AiJob | null>(null);
+  const [deletingJobId, setDeletingJobId] = useState<string | null>(null);
   
+  // Details modal
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsJobId, setDetailsJobId] = useState<string | null>(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [detailsData, setDetailsData] = useState<any | null>(null);
+  const detailsEventRef = useRef<EventSource | null>(null);
+
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 4;
@@ -156,6 +166,10 @@ export default function AdminValidationPage() {
         clearInterval(refreshIntervalRef.current);
         refreshIntervalRef.current = null;
       }
+      if (detailsEventRef.current) {
+        detailsEventRef.current.close();
+        detailsEventRef.current = null;
+      }
     };
   }, []);
 
@@ -194,15 +208,44 @@ export default function AdminValidationPage() {
     }
   };
 
-  const downloadValidated = (mode: 'good' | 'bad') => {
+  const downloadValidated = async (mode: 'good' | 'bad') => {
     if (!validationResult) return;
-    const payload = encodeURIComponent(JSON.stringify({
-      good: validationResult.good,
-      bad: validationResult.bad,
-    }));
-    const url = `/api/validation?mode=${mode}&payload=${payload}`;
-    // Open in a new tab to trigger download
-    window.open(url, '_blank');
+    try {
+      // Prefer session-based download (no long URLs)
+      if (validationResult.sessionId) {
+        const res = await fetch(`/api/validation?mode=${mode}&sessionId=${validationResult.sessionId}`);
+        if (!res.ok) throw new Error('Export failed');
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = `validation_${mode}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        return;
+      }
+
+      // Fallback to POST export with JSON body
+      const res = await fetch('/api/validation/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode, good: validationResult.good, bad: validationResult.bad })
+      });
+      if (!res.ok) throw new Error('Export failed');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = `validation_${mode}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      toast.error('Impossible de télécharger');
+    }
   };
 
   const resetValidation = () => {
@@ -233,6 +276,73 @@ export default function AdminValidationPage() {
     }
   };
 
+  // Delete job (custom dialog)
+  const deleteJob = async (job: AiJob) => {
+    setDeletingJobId(job.id);
+    try {
+      const response = await fetch(`/api/validation/ai-progress?aiId=${job.id}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error('Suppression échouée');
+      toast.success('Job supprimé');
+      if (detailsJobId === job.id) {
+        setDetailsOpen(false);
+        setDetailsJobId(null);
+        setDetailsData(null);
+      }
+      // Optimistic removal
+      setAllJobs(prev => prev.filter(j => j.id !== job.id));
+      loadJobs();
+    } catch (error: any) {
+      toast.error('Erreur suppression', { description: error?.message || 'Erreur inconnue' });
+    } finally {
+      setConfirmDeleteJob(null);
+      setDeletingJobId(null);
+    }
+  };
+
+  // Open job details
+  const openDetails = async (job: AiJob) => {
+    setDetailsJobId(job.id);
+    setDetailsOpen(true);
+    setDetailsLoading(true);
+    try {
+      const response = await fetch(`/api/validation/ai-progress?aiId=${encodeURIComponent(job.id)}&action=details`);
+      if (response.ok) {
+        const data = await response.json();
+        setDetailsData(data);
+
+        // Auto-refresh logs if job is running
+        if (data.phase === 'running') {
+          if (detailsEventRef.current) detailsEventRef.current.close();
+          const eventSource = new EventSource(`/api/validation/ai-progress?aiId=${encodeURIComponent(job.id)}`);
+          detailsEventRef.current = eventSource;
+          eventSource.onmessage = (ev) => {
+            try {
+              const upd = JSON.parse(ev.data);
+              setDetailsData((prev: any) => prev ? { ...prev, ...upd, logs: upd.logs || prev.logs || [] } : upd);
+            } catch { }
+          };
+          eventSource.onerror = () => {
+            eventSource.close();
+          };
+        }
+      } else {
+        toast.error('Impossible de charger les détails');
+      }
+    } finally {
+      setDetailsLoading(false);
+    }
+  };
+
+  const closeDetails = () => {
+    setDetailsOpen(false);
+    setDetailsJobId(null);
+    setDetailsData(null);
+    if (detailsEventRef.current) {
+      detailsEventRef.current.close();
+      detailsEventRef.current = null;
+    }
+  };
+
   // Status badge component
   const StatusBadge = ({ status }: { status: string }) => {
     const variants: Record<string, { color: string; icon: any }> = {
@@ -260,8 +370,7 @@ export default function AdminValidationPage() {
 
   // Pagination
   const totalPages = Math.ceil(allJobs.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const displayedJobs = allJobs.slice(startIndex, startIndex + itemsPerPage);
+  const displayedJobs = allJobs.slice((currentPage - 1) * itemsPerPage, (currentPage - 1) * itemsPerPage + itemsPerPage);
 
   return (
     <ProtectedRoute requireAdmin>
@@ -342,7 +451,7 @@ export default function AdminValidationPage() {
                         <li>Présence des colonnes requises par type de feuille</li>
                         <li>Réponses QCM valides (A–E) ou "?" / "Pas de réponse"</li>
                         <li>Réponses QROC non vides</li>
-                        <li>Explications présentes (globale ou par option)</li>
+                        <li>Explications: facultatives (QCM/QROC/Cas clinique), si présentes on les conserve</li>
                       </ul>
                       <p><strong>Résultat :</strong> Liste des lignes valides vs invalides avec raisons d'erreur</p>
                     </div>
@@ -513,9 +622,10 @@ export default function AdminValidationPage() {
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => setPreviewJob(job)}
+                                onClick={() => openDetails(job)}
+                                title="Détails"
                               >
-                                Détails
+                                <Info className="h-4 w-4 mr-1" /> Détails
                               </Button>
                               
                               {job.status === 'completed' && (
@@ -528,8 +638,17 @@ export default function AdminValidationPage() {
                                 </Button>
                               )}
                               
-                              {/* Delete job (local only for now) */}
-                              {/* ...existing Buttons... */}
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => setConfirmDeleteJob(job)}
+                                title="Supprimer"
+                                disabled={deletingJobId === job.id}
+                              >
+                                {deletingJobId === job.id ? (
+                                  <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-full border-2 border-white border-t-transparent animate-spin" />...</span>
+                                ) : <Trash2 className="h-4 w-4" />}
+                              </Button>
                             </div>
                           </div>
                         </div>
@@ -578,6 +697,95 @@ export default function AdminValidationPage() {
               onOpenChange={() => setPreviewJob(null)}
             />
           )}
+
+          {/* Details Dialog */}
+          {detailsOpen && (
+            <div className="fixed inset-0 z-50 flex items-start justify-center p-4 overflow-y-auto bg-black/40">
+              <div className="bg-white dark:bg-gray-900 shadow-xl rounded-lg w-full max-w-4xl p-6 relative">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-sm font-semibold flex items-center gap-2">
+                    <Activity className="h-4 w-4" /> Détails Job {detailsData?.fileName && <span className="font-normal text-muted-foreground">({detailsData.fileName})</span>}
+                  </h2>
+                  <div className="flex gap-2">
+                    {detailsData?.phase === 'complete' && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => downloadJobResult({ id: detailsData.id, fileName: detailsData.fileName, status: 'completed', progress: detailsData.progress, message: detailsData.message, createdAt: new Date().toISOString() } as AiJob)}
+                      >
+                        <Download className="h-4 w-4 mr-1" /> Télécharger
+                      </Button>
+                    )}
+                    <Button size="sm" variant="ghost" onClick={closeDetails}>
+                      Fermer
+                    </Button>
+                  </div>
+                </div>
+                {detailsLoading && <p className="text-xs text-muted-foreground">Chargement…</p>}
+                {!detailsLoading && detailsData && (
+                  <div className="space-y-5">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                      <div className="p-2 rounded bg-gray-100 dark:bg-gray-800">
+                        <p className="font-medium">Phase</p>
+                        <p>{detailsData.phase}</p>
+                      </div>
+                      <div className="p-2 rounded bg-gray-100 dark:bg-gray-800">
+                        <p className="font-medium">Progression</p>
+                        <p>{detailsData.progress}%</p>
+                      </div>
+                      <div className="p-2 rounded bg-gray-100 dark:bg-gray-800">
+                        <p className="font-medium">Corrigées</p>
+                        <p>{detailsData.stats?.fixedCount ?? 0}</p>
+                      </div>
+                      <div className="p-2 rounded bg-gray-100 dark:bg-gray-800">
+                        <p className="font-medium">Erreurs</p>
+                        <p>{detailsData.stats?.errorCount ?? 0}</p>
+                      </div>
+                      <div className="p-2 rounded bg-gray-100 dark:bg-gray-800 md:col-span-2 col-span-2">
+                        <p className="font-medium">Lots</p>
+                        <p>{detailsData.stats?.processedBatches ?? 0} / {detailsData.stats?.totalBatches ?? 0}</p>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs font-medium flex items-center gap-1">
+                        <Terminal className="h-3 w-3" /> Logs
+                      </p>
+                      <div className="border rounded h-64 overflow-y-auto bg-gray-50 dark:bg-gray-800 p-3 text-[11px] leading-relaxed font-mono">
+                        {(detailsData.logs || []).length === 0 && <p className="text-muted-foreground">Aucun log</p>}
+                        {(detailsData.logs || []).map((l: string, i: number) => (
+                          <div key={i} className="whitespace-pre-wrap">{l}</div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Global Delete Confirmation Dialog (always mounted) */}
+          <Dialog open={!!confirmDeleteJob} onOpenChange={(o)=>{ if(!o) setConfirmDeleteJob(null); }}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Supprimer ce job ?</DialogTitle>
+                <DialogDescription>
+                  Cette action est irréversible. Le job {confirmDeleteJob?.fileName} sera définitivement supprimé.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="text-sm space-y-2">
+                <p>ID: <code className="text-xs">{confirmDeleteJob?.id}</code></p>
+                {confirmDeleteJob?.status !== 'completed' && (
+                  <p className="text-red-600 dark:text-red-400 text-xs">Attention: ce job n'est pas terminé.</p>
+                )}
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={()=>setConfirmDeleteJob(null)}>Annuler</Button>
+                <Button variant="destructive" disabled={!!deletingJobId} onClick={()=> confirmDeleteJob && deleteJob(confirmDeleteJob)}>
+                  {deletingJobId ? 'Suppression...' : 'Supprimer'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </AdminLayout>
       </AdminRoute>
     </ProtectedRoute>

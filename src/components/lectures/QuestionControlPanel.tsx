@@ -10,6 +10,18 @@ import { cn } from '@/lib/utils';
 import { Drawer, DrawerContent, DrawerTrigger } from '@/components/ui/drawer';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganizer } from '@/contexts/OrganizerContext';
+
+type ColumnKey = 'mcq' | 'qroc' | 'clinical';
+
+interface OrganizerEntry {
+  id: string;
+  type: string;
+  text: string;
+  number?: number;
+  caseNumber?: number;
+  originalIndex: number;
+}
 
 interface QuestionControlPanelProps {
   questions: (Question | ClinicalCase)[];
@@ -21,8 +33,12 @@ interface QuestionControlPanelProps {
   onNext: () => void;
   isComplete: boolean;
   pinnedIds?: string[]; // optional list of pinned question IDs
+<<<<<<< HEAD
+  organizerState?: Record<ColumnKey, OrganizerEntry[]> | null; // optional organizer override
+=======
   onQuit?: () => void; // optional handler to show a Quit button in header
   quitLabel?: string; // optional label for quit button (default: 'Quitter')
+>>>>>>> origin/master
 }
 
 export function QuestionControlPanel({
@@ -35,13 +51,21 @@ export function QuestionControlPanel({
   onNext,
   isComplete,
   pinnedIds = [],
+<<<<<<< HEAD
+  organizerState = null
+=======
   onQuit,
   quitLabel = 'Quitter'
+>>>>>>> origin/master
 }: QuestionControlPanelProps) {
   const { t } = useTranslation();
   const { user } = useAuth();
+  const { isOrganizerOpen, organizerState: contextOrganizerState } = useOrganizer();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [notesMap, setNotesMap] = useState<Record<string, boolean>>({});
+  
+  // Use organizer state from context if available, otherwise use prop
+  const activeOrganizerState = contextOrganizerState || organizerState;
   
   // Refs to track question buttons for auto-scrolling
   const questionRefs = useRef<Record<number, HTMLButtonElement | null>>({});
@@ -212,7 +236,183 @@ export function QuestionControlPanel({
     </Card>
   );
 
+  const renderOrganizerBasedNavigation = () => {
+    if (!activeOrganizerState) return null;
+
+    const getTypeLabel = (key: ColumnKey) => {
+      switch (key) {
+        case 'mcq': return t('questions.mcq');
+        case 'qroc': return 'QROC';
+        case 'clinical': return 'Cas Cliniques';
+      }
+    };
+
+    const getColumnIcon = (key: ColumnKey) => {
+      switch (key) {
+        case 'clinical': return <Stethoscope className="h-4 w-4 text-blue-600 dark:text-blue-400" />;
+        default: return <div className="w-2 h-2 bg-blue-500 rounded-full"></div>;
+      }
+    };
+
+    const renderOrganizerButton = (entry: OrganizerEntry, displayNumber: number) => {
+      let isAnswered = false;
+      let isCorrect: boolean | 'partial' | undefined;
+      let isCurrent = false;
+      let actualIndex = entry.originalIndex;
+      
+      // For groups, find the actual index in the questions array and check group answers
+      if (entry.originalIndex === -1 && entry.caseNumber) {
+        // Find the ClinicalCase object with matching caseNumber
+        const foundIndex = questions.findIndex(item => {
+          if ('questions' in item && 'caseNumber' in item) {
+            return (item as any).caseNumber === entry.caseNumber;
+          }
+          return false;
+        });
+        if (foundIndex !== -1) {
+          actualIndex = foundIndex;
+          // For groups, check if all questions in the group are answered
+          const groupItem = questions[foundIndex];
+          if ('questions' in groupItem) {
+            const groupQuestions = (groupItem as any).questions;
+            isAnswered = groupQuestions.every((q: any) => answers[q.id] !== undefined);
+            
+            // Calculate group result
+            if (isAnswered) {
+              const allCorrect = groupQuestions.every((q: any) => answerResults[q.id] === true);
+              const someCorrect = groupQuestions.some((q: any) => answerResults[q.id] === true || answerResults[q.id] === 'partial');
+              isCorrect = allCorrect ? true : (someCorrect ? 'partial' : false);
+            }
+          }
+        }
+      } else {
+        // For single questions
+        isAnswered = answers[entry.id] !== undefined;
+        isCorrect = answerResults[entry.id];
+      }
+      
+      isCurrent = actualIndex === currentQuestionIndex && !isComplete;
+      const hasNote = notesMap[entry.id] === true;
+      const isPinned = pinnedIds.includes(entry.id);
+
+      return (
+        <motion.div
+          key={entry.id}
+          layout
+          initial={{ opacity: 0, y: 4, scale: 0.995 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -4, scale: 0.99 }}
+          transition={{ type: 'spring', stiffness: 160, damping: 22, mass: 0.6 }}
+        >
+          <Button
+            ref={(el) => { 
+              if (actualIndex >= 0) {
+                questionRefs.current[actualIndex] = el; 
+              }
+            }}
+            variant="outline"
+            className={cn(
+              "relative overflow-hidden w-full justify-start h-auto p-3 backdrop-blur-sm bg-white/90 dark:bg-gray-800/90 border border-gray-200/60 dark:border-gray-700/60 hover:bg-blue-50/70 dark:hover:bg-blue-900/30 hover:border-blue-300/80 dark:hover:border-blue-600/70 rounded-xl transition-colors duration-300 will-change-transform",
+              isCurrent && "border-blue-500 dark:border-blue-400 bg-blue-50/80 dark:bg-blue-900/40 shadow-[0_6px_18px_-4px_rgba(0,0,0,0.18)]",
+              isAnswered && !isCurrent && "bg-gray-50 dark:bg-gray-700/40"
+            )}
+            onClick={() => {
+              if (actualIndex >= 0) {
+                onQuestionSelect(actualIndex);
+                setIsDrawerOpen(false);
+              }
+            }}
+          >
+            {/* Animated active glow */}
+            {isCurrent && (
+              <motion.div
+                layoutId="active-glow"
+                className="absolute inset-0 pointer-events-none"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ type: 'spring', stiffness: 120, damping: 24, mass: 0.9 }}
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-500/15 via-blue-400/10 to-blue-500/15" />
+                <div className="absolute -inset-px rounded-xl ring-1 ring-blue-400/40 dark:ring-blue-500/30" />
+              </motion.div>
+            )}
+            <div className="flex items-start w-full relative">
+              <div className="flex flex-col items-start mr-3 flex-1 min-w-0">
+                <span className="text-left text-sm sm:text-base font-semibold text-gray-900 dark:text-gray-100 truncate w-full">
+                  {entry.text}
+                </span>
+                <span className="text-left text-xs text-gray-600 dark:text-gray-400 truncate flex items-center gap-1 w-full">
+                  {`${entry.type.toUpperCase()} ${displayNumber}`}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                {isPinned && (
+                  <Pin className="h-4 w-4 text-pink-600 dark:text-pink-400" />
+                )}
+                {hasNote && (
+                  <StickyNote className="h-4 w-4 text-yellow-500" />
+                )}
+                <motion.div
+                  layout
+                  className="flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-700"
+                  animate={isCurrent ? { scale: 1.08 } : { scale: 1 }}
+                  transition={{ type: 'spring', stiffness: 180, damping: 18 }}
+                >
+                  {isAnswered ? (
+                    isCorrect === true ? (
+                      <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                    ) : isCorrect === 'partial' ? (
+                      <MinusCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+                    ) : (
+                      <XCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
+                    )
+                  ) : (
+                    <Circle className="h-5 w-5 text-gray-400 dark:text-gray-500" />
+                  )}
+                </motion.div>
+              </div>
+            </div>
+          </Button>
+        </motion.div>
+      );
+    };
+
+    return (
+      <div className="space-y-4">
+        {(['mcq', 'qroc', 'clinical'] as ColumnKey[]).map(columnKey => {
+          const columnEntries = activeOrganizerState[columnKey] || [];
+          if (columnEntries.length === 0) return null;
+
+          return (
+            <div key={columnKey} className="space-y-3">
+              <div className="flex items-center gap-2 px-3 py-2 bg-blue-50/50 dark:bg-blue-900/20 border border-blue-200/50 dark:border-blue-700/50 rounded-xl">
+                {getColumnIcon(columnKey)}
+                <span className="text-sm font-semibold text-blue-700 dark:text-blue-300">
+                  {getTypeLabel(columnKey)} ({columnEntries.length})
+                </span>
+              </div>
+              <div className="space-y-2">
+                <AnimatePresence initial={false}>
+                  {columnEntries.map((entry, index) => 
+                    renderOrganizerButton(entry, index + 1)
+                  )}
+                </AnimatePresence>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   const renderQuestionsList = () => {
+    // If organizer is open and has state, use that instead of automatic grouping
+    if (isOrganizerOpen && activeOrganizerState) {
+      return renderOrganizerBasedNavigation();
+    }
+
+    // Original automatic grouping logic
     // Group questions by type
     const regularQuestions: Array<Question & { originalIndex: number }> = [];
     const clinicalCases: Array<ClinicalCase & { originalIndex: number }> = [];
@@ -223,6 +423,12 @@ export function QuestionControlPanel({
     questions.forEach((item, index) => {
       if ('caseNumber' in item && 'questions' in item) {
         const caseItem = item as ClinicalCase;
+          // Safety net: collapse single-question clinical wrappers (should have been unwrapped upstream)
+          if (Array.isArray(caseItem.questions) && caseItem.questions.length === 1) {
+            const solo = caseItem.questions[0] as any;
+            regularQuestions.push({ ...(solo as Question), originalIndex: index });
+            return; // skip adding as clinical case
+          }
         const allQroc = Array.isArray(caseItem.questions) && caseItem.questions.length > 0 && caseItem.questions.every(q => (q as any).type === 'qroc');
         const allMcq = Array.isArray(caseItem.questions) && caseItem.questions.length > 0 && caseItem.questions.every(q => (q as any).type === 'mcq');
         if (allQroc) {

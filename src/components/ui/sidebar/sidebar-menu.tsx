@@ -108,12 +108,18 @@ export const SidebarMenuButton = React.forwardRef<
 
     // Simple implementation without Slot to prevent infinite loops
     const button = asChild && React.isValidElement(children) ? (
-      React.cloneElement(children, {
+      // Cast child to any to allow injecting arbitrary data-* attributes without TS prop mismatch errors
+      React.cloneElement(children as any, {
         ...props,
-        "data-sidebar": "menu-button",
-        "data-size": size,
-        "data-active": isActive,
-        className: cn(sidebarMenuButtonVariants({ variant, size }), className, children.props.className),
+        'data-sidebar': 'menu-button',
+        'data-size': size,
+        'data-active': isActive,
+        className: cn(
+          sidebarMenuButtonVariants({ variant, size }),
+          className,
+          // Preserve any existing className from the child
+          (children as any).props?.className
+        ),
       })
     ) : (
       <button
@@ -148,9 +154,10 @@ export const SidebarMenuAction = React.forwardRef<
 >(({ className, asChild = false, showOnHover = false, children, ...props }, ref) => {
   // Simple implementation without Slot to prevent infinite loops
   if (asChild && React.isValidElement(children)) {
-    return React.cloneElement(children, {
+    const child: any = children
+    return React.cloneElement(child, {
       ...props,
-      "data-sidebar": "menu-action",
+      'data-sidebar': 'menu-action',
       className: cn(
         "absolute right-1 top-1.5 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-foreground outline-none ring-sidebar-ring transition-transform hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 peer-hover/menu-button:text-sidebar-accent-foreground [&>svg]:size-4 [&>svg]:shrink-0",
         // Increases the hit area of the button on mobile.
@@ -162,7 +169,7 @@ export const SidebarMenuAction = React.forwardRef<
         showOnHover &&
           "group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 data-[state=open]:opacity-100 peer-data-[active=true]/menu-button:text-sidebar-accent-foreground md:opacity-0",
         className,
-        children.props.className
+        child.props?.className
       ),
     })
   }
