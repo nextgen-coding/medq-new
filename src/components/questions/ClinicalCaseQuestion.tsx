@@ -267,28 +267,8 @@ export function ClinicalCaseQuestion({
     setEvaluationIndex(0);
     setEvaluationComplete(openIds.length === 0); // if no open questions, evaluation instantly complete
     onSubmit(clinicalCase.caseNumber, answers, questionResults); // results will be updated as user evaluates
-<<<<<<< HEAD
     // Always scroll to top after submit per request (then user can scroll down to evaluate)
     setTimeout(() => { window.scrollTo({ top: 0, behavior: 'smooth' }); }, 120);
-=======
-    
-    // Auto-open notes area when case is completed
-    setShowNotesArea(true);
-    
-    // Scroll to first evaluation question after a brief delay, or to top if no evaluation needed
-    setTimeout(() => {
-      if (openIds.length > 0) {
-        const firstEvalId = openIds[0];
-        const element = questionRefs.current[firstEvalId];
-        if (element) {
-          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-      } else {
-        // If no evaluation needed, scroll to top of case
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      }
-    }, 300);
->>>>>>> origin/master
   };
   // Allow resubmission: keep current answers, hide results, reset evaluation state and per-question results
   const handleResubmit = () => {
@@ -348,78 +328,59 @@ export function ClinicalCaseQuestion({
     }
   }, [evaluationIndex, evaluationOrder, showResults, evaluationComplete]);
 
-<<<<<<< HEAD
-  // Keyboard navigation & progressive reveal (Enter driven)
+  // Keyboard navigation: Answer phase (Enter to advance), Evaluation phase disabled (no keyboard shortcuts)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Evaluation phase (after submission) - Enter to go next when fully complete
-      if (showResults && evaluationComplete) {
-        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); onNext(); }
-        return;
-      }
+      // Evaluation phase key handling - DISABLED to remove 1/2/3 shortcuts
       if (showResults && !evaluationComplete) {
-        if (["1","2","3","Enter"].includes(e.key)) e.preventDefault();
+        // Disable all number keys for evaluation - user must click buttons
+        if (["1", "2", "3"].includes(e.key)) {
+          // No longer handle 1/2/3 shortcuts
+          e.preventDefault();
+          return;
+        } else if (e.key === 'Enter') {
+          // Enter disabled during evaluation selection
+          e.preventDefault();
+        }
+        return; // stop further processing during evaluation phase
+      }
+
+      // After evaluation complete & results shown: Enter -> next case
+      if (showResults && evaluationComplete) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          onNext();
+        }
         return;
       }
-      // Progressive answering phase
+
+      // Answering phase
       if (!showResults && e.key === 'Enter' && !e.shiftKey) {
-        const active = document.activeElement as HTMLElement | null;
-        if (active && active.tagName === 'TEXTAREA') {
-          // Allow Shift+Enter newline
-          e.preventDefault();
-        } else { e.preventDefault(); }
-        // Step 1: reveal first question
-        if (revealIndex === -1) {
-          setRevealIndex(0);
-          setTimeout(()=>focusFirstInput(clinicalCase.questions[0].id), 60);
+        e.preventDefault();
+        
+        // If all questions answered, submit
+        if (answeredQuestions === clinicalCase.totalQuestions) {
+          handleCompleteCase();
           return;
         }
-        // Ensure current revealed question answered before advancing
-        const currentQ = clinicalCase.questions[revealIndex];
-        if (!currentQ) return;
-        const val = answers[currentQ.id];
-        const isAnsweredCurrent = Array.isArray(val) ? val.length>0 : (typeof val === 'string' ? val.trim().length>0 : val !== undefined && val !== null);
-        if (!isAnsweredCurrent) return; // block until answered
-        if (revealIndex < clinicalCase.questions.length - 1) {
-          // Move to next question immediately
-            setRevealIndex(r=>r+1);
-            const nextId = clinicalCase.questions[revealIndex+1].id;
-            setTimeout(()=>focusFirstInput(nextId),80);
-            return;
+        
+        // Find next unanswered question in order
+        const nextUnanswered = clinicalCase.questions.find(q => answers[q.id] === undefined);
+        
+        if (nextUnanswered) {
+          const element = questionRefs.current[nextUnanswered.id];
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            setTimeout(() => focusFirstInput(nextUnanswered.id), 300);
+          }
+        } else if (answeredQuestions === clinicalCase.totalQuestions) {
+          // Fallback: if somehow all are answered, submit
+          handleCompleteCase();
         }
-        // Last question reached: if all answered trigger global submit
-        if (answeredQuestions === clinicalCase.totalQuestions) handleCompleteCase();
       }
-    };
-    document.addEventListener('keydown', handleKeyDown);
+    };    document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [showResults, evaluationComplete, onNext, revealIndex, clinicalCase.questions, answers, answeredQuestions, clinicalCase.totalQuestions]);
-
-  // When a new question is revealed (revealIndex increments) gently scroll it into view
-  useEffect(() => {
-    if (showResults) return; // only during answering phase
-    if (revealIndex < 0) return; // nothing revealed yet
-    if (revealIndex >= clinicalCase.questions.length) return;
-    const qid = clinicalCase.questions[revealIndex].id;
-    if (typeof window === 'undefined') return;
-    // Wait a frame so the DOM has rendered the newly revealed block
-    requestAnimationFrame(() => {
-      const el = questionRefs.current[qid];
-      if (!el) return;
-      const rect = el.getBoundingClientRect();
-      // Determine if we need to scroll: if the element's bottom is below viewport or its top is too low
-      const needsScroll = rect.bottom > window.innerHeight || rect.top < 80 || rect.top > window.innerHeight * 0.6;
-      if (needsScroll) {
-        const targetTop = window.scrollY + rect.top - 100; // offset so the question isn't flush with the top
-        window.scrollTo({ top: Math.max(targetTop, 0), behavior: 'smooth' });
-      } else {
-        // Provide a tiny upward nudge so user context includes previous question tail
-        window.scrollBy({ top: -40, behavior: 'smooth' });
-      }
-    });
-  }, [revealIndex, showResults, clinicalCase.questions]);
-=======
->>>>>>> origin/master
+  }, [answers, answeredQuestions, isCaseComplete, showResults, evaluationOrder, evaluationIndex, evaluationComplete, clinicalCase.questions, clinicalCase.totalQuestions]);
   const getQuestionStatus = (question: Question) => {
     if (answers[question.id] !== undefined) {
       if (showResults) {

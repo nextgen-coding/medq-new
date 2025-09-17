@@ -33,12 +33,7 @@ interface QuestionControlPanelProps {
   onNext: () => void;
   isComplete: boolean;
   pinnedIds?: string[]; // optional list of pinned question IDs
-<<<<<<< HEAD
   organizerState?: Record<ColumnKey, OrganizerEntry[]> | null; // optional organizer override
-=======
-  onQuit?: () => void; // optional handler to show a Quit button in header
-  quitLabel?: string; // optional label for quit button (default: 'Quitter')
->>>>>>> origin/master
 }
 
 export function QuestionControlPanel({
@@ -50,13 +45,7 @@ export function QuestionControlPanel({
   onPrevious,
   onNext,
   isComplete,
-  pinnedIds = [],
-<<<<<<< HEAD
-  organizerState = null
-=======
-  onQuit,
-  quitLabel = 'Quitter'
->>>>>>> origin/master
+  pinnedIds = []
 }: QuestionControlPanelProps) {
   const { t } = useTranslation();
   const { user } = useAuth();
