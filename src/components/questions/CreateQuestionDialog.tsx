@@ -23,6 +23,9 @@ interface CreateQuestionDialogProps {
 }
 
 export function CreateQuestionDialog({ lecture, isOpen, onOpenChange, onQuestionCreated }: CreateQuestionDialogProps) {
+  // Detect niveau (PCEM1/PCEM2 => preclinical; clinical cases not allowed)
+  const niveauName = (lecture?.specialty as any)?.niveau?.name?.toLowerCase?.() || '';
+  const isPreclinical = niveauName.includes('pcem 1') || niveauName.includes('pcem1') || niveauName.includes('pcem 2') || niveauName.includes('pcem2');
   const LAST_QROC_ANSWER_KEY = 'last_qroc_answer';
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
@@ -50,6 +53,10 @@ export function CreateQuestionDialog({ lecture, isOpen, onOpenChange, onQuestion
   interface QrocSubQuestion { id: string; text: string; answer: string; }
   const [multiQrocMode, setMultiQrocMode] = useState(false);
   const [qrocSubs, setQrocSubs] = useState<QrocSubQuestion[]>([]);
+  // Multi QCM builder (non clinical case) state
+  interface QcmSubQuestion { id: string; text: string; options: Option[]; correctAnswers: string[]; }
+  const [multiQcmMode, setMultiQcmMode] = useState(false);
+  const [qcmSubs, setQcmSubs] = useState<QcmSubQuestion[]>([]);
   // refs to track auto-focus behavior
   const prevQrocSubsLen = useRef(0);
   // Bulk paste helper state
@@ -154,6 +161,8 @@ export function CreateQuestionDialog({ lecture, isOpen, onOpenChange, onQuestion
   setQrocAnswer(stored || '');
   setMultiQrocMode(false);
   setQrocSubs([]);
+  setMultiQcmMode(false);
+  setQcmSubs([]);
   };
 
   const handleOptionChange = (index: number, text: string) => {
@@ -175,6 +184,11 @@ export function CreateQuestionDialog({ lecture, isOpen, onOpenChange, onQuestion
   };
 
   const handleQuestionTypeChange = (newType: QuestionType) => {
+    // Guard: prevent selecting clinical case in preclinical niveaux
+    if (isPreclinical && newType === 'clinical_case') {
+      toast({ title: 'Cas clinique indisponible', description: 'Les cas cliniques sont désactivés pour PCEM 1 / PCEM 2. Utilisez les modes multi QCM/QROC (texte commun) à la place.', variant: 'destructive' });
+      return;
+    }
     setFormData(prev => ({ ...prev, type: newType }));
     
     // Reset options and correct answers when changing to/from MCQ types
@@ -295,7 +309,8 @@ export function CreateQuestionDialog({ lecture, isOpen, onOpenChange, onQuestion
             courseReminderMediaUrl: formData.reminderMediaUrl || null,
             courseReminderMediaType: formData.reminderMediaType || null,
             caseNumber: groupNumber, // reuse/assign as group id
-            caseText: null,
+            // For PCEM niveaux, also persist common case text so grouping-by-text works
+            caseText: (formData.text || '').trim() || null,
             caseQuestionNumber: i + 1,
             options: [],
             correctAnswers: [sq.answer.trim()],
@@ -316,6 +331,71 @@ export function CreateQuestionDialog({ lecture, isOpen, onOpenChange, onQuestion
       } finally {
         setIsSubmitting(false);
       }
+      return;
+    }
+
+    // Multi QCM submission path
+    if (formData.type === 'mcq' && multiQcmMode) {
+      if (qcmSubs.length === 0) {
+        toast({ title: 'Erreur', description: 'Ajoutez au moins une sous-question QCM.', variant: 'destructive' });
+        return;
+      }
+      for (const sq of qcmSubs) {
+        if (!sq.text.trim()) { toast({ title: 'Erreur', description: 'Chaque sous-question QCM doit avoir un texte.', variant: 'destructive' }); return; }
+        const validOpts = sq.options.filter(o=> o.text.trim());
+        if (validOpts.length < 2) { toast({ title: 'Erreur', description: 'Chaque QCM doit avoir au moins 2 options.', variant: 'destructive' }); return; }
+        if (sq.correctAnswers.length === 0) { toast({ title: 'Erreur', description: 'Sélectionnez au moins une bonne réponse pour chaque QCM.', variant: 'destructive' }); return; }
+      }
+      try {
+        setIsSubmitting(true);
+        // Determine or assign group number among existing MCQs
+        let groupNumber = formData.number;
+        if (!groupNumber) {
+          try {
+            const resp = await fetch(`/api/questions?lectureId=${lecture.id}`);
+            if (resp.ok) {
+              const data = await resp.json();
+              const maxExisting = (data as any[])
+                .filter(q => q.type === 'mcq' && q.caseNumber)
+                .reduce((m, q) => Math.max(m, q.caseNumber || 0), 0);
+              groupNumber = maxExisting + 1;
+            } else {
+              groupNumber = Math.floor(Date.now()/1000);
+            }
+          } catch { groupNumber = Math.floor(Date.now()/1000); }
+        }
+        let created = 0;
+        for (let i=0; i<qcmSubs.length; i++) {
+          const sq = qcmSubs[i];
+          const body = {
+            lectureId: lecture.id,
+            text: sq.text.trim(),
+            type: 'mcq' as const,
+            explanation: null,
+            courseReminder: formData.courseReminder.trim() || null,
+            number: null,
+            session: formData.session.trim() || null,
+            mediaUrl: null,
+            mediaType: null,
+            courseReminderMediaUrl: formData.reminderMediaUrl || null,
+            courseReminderMediaType: formData.reminderMediaType || null,
+            caseNumber: groupNumber,
+            caseText: (formData.text || '').trim() || null,
+            caseQuestionNumber: i + 1,
+            options: sq.options.filter(o=>o.text.trim()).map(o=> ({ id: o.id, text: o.text.trim(), explanation: (o.explanation||'').trim() })),
+            correctAnswers: sq.correctAnswers,
+          };
+          const resp = await fetch('/api/questions', { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(body) });
+          if (!resp.ok) { const err = await resp.json().catch(()=>({})); throw new Error(err.error || `Échec sous-question ${i+1}`); }
+          created++;
+        }
+        toast({ title: 'Bloc QCM créé', description: `${created} sous-question(s) ajoutée(s).` });
+        resetForm();
+        onQuestionCreated();
+        onOpenChange(false);
+      } catch(e) {
+        toast({ title: 'Erreur', description: e instanceof Error ? e.message : 'Création échouée.', variant: 'destructive' });
+      } finally { setIsSubmitting(false); }
       return;
     }
 
@@ -774,14 +854,17 @@ export function CreateQuestionDialog({ lecture, isOpen, onOpenChange, onQuestion
                 <SelectContent>
                   <SelectItem value="mcq">QCM</SelectItem>
                   <SelectItem value="qroc">QROC</SelectItem>
-                  <SelectItem value="clinical_case">Cas clinique (multi)</SelectItem>
+                  <SelectItem value="clinical_case" disabled={isPreclinical}>Cas clinique (multi){isPreclinical ? ' – désactivé pour PCEM' : ''}</SelectItem>
                 </SelectContent>
               </Select>
+              {isPreclinical && (
+                <p className="text-[11px] text-muted-foreground">Pour PCEM 1/2, créez des blocs Multi QCM/QROC en utilisant un texte commun.</p>
+              )}
             </div>
           </div>
 
           {/* Global clinical case quick parse (creation) */}
-          {formData.type === 'clinical_case' && (
+          {formData.type === 'clinical_case' && !isPreclinical && (
             <QuickParseClinicalCaseCreate
               rawCaseText={caseText}
               subs={subQuestions}
@@ -798,6 +881,34 @@ export function CreateQuestionDialog({ lecture, isOpen, onOpenChange, onQuestion
                 setMultiQrocMode(true);
                 setQrocSubs([{ id: makeId(), text: formData.text, answer: qrocAnswer }]);
               }}>Activer multi QROC</Button>
+            </div>
+          )}
+          {/* Make multi QCM easily discoverable when user is on QCM */}
+          {formData.type === 'mcq' && !multiQcmMode && (
+            <div className="flex justify-end -mt-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setMultiQcmMode(true);
+                  // seed first QCM sub-question from current fields
+                  setQcmSubs([{
+                    id: makeId(),
+                    text: formData.text,
+                    options: options.length ? options : [
+                      { id: makeId(), text: '', explanation: '' },
+                      { id: makeId(), text: '', explanation: '' },
+                      { id: makeId(), text: '', explanation: '' },
+                      { id: makeId(), text: '', explanation: '' },
+                    ],
+                    correctAnswers: correctAnswers,
+                  }]);
+                  toast({ title: 'Multi QCM activé', description: 'Vous êtes maintenant en mode QCM groupé.' });
+                }}
+              >
+                Activer multi QCM
+              </Button>
             </div>
           )}
           {formData.type === 'qroc' && !multiQrocMode && (
@@ -925,7 +1036,7 @@ export function CreateQuestionDialog({ lecture, isOpen, onOpenChange, onQuestion
 
           {/* Énoncé (single question OR multi QROC group header) */}
           <div className="space-y-2">
-            <Label htmlFor="text">{multiQrocMode && formData.type==='qroc' ? 'Texte commun (optionnel)' : 'Énoncé de la question *'}</Label>
+            <Label htmlFor="text">{((multiQrocMode && formData.type==='qroc') || (multiQcmMode && formData.type==='mcq')) ? 'Texte commun (optionnel)' : 'Énoncé de la question *'}</Label>
             <RichTextInput
               value={formData.text}
               onChange={(value) => setFormData(prev => ({ ...prev, text: value }))}
@@ -940,7 +1051,7 @@ export function CreateQuestionDialog({ lecture, isOpen, onOpenChange, onQuestion
           {/* (Block reference QROC removed; unified bottom section handles all) */}
 
           {/* Options (MCQ) */}
-          {(formData.type === 'mcq' || formData.type === 'clinic_mcq') && (
+          {(formData.type === 'mcq' || formData.type === 'clinic_mcq') && !multiQcmMode && (
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm">Options de réponse</CardTitle>
@@ -1002,6 +1113,50 @@ export function CreateQuestionDialog({ lecture, isOpen, onOpenChange, onQuestion
                 >
                   <Plus className="h-3 w-3 mr-1" />
                   Ajouter une option
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Grouped QCM builder */}
+          {multiQcmMode && formData.type==='mcq' && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">Sous-questions QCM ({qcmSubs.length})</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {qcmSubs.map((sq, idx) => (
+                  <div key={sq.id} className="border rounded-md p-3 space-y-3">
+                    <div className="flex justify-between items-center">
+                      <div className="text-xs font-medium bg-muted px-2 py-0.5 rounded">QCM {idx+1}</div>
+                      {qcmSubs.length>1 && (
+                        <Button variant="ghost" size="sm" onClick={()=> setQcmSubs(prev => prev.filter(s=>s.id!==sq.id))} className="text-destructive">Supprimer</Button>
+                      )}
+                    </div>
+                    <RichTextInput rows={3} placeholder="Énoncé de la sous-question QCM. Vous pouvez inclure des images." value={sq.text} onChange={value=> setQcmSubs(prev => prev.map(s=> s.id===sq.id? {...s, text: value}: s))} images={images} onImagesChange={setImages} />
+                    <div className="space-y-3">
+                      {sq.options.map((opt, oIdx) => (
+                        <div key={`${sq.id}_${opt.id}`} className="flex items-start gap-2 border rounded-md p-2">
+                          <div className="pt-2 text-xs w-5 text-center">{String.fromCharCode(65+oIdx)}</div>
+                          <div className="flex-1 space-y-2">
+                            <Input placeholder={`Option ${oIdx+1}`} value={opt.text} onChange={e=> setQcmSubs(prev => prev.map(s=> s.id===sq.id ? { ...s, options: s.options.map((oo,ii)=> ii===oIdx ? { ...oo, text: e.target.value } : oo) } : s))} />
+                            <Textarea placeholder="Explication (optionnel)" value={opt.explanation || ''} onChange={e=> setQcmSubs(prev => prev.map(s=> s.id===sq.id ? { ...s, options: s.options.map((oo,ii)=> ii===oIdx ? { ...oo, explanation: e.target.value } : oo) } : s))} rows={2} className="resize-none" />
+                          </div>
+                          <div className="flex flex-col gap-2 items-center">
+                            <label className="text-xs flex items-center gap-1 cursor-pointer"><input type="checkbox" checked={sq.correctAnswers.includes(opt.id)} onChange={()=> setQcmSubs(prev => prev.map(s=> s.id===sq.id ? { ...s, correctAnswers: s.correctAnswers.includes(opt.id) ? s.correctAnswers.filter(id=>id!==opt.id) : [...s.correctAnswers, opt.id] } : s))} />Bonne</label>
+                            <Button type="button" size="sm" variant="ghost" disabled={sq.options.length <= 2} onClick={()=> setQcmSubs(prev => prev.map(s=> s.id===sq.id ? { ...s, options: s.options.filter((_,ii)=> ii!==oIdx), correctAnswers: s.correctAnswers.filter(id=> id !== opt.id) } : s))} className="text-destructive hover:text-destructive"><Trash2 className="h-3 w-3" /></Button>
+                          </div>
+                        </div>
+                      ))}
+                      <Button type="button" variant="outline" size="sm" onClick={()=> setQcmSubs(prev => prev.map(s=> s.id===sq.id ? { ...s, options: [...s.options, { id: makeId(), text: '', explanation: '' }] } : s))} className="w-full"><Plus className="h-3 w-3 mr-1" /> Ajouter une option</Button>
+                    </div>
+                  </div>
+                ))}
+                <Button type="button" variant="outline" size="sm" onClick={() => setQcmSubs(prev => [...prev, { id: makeId(), text: '', options: [
+                  { id: makeId(), text: '', explanation: '' },
+                  { id: makeId(), text: '', explanation: '' },
+                ], correctAnswers: [] }])} className="w-full">
+                  <Plus className="h-3 w-3 mr-1" /> Ajouter un QCM
                 </Button>
               </CardContent>
             </Card>
@@ -1081,7 +1236,7 @@ export function CreateQuestionDialog({ lecture, isOpen, onOpenChange, onQuestion
             <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSubmitting} className="border-blue-200 dark:border-blue-800">
               Annuler
             </Button>
-            {!builderModeDerived && !multiQrocMode && (
+            {!builderModeDerived && !multiQrocMode && !multiQcmMode && (
               <Button onClick={handleSubmit} disabled={isSubmitting} className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm">
                 <Save className="h-4 w-4 mr-2" />
                 {isSubmitting ? 'Création…' : 'Créer la question'}
@@ -1091,6 +1246,12 @@ export function CreateQuestionDialog({ lecture, isOpen, onOpenChange, onQuestion
               <Button onClick={handleSubmit} disabled={isSubmitting} className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm">
                 <Save className="h-4 w-4 mr-2" />
                 {isSubmitting ? 'Création…' : 'Créer le bloc QROC'}
+              </Button>
+            )}
+            {!builderModeDerived && multiQcmMode && (
+              <Button onClick={handleSubmit} disabled={isSubmitting} className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm">
+                <Save className="h-4 w-4 mr-2" />
+                {isSubmitting ? 'Création…' : 'Créer le bloc QCM'}
               </Button>
             )}
             {builderModeDerived && (

@@ -39,8 +39,9 @@ interface DragToken {
 }
 
 export function QuestionOrganizerDialog({ lecture, isOpen, onOpenChange, onSaved }: OrganizerProps) {
-  // Previously: PCEM1 / PCEM2 flattened clinical cases; now we always expose the clinical column
-  const isPreclinical = false; // keep variable for layout references; forced to false to always show Cas Cliniques
+  // Determine niveau: PCEM1/PCEM2 => preclinical (no clinical cases)
+  const niveauName = (lecture?.specialty as any)?.niveau?.name?.toLowerCase?.() || '';
+  const isPreclinical = niveauName.includes('pcem 1') || niveauName.includes('pcem1') || niveauName.includes('pcem 2') || niveauName.includes('pcem2');
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -123,24 +124,75 @@ export function QuestionOrganizerDialog({ lecture, isOpen, onOpenChange, onSaved
           groupedQrocEntries.push({ kind: 'group', groupKind: 'grouped_qroc', caseNumber: cn, questions: arr });
         }
       }
-      // Clinical cases grouping (always enabled now)
-      let clinicalEntries: GroupEntry[] = [];
-      const clinicalMap = new Map<number, Question[]>();
-      data.filter(q => (q.type === 'clinic_mcq' || q.type === 'clinic_croq') && q.caseNumber).forEach(q => {
-        const arr = clinicalMap.get(q.caseNumber!) || [];
-        arr.push(q);
-        clinicalMap.set(q.caseNumber!, arr);
-      });
-      for (const [cn, arr] of clinicalMap.entries()) {
-        arr.sort((a,b)=> (a.caseQuestionNumber||0)-(b.caseQuestionNumber||0) || a.id.localeCompare(b.id));
-        clinicalEntries.push({ kind: 'group', groupKind: 'clinical_case', caseNumber: cn, questions: arr });
+  // Clinical cases grouping (disabled for preclinical niveaux)
+  let clinicalEntries: GroupEntry[] = [];
+      if (!isPreclinical) {
+        const clinicalMap = new Map<number, Question[]>();
+        data.filter(q => (q.type === 'clinic_mcq' || q.type === 'clinic_croq') && q.caseNumber).forEach(q => {
+          const arr = clinicalMap.get(q.caseNumber!) || [];
+          arr.push(q);
+          clinicalMap.set(q.caseNumber!, arr);
+        });
+        for (const [cn, arr] of clinicalMap.entries()) {
+          arr.sort((a,b)=> (a.caseQuestionNumber||0)-(b.caseQuestionNumber||0) || a.id.localeCompare(b.id));
+          clinicalEntries.push({ kind: 'group', groupKind: 'clinical_case', caseNumber: cn, questions: arr });
+        }
       }
-      const mcqEntries: OrganizerEntry[] = data.filter(q => q.type === 'mcq').sort((a,b)=>(a.number??0)-(b.number??0) || a.id.localeCompare(b.id)).map(q => ({ kind: 'single', question: q }));
-      const qrocSingles: OrganizerEntry[] = singleQroc.sort((a,b)=>(a.number??0)-(b.number??0) || a.id.localeCompare(b.id)).map(q => ({ kind: 'single', question: q }));
+      // If clinical column is enabled (non-preclinical), also consider base MCQ/QROC that have caseText as clinical candidates
+      // Build a set of IDs that will be shown in clinical to avoid duplicates in base columns
+      const clinicalIdSet = new Set<string>();
+      if (!isPreclinical) {
+        // Extend existing clinicalEntries with base questions that have caseText
+        const caseMap = new Map<number, Question[]>();
+        const textCaseMap = new Map<string, number>();
+        let nextSynthetic = 100000; // synthetic case numbers for missing ones
+        // Seed map with already detected clinical groups
+        clinicalEntries.forEach(g => {
+          caseMap.set(g.caseNumber, [...g.questions]);
+          g.questions.forEach(q => clinicalIdSet.add(q.id));
+        });
+        // Collect base questions with caseText
+        const baseWithText = data.filter(q => (q.type === 'mcq' || q.type === 'qroc') && typeof (q as any).caseText === 'string' && String((q as any).caseText).trim().length > 0);
+        for (const q of baseWithText) {
+          if (clinicalIdSet.has(q.id)) continue;
+          const hasNumber = !!q.caseNumber;
+          let keyNum: number;
+          if (hasNumber) {
+            keyNum = q.caseNumber as number;
+          } else {
+            const keyText = String((q as any).caseText).trim();
+            if (!textCaseMap.has(keyText)) textCaseMap.set(keyText, nextSynthetic++);
+            keyNum = textCaseMap.get(keyText)!;
+          }
+          const arr = caseMap.get(keyNum) || [];
+          // Push a coerced clinical variant for UI purposes (persisted on save)
+          const coerced: Question = { ...q, type: (q.type === 'mcq' ? 'clinic_mcq' : 'clinic_croq') as any, caseNumber: keyNum as any };
+          arr.push(coerced);
+          clinicalIdSet.add(q.id);
+          caseMap.set(keyNum, arr);
+        }
+        // Rebuild clinicalEntries from combined caseMap
+        clinicalEntries = [];
+        for (const [cn, arr] of caseMap.entries()) {
+          // Stable sort inside case
+          arr.sort((a,b)=> (a.caseQuestionNumber||0)-(b.caseQuestionNumber||0) || a.id.localeCompare(b.id));
+          clinicalEntries.push({ kind: 'group', groupKind: 'clinical_case', caseNumber: cn, questions: arr });
+        }
+        clinicalEntries.sort((a,b)=> a.caseNumber - b.caseNumber);
+      }
+
+      // Build base columns, excluding questions already shown as clinical
+      const mcqEntries: OrganizerEntry[] = data
+        .filter(q => q.type === 'mcq' && !clinicalIdSet.has(q.id))
+        .sort((a,b)=>(a.number??0)-(b.number??0) || a.id.localeCompare(b.id))
+        .map(q => ({ kind: 'single', question: q }));
+      const qrocSingles: OrganizerEntry[] = singleQroc
+        .filter(q => !clinicalIdSet.has(q.id))
+        .sort((a,b)=>(a.number??0)-(b.number??0) || a.id.localeCompare(b.id))
+        .map(q => ({ kind: 'single', question: q }));
       // Combine singles + groups for qroc column (groups appear after singles by default)
   const qrocColumn: OrganizerEntry[] = [...qrocSingles, ...groupedQrocEntries.sort((a,b)=> a.caseNumber - b.caseNumber)];
   setColumns({ mcq: mcqEntries, qroc: qrocColumn, clinical: clinicalEntries.sort((a,b)=> a.caseNumber - b.caseNumber) });
-  // Removed dissolving of clinical cases for preclinical niveaux
   setDirty(false);
     } catch (e) {
       console.error(e);
@@ -862,10 +914,12 @@ export function QuestionOrganizerDialog({ lecture, isOpen, onOpenChange, onSaved
           {loading ? (
             <div className="text-sm text-muted-foreground">Chargement…</div>
           ) : (
-            <div className={`grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3`}>
+            <div className={`grid gap-4 grid-cols-1 sm:grid-cols-2 ${isPreclinical ? 'lg:grid-cols-2' : 'lg:grid-cols-3'}`}>
               <ColumnView title="QCM" col="mcq" entries={columns.mcq} />
               <ColumnView title="QROC & Blocs" col="qroc" entries={columns.qroc} />
-              <ColumnView title="Cas Cliniques" col="clinical" entries={columns.clinical} />
+              {!isPreclinical && (
+                <ColumnView title="Cas Cliniques" col="clinical" entries={columns.clinical} />
+              )}
             </div>
           )}
         </div>

@@ -12,9 +12,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { LogOut, Settings, User, Heart, Stethoscope, Menu, Bell, Moon, Sun, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { toast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { useSidebar } from '@/components/ui/sidebar';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 export function AppHeader() {
   const { user, isAdmin, logout } = useAuth();
@@ -29,11 +28,7 @@ export function AppHeader() {
       router.push('/auth');
     } catch (err) {
       console.error('Unexpected sign out error:', err);
-      toast({
-        title: t('auth.signOutError'),
-        description: t('auth.unexpectedError'),
-        variant: "destructive",
-      });
+      toast.error(t('auth.unexpectedError'));
     }
   };
 
@@ -95,27 +90,22 @@ export function AppHeader() {
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              {/* Theme Toggle */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                    className="hover:bg-blue-500/10 hover:text-blue-600 dark:hover:text-blue-400 transition-all duration-200 rounded-xl"
-                  >
-                    {theme === 'dark' ? (
-                      <Sun className="h-5 w-5" />
-                    ) : (
-                      <Moon className="h-5 w-5" />
-                    )}
-                    <span className="sr-only">Toggle theme</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" align="center" className="bg-background/95 backdrop-blur-sm border-border/50">
-                  <p>{theme === 'dark' ? t('settings.light') : t('settings.dark')}</p>
-                </TooltipContent>
-              </Tooltip>
+              {/* Theme Toggle (tooltip removed to avoid ref loops) */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                className="hover:bg-blue-500/10 hover:text-blue-600 dark:hover:text-blue-400 transition-all duration-200 rounded-xl"
+                aria-label={theme === 'dark' ? t('settings.light') : t('settings.dark')}
+                title={theme === 'dark' ? t('settings.light') : t('settings.dark')}
+              >
+                {theme === 'dark' ? (
+                  <Sun className="h-5 w-5" />
+                ) : (
+                  <Moon className="h-5 w-5" />
+                )}
+                <span className="sr-only">Toggle theme</span>
+              </Button>
 
               {isAdmin && (
                 <Button

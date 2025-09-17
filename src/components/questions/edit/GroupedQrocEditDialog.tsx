@@ -17,13 +17,14 @@ interface GroupedQrocEditDialogProps {
   onSaved?: (updated: Question[]) => void;
 }
 
-type EditableSub = { id: string; text: string; answer: string; };
+type EditableSub = { id: string; text: string; answer: string; explanation: string };
 interface GroupReminderState { text: string; mediaUrl?: string; mediaType?: 'image' | 'video'; }
 
 export function GroupedQrocEditDialog({ caseNumber, questions, isOpen, onOpenChange, onSaved }: GroupedQrocEditDialogProps) {
   const [subs, setSubs] = useState<EditableSub[]>([]);
   const [groupReminder, setGroupReminder] = useState<GroupReminderState>({ text: '' });
   const [saving, setSaving] = useState(false);
+  const [commonText, setCommonText] = useState('');
 
   useEffect(() => {
     if (isOpen) {
@@ -33,7 +34,8 @@ export function GroupedQrocEditDialog({ caseNumber, questions, isOpen, onOpenCha
         .map(q=>({
           id: q.id,
           text: q.text || '',
-          answer: (q.correctAnswers || q.correct_answers || [])[0] || ''
+          answer: (q.correctAnswers || q.correct_answers || [])[0] || '',
+          explanation: q.explanation || ''
         }));
   // All subs share same courseReminder + media; take first non-empty
   const withReminder = questions.find(q => (q as any).course_reminder || (q as any).courseReminder || (q as any).course_reminder_media_url);
@@ -41,6 +43,9 @@ export function GroupedQrocEditDialog({ caseNumber, questions, isOpen, onOpenCha
   const reminderMediaUrl = withReminder ? ((withReminder as any).course_reminder_media_url || (withReminder as any).courseReminderMediaUrl) : undefined;
   const reminderMediaType: 'image' | 'video' | undefined = withReminder ? ((withReminder as any).course_reminder_media_type || (withReminder as any).courseReminderMediaType) : undefined;
   setGroupReminder({ text: reminderText, mediaUrl: reminderMediaUrl, mediaType: reminderMediaType });
+      // Common case text: take first non-empty caseText across subs
+      const withCaseText = questions.find(q => (q as any).caseText && (q as any).caseText.trim());
+      setCommonText(withCaseText ? ((withCaseText as any).caseText as string) : '');
       setSubs(mapped);
     }
   }, [isOpen, questions]);
@@ -62,6 +67,8 @@ export function GroupedQrocEditDialog({ caseNumber, questions, isOpen, onOpenCha
         const body: any = {
           text: s.text.trim(),
           correctAnswers: [s.answer.trim()],
+          explanation: s.explanation?.trim() ? s.explanation.trim() : null,
+          caseText: (commonText || '').trim() || null,
           courseReminder: groupReminder.text.trim() || null,
           courseReminderMediaUrl: groupReminder.mediaUrl || null,
           courseReminderMediaType: groupReminder.mediaUrl ? (groupReminder.mediaType || 'image') : null,
@@ -84,6 +91,10 @@ export function GroupedQrocEditDialog({ caseNumber, questions, isOpen, onOpenCha
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader><DialogTitle>Éditer Bloc QROC #{caseNumber}</DialogTitle></DialogHeader>
         <div className="flex-1 overflow-y-auto space-y-4 pr-2 pb-4">
+          <div className="space-y-2">
+            <Label>Texte commun (optionnel)</Label>
+            <Textarea rows={3} value={commonText} onChange={e=> setCommonText(e.target.value)} placeholder="Texte commun affiché en haut du bloc" />
+          </div>
           <QuickParseGroupedQrocEdit
             subs={subs}
             updateSub={updateSub}
@@ -99,7 +110,10 @@ export function GroupedQrocEditDialog({ caseNumber, questions, isOpen, onOpenCha
                 <Label>Réponse de référence *</Label>
                 <Textarea rows={2} value={s.answer} onChange={e=> updateSub(s.id,{ answer: e.target.value })} placeholder="Réponse courte (multi-lignes possible)" className="resize-y" />
               </div>
-              {/* Explanation removed; shared reminder used instead */}
+              <div className="space-y-2">
+                <Label>Explication (optionnel)</Label>
+                <Textarea rows={3} value={s.explanation} onChange={e=> updateSub(s.id,{ explanation: e.target.value })} placeholder="Explication détaillée pour cette QROC (optionnel)" className="resize-y" />
+              </div>
             </div>
           ))}
           {subs.length===0 && <p className="text-sm text-muted-foreground">Aucune sous-question.</p>}
@@ -164,6 +178,11 @@ function QuickParseGroupedQrocEdit({ subs, updateSub }: { subs: EditableSub[]; u
       lines.push(`Q${idx+1}:`);
       (s.text || '').split(/\r?\n/).forEach(l=> lines.push(l));
       lines.push(`Réponse: ${s.answer || ''}`);
+      if ((s.explanation || '').trim()) {
+        const expLines = (s.explanation || '').split(/\r?\n/);
+        lines.push(`Explication: ${expLines[0] || ''}`);
+        for (let i=1;i<expLines.length;i++) lines.push(expLines[i]);
+      }
       lines.push('');
     });
     setRaw(lines.join('\n').trimEnd());
@@ -175,8 +194,8 @@ function QuickParseGroupedQrocEdit({ subs, updateSub }: { subs: EditableSub[]; u
   const parse = () => {
     if (!raw.trim()) { toast({ title:'Vide', description:'Rien à analyser.'}); return; }
     const lines = raw.replace(/\r/g,'').split('\n');
-    const header = /^Q(\d+)\s*:/i;
-    const parsed: { text:string; answer:string }[] = [];
+  const header = /^Q(\d+)\s*:/i;
+  const parsed: { text:string; answer:string; explanation?: string }[] = [];
     let i=0;
     while(i<lines.length) {
       while(i<lines.length && !header.test(lines[i])) i++;
@@ -186,12 +205,24 @@ function QuickParseGroupedQrocEdit({ subs, updateSub }: { subs: EditableSub[]; u
       while(i<lines.length && !/^Réponse:/i.test(lines[i]) && !header.test(lines[i])) { textLines.push(lines[i]); i++; }
       let answer='';
       if (i<lines.length && /^Réponse:/i.test(lines[i])) { answer = lines[i].replace(/^Réponse:\s*/i,'').trim(); i++; }
-      while(i<lines.length && lines[i].trim()==='') i++; // skip blanks
-      parsed.push({ text: textLines.join('\n').trim(), answer });
+      // Optional Explication section (can be multi-line) until next header or blank blank separation
+      let explanation = '';
+      // skip one optional blank line
+      if (i<lines.length && lines[i].trim()==='') i++;
+      if (i<lines.length && /^Explication:/i.test(lines[i])) {
+        explanation = lines[i].replace(/^Explication:\s*/i,''); i++;
+        while(i<lines.length && !header.test(lines[i])) {
+          if (lines[i].trim()==='') { i++; break; }
+          explanation += (explanation ? '\n' : '') + lines[i];
+          i++;
+        }
+      }
+      while(i<lines.length && lines[i].trim()==='') i++; // skip remaining blanks
+      parsed.push({ text: textLines.join('\n').trim(), answer, explanation: explanation.trim() });
     }
     if (!parsed.length) { toast({ title:'Format invalide', description:'Aucune sous-question détectée.', variant:'destructive' }); return; }
     // Only update up to existing count
-    parsed.forEach((p, idx)=> { if (idx < subs.length) updateSub(subs[idx].id, { text: p.text, answer: p.answer }); });
+    parsed.forEach((p, idx)=> { if (idx < subs.length) updateSub(subs[idx].id, { text: p.text, answer: p.answer, explanation: p.explanation || '' }); });
     toast({ title:'Analyse effectuée', description:'Sous-questions mises à jour.' });
   };
 
@@ -208,7 +239,7 @@ function QuickParseGroupedQrocEdit({ subs, updateSub }: { subs: EditableSub[]; u
         value={raw}
         onChange={e=> setRaw(e.target.value)}
         className="min-h-56 font-mono text-xs"
-        placeholder={`Q1:\nÉnoncé...\nRéponse: ...\n\nQ2:\nÉnoncé...\nRéponse: ...`}
+        placeholder={`Q1:\nÉnoncé...\nRéponse: ...\nExplication: ... (optionnel, multi-lignes possibles)\n\nQ2:\nÉnoncé...\nRéponse: ...`}
       />
       <p className="text-[10px] text-muted-foreground leading-snug">Format: Qn: puis lignes d'énoncé jusqu'à "Réponse:". Ne change pas le nombre de sous-questions.</p>
     </div>

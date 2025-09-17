@@ -128,13 +128,52 @@ export const reducer = (state: State, action: Action): State => {
 
 const listeners: Array<(state: State) => void> = []
 
+// Deduplicate and cap listeners to avoid runaway growth in dev/HMR
+const MAX_LISTENERS = 200
+function dedupeListeners() {
+  if (listeners.length === 0) return
+  const unique = Array.from(new Set(listeners))
+  if (unique.length !== listeners.length) {
+    listeners.length = 0
+    listeners.push(...unique)
+  }
+  if (listeners.length > MAX_LISTENERS) {
+    // Keep only the most recent listeners
+    listeners.splice(0, listeners.length - MAX_LISTENERS)
+  }
+}
+
 let memoryState: State = { toasts: [] }
+let isDispatching = false
+const pendingActions: Action[] = []
 
 function dispatch(action: Action) {
-  memoryState = reducer(memoryState, action)
-  listeners.forEach((listener) => {
-    listener(memoryState)
-  })
+  // Prevent re-entrant dispatch loops by queueing actions
+  if (isDispatching) {
+    pendingActions.push(action)
+    return
+  }
+  isDispatching = true
+  try {
+    memoryState = reducer(memoryState, action)
+    dedupeListeners()
+    const snapshot = listeners.slice()
+    for (const listener of snapshot) {
+      try {
+        listener(memoryState)
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error("toast listener error", e)
+      }
+    }
+  } finally {
+    isDispatching = false
+    if (pendingActions.length) {
+      const next = pendingActions.shift()!
+      // Defer next dispatch to break synchronous recursion
+      setTimeout(() => dispatch(next), 0)
+    }
+  }
 }
 
 type Toast = Omit<ToasterToast, "id">
@@ -171,15 +210,22 @@ function toast({ ...props }: Toast) {
 function useToast() {
   const [state, setState] = React.useState<State>(memoryState)
 
+  // Subscribe once on mount; don't resubscribe on each state change.
+  // Re-subscribing on every update causes the listeners array to grow and
+  // triggers cascading setState calls (Array.forEach -> setState) leading to
+  // "Maximum update depth exceeded" when toasts are used.
   React.useEffect(() => {
-    listeners.push(setState)
+    dedupeListeners()
+    if (!listeners.includes(setState)) {
+      listeners.push(setState)
+    }
     return () => {
       const index = listeners.indexOf(setState)
       if (index > -1) {
         listeners.splice(index, 1)
       }
     }
-  }, [state])
+  }, [])
 
   return {
     ...state,

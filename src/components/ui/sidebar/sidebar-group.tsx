@@ -10,7 +10,7 @@
  */
 
 import * as React from "react"
-import { Slot } from "@radix-ui/react-slot"
+// Removed Radix Slot to prevent infinite loops
 import { cn } from "@/lib/utils"
 
 /**
@@ -43,11 +43,23 @@ SidebarGroup.displayName = "SidebarGroup"
 export const SidebarGroupLabel = React.forwardRef<
   HTMLDivElement,
   React.ComponentProps<"div"> & { asChild?: boolean }
->(({ className, asChild = false, ...props }, ref) => {
-  const Comp = asChild ? Slot : "div"
+>(({ className, asChild = false, children, ...props }, ref) => {
+  // Simple implementation without Slot to prevent infinite loops
+  if (asChild && React.isValidElement(children)) {
+    return React.cloneElement(children, {
+      ...props,
+      "data-sidebar": "group-label",
+      className: cn(
+        "duration-200 flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-medium text-sidebar-foreground/70 outline-none ring-sidebar-ring transition-[margin,opa] ease-linear focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
+        "group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0",
+        className,
+        children.props.className
+      ),
+    })
+  }
 
   return (
-    <Comp
+    <div
       ref={ref}
       data-sidebar="group-label"
       className={cn(
@@ -56,7 +68,9 @@ export const SidebarGroupLabel = React.forwardRef<
         className
       )}
       {...props}
-    />
+    >
+      {children}
+    </div>
   )
 })
 SidebarGroupLabel.displayName = "SidebarGroupLabel"
@@ -70,11 +84,25 @@ SidebarGroupLabel.displayName = "SidebarGroupLabel"
 export const SidebarGroupAction = React.forwardRef<
   HTMLButtonElement,
   React.ComponentProps<"button"> & { asChild?: boolean }
->(({ className, asChild = false, ...props }, ref) => {
-  const Comp = asChild ? Slot : "button"
+>(({ className, asChild = false, children, ...props }, ref) => {
+  // Simple implementation without Slot to prevent infinite loops
+  if (asChild && React.isValidElement(children)) {
+    return React.cloneElement(children, {
+      ...props,
+      "data-sidebar": "group-action",
+      className: cn(
+        "absolute right-3 top-3.5 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-foreground outline-none ring-sidebar-ring transition-transform hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
+        // Increases the hit area of the button on mobile.
+        "after:absolute after:-inset-2 after:md:hidden",
+        "group-data-[collapsible=icon]:hidden",
+        className,
+        children.props.className
+      ),
+    })
+  }
 
   return (
-    <Comp
+    <button
       ref={ref}
       data-sidebar="group-action"
       className={cn(
@@ -85,7 +113,9 @@ export const SidebarGroupAction = React.forwardRef<
         className
       )}
       {...props}
-    />
+    >
+      {children}
+    </button>
   )
 })
 SidebarGroupAction.displayName = "SidebarGroupAction"

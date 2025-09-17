@@ -14,7 +14,9 @@ import { CheckCircle, Circle, AlertCircle, Eye, FileText, Pin, PinOff, EyeOff, T
 import { ReportQuestionDialog } from './ReportQuestionDialog';
 import { HighlightableCaseText } from './HighlightableCaseText';
 import { RichTextDisplay } from '@/components/ui/rich-text-display';
-import { ClinicalCaseEditDialog } from './edit/ClinicalCaseEditDialog';
+import { ClinicalCaseEditDialog } from '@/components/questions/edit/ClinicalCaseEditDialog';
+import { GroupedQrocEditDialog } from '@/components/questions/edit/GroupedQrocEditDialog';
+import { GroupedMcqEditDialog } from '@/components/questions/edit/GroupedMcqEditDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 
@@ -25,6 +27,9 @@ interface ClinicalCaseQuestionProps {
   lectureId: string;
   lectureTitle?: string;
   specialtyName?: string;
+  // Distinguish visual label and admin edit behavior
+  // 'clinical' for true clinical cases; 'multi_qcm' or 'multi_qroc' for grouped blocks
+  displayMode?: 'clinical' | 'multi_qcm' | 'multi_qroc';
   isAnswered: boolean;
   answerResult?: boolean | 'partial';
   userAnswers?: Record<string, any>;
@@ -39,6 +44,7 @@ export function ClinicalCaseQuestion({
   lectureId,
   lectureTitle,
   specialtyName,
+  displayMode = 'clinical',
   isAnswered,
   answerResult,
   userAnswers = {},
@@ -70,11 +76,19 @@ export function ClinicalCaseQuestion({
     }
   }, [notesHasContent]);
   const [openCaseEdit, setOpenCaseEdit] = useState(false);
+  const [openGroupQrocEdit, setOpenGroupQrocEdit] = useState(false);
+  const [openGroupMcqEdit, setOpenGroupMcqEdit] = useState(false);
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
   const [reportTargetQuestion, setReportTargetQuestion] = useState<Question | null>(null);
   const questionRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  const answeredQuestions = Object.keys(answers).length;
+  // Count only non-empty answers for progress (arrays with length, non-empty strings, or truthy values)
+  const answeredQuestions = clinicalCase.questions.reduce((count, q) => {
+    const a = answers[q.id];
+    if (Array.isArray(a)) return count + (a.length > 0 ? 1 : 0);
+    if (typeof a === 'string') return count + (a.trim().length > 0 ? 1 : 0);
+    return count + (a !== undefined && a !== null ? 1 : 0);
+  }, 0);
   const progress = (answeredQuestions / clinicalCase.totalQuestions) * 100;
 
   useEffect(() => {
@@ -219,11 +233,22 @@ export function ClinicalCaseQuestion({
   const handleQuestionAnswer = (questionId: string, answer: any, result?: boolean | 'partial') => {
     const wasAnswered = answers[questionId] !== undefined;
     setAnswers(prev => {
-      const newAnswers = { ...prev, [questionId]: answer };
-      return newAnswers;
+      const next = { ...prev } as Record<string, any>;
+      // If the answer is empty (cleared), remove the key so progress reflects it
+      const isEmpty = (Array.isArray(answer) && answer.length === 0) || (typeof answer === 'string' && answer.trim().length === 0);
+      if (isEmpty) {
+        delete next[questionId];
+      } else {
+        next[questionId] = answer;
+      }
+      return next;
     });
     if (result !== undefined) {
       setQuestionResults(prev => ({ ...prev, [questionId]: result }));
+    }
+    // Propagate to parent for global progress/state (works for MCQ and open)
+    if (onAnswerUpdate) {
+      try { onAnswerUpdate(questionId, answer, result); } catch {}
     }
   };
 
@@ -255,6 +280,27 @@ export function ClinicalCaseQuestion({
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     }, 300);
+  };
+  // Allow resubmission: keep current answers, hide results, reset evaluation state and per-question results
+  const handleResubmit = () => {
+    setIsCaseComplete(false);
+    setShowResults(false);
+    setEvaluationOrder([]);
+    setEvaluationIndex(0);
+    setEvaluationComplete(false);
+    // Clear previous results AND answers so restart is clean (no pre-picked options)
+    setQuestionResults({});
+    setAnswers({});
+    // Scroll to first unanswered (or first question if all answered)
+    setTimeout(() => {
+      const firstUnanswered = clinicalCase.questions.find(q => answers[q.id] === undefined);
+      const targetId = firstUnanswered?.id || clinicalCase.questions[0]?.id;
+      if (targetId) {
+        const el = questionRefs.current[targetId];
+        el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setTimeout(() => focusFirstInput(targetId), 150);
+      }
+    }, 50);
   };
   const handleShowResults = () => setShowResults(true);
   const handleSelfAssessmentUpdate = (questionId: string, result: boolean | 'partial') => {
@@ -308,7 +354,7 @@ export function ClinicalCaseQuestion({
   };
   const renderQuestion = (question: Question, index: number) => {
     const isAnsweredQ = answers[question.id] !== undefined;
-    const answerResultQ = showResults ? questionResults[question.id] : undefined;
+    const answerResultQ = questionResults[question.id];
     const userAnswerQ = answers[question.id];
     const isCurrentEvaluationTarget = showResults && !evaluationComplete && evaluationOrder[evaluationIndex] === question.id;
     const hasEvaluation = showResults && question.type === 'clinic_croq' && questionResults[question.id] !== undefined;
@@ -395,23 +441,26 @@ export function ClinicalCaseQuestion({
           <MCQQuestion
             question={question}
             onSubmit={(answer, isCorrect) => handleQuestionAnswer(question.id, answer, isCorrect)}
+            // Track answers live for group-level submission; no per-question Next
             onAnswerChange={(answer, isCorrect) => handleQuestionAnswer(question.id, answer, isCorrect)}
             onNext={() => {}}
             lectureId={lectureId}
             lectureTitle={lectureTitle}
             specialtyName={specialtyName}
+            // Before group submit, keep UI in answering mode (no answered state)
             isAnswered={showResults ? isAnsweredQ : false}
             answerResult={showResults ? answerResultQ : undefined}
             userAnswer={userAnswerQ as any}
+            // Hide immediate results until the group is submitted once
             hideImmediateResults={!showResults}
+            // Hide per-question actions; we submit once for all
             hideActions
-            hideNotes={!showResults} // Notes only after results
+            hideNotes={!showResults}
             hideComments={true} // Always hide individual question comments in clinical cases
             highlightConfirm
             hideMeta
-            suppressReminder={true} // Hide "Rappel du cours" in clinical cases
-            enableOptionHighlighting={true} // Enable highlighting for MCQ options
-            disableKeyboardHandlers={true} // Disable keyboard navigation in clinical cases
+            suppressReminder={true}
+            enableOptionHighlighting={true}
           />
         ) : (
           <OpenQuestion
@@ -485,7 +534,14 @@ export function ClinicalCaseQuestion({
 
               // Build the metadata line with better structure
               const parts: string[] = [];
-              parts.push(`Cas Clinique ${clinicalCase.caseNumber}`);
+              // Title label based on displayMode
+              if (displayMode === 'multi_qcm') {
+                parts.push(`Multi QCM ${clinicalCase.caseNumber}`);
+              } else if (displayMode === 'multi_qroc') {
+                parts.push(`Multi QROC ${clinicalCase.caseNumber}`);
+              } else {
+                parts.push(`Cas Clinique ${clinicalCase.caseNumber}`);
+              }
               
               const formattedSession = formatSession(session);
               if (formattedSession) {
@@ -523,7 +579,16 @@ export function ClinicalCaseQuestion({
                         </Button>
                       )}
                       {(user?.role === 'admin' || user?.role === 'maintainer') && (
-                        <Button variant="outline" size="sm" title="Éditer le cas clinique" onClick={() => setOpenCaseEdit(true)}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          title={displayMode === 'multi_qcm' ? 'Éditer le bloc QCM' : displayMode === 'multi_qroc' ? 'Éditer le bloc QROC' : 'Éditer le cas clinique'}
+                          onClick={() => {
+                            if (displayMode === 'multi_qcm') setOpenGroupMcqEdit(true);
+                            else if (displayMode === 'multi_qroc') setOpenGroupQrocEdit(true);
+                            else setOpenCaseEdit(true);
+                          }}
+                        >
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
                       )}
@@ -551,11 +616,7 @@ export function ClinicalCaseQuestion({
                       )}
                     </span>
                   </div>
-                  {showResults && !evaluationComplete && (
-                    <div className="text-xs text-muted-foreground mt-1">
-                      Utilisez les touches 1 (Correct), 2 (Partiel), 3 (Incorrect) pour évaluer
-                    </div>
-                  )}
+                  {/* Keep helper succinct; keyboard shortcuts removed to avoid confusion */}
                   {showResults && evaluationComplete && (
                     <div className="text-xs text-muted-foreground mt-1">
                       Appuyez sur Entrée pour continuer
@@ -602,6 +663,9 @@ export function ClinicalCaseQuestion({
         </CardContent>
       </Card>
 
+      {(() => {
+        const hasOpen = clinicalCase.questions.some(q => q.type === 'clinic_croq');
+        return (
       <Card>
         <CardContent>
           <div className="space-y-6 mt-6">
@@ -629,17 +693,20 @@ export function ClinicalCaseQuestion({
           <div className="mt-8 space-y-4">
             
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 flex-wrap">
-              {/* Progress / status */}
+               {/* Progress / status */}
               <div className="text-sm text-muted-foreground">
-                {!showResults && (answeredQuestions === clinicalCase.totalQuestions
-                  ? 'Toutes les réponses saisies - Appuyez sur Entrée pour soumettre'
-                  : `${clinicalCase.totalQuestions - answeredQuestions} question(s) restante(s) - Répondez puis appuyez sur Entrée`)}
-                {showResults && !evaluationComplete && `Phase d'évaluation: ${evaluationOrder.filter(id => questionResults[id] !== undefined).length}/${evaluationOrder.length} évaluées (1 Correct • 2 Partiel • 3 Incorrect)`}
-                {showResults && evaluationComplete && 'Évaluation terminée - Entrée pour continuer'}
+                {!showResults && (
+                  answeredQuestions === clinicalCase.totalQuestions
+                    ? 'Toutes les réponses saisies — Entrée ou Soumettre pour valider'
+                    : `${clinicalCase.totalQuestions - answeredQuestions} question(s) restante(s) — répondez puis Soumettre`
+                )}
+                {hasOpen && showResults && !evaluationComplete && `Phase d'évaluation: ${evaluationOrder.filter(id => questionResults[id] !== undefined).length}/${evaluationOrder.length} évaluées`}
+                {hasOpen && showResults && evaluationComplete && 'Évaluation terminée — Entrée ou Suivant pour continuer'}
+                {!hasOpen && showResults && 'Révision terminée — Entrée ou Suivant pour continuer'}
               </div>
 
               <div className="flex gap-2 flex-wrap justify-end items-center">
-                {/* Always show submit (disabled until all answered or already submitted) */}
+                {/* Group submit: shown for any grouped block (MCQ or open) */}
                 {!showResults && (
                   <Button
                     onClick={handleCompleteCase}
@@ -651,9 +718,34 @@ export function ClinicalCaseQuestion({
                   </Button>
                 )}
 
-                {/* Notes + reset + next buttons after results */}
-                {isCaseComplete && showResults && evaluationComplete && (
-                  <>
+                {/* Resubmit button visible after submission (for both MCQ-only and open cases) */}
+                {isCaseComplete && showResults && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleResubmit}
+                    className="flex items-center gap-1"
+                  >
+                    Soumettre à nouveau
+                  </Button>
+                )}
+
+                {/* Next button after submission: always for MCQ-only; for open, after evaluation complete */}
+                {isCaseComplete && showResults && (!hasOpen || evaluationComplete) && (
+                  <Button onClick={onNext} size="sm" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold">
+                    Suivant
+                    <ChevronRight className="h-4 w-4 ml-2" />
+                  </Button>
+                )}
+
+                {/* Notes toggle: immediately after submit for Multi QROC; after evaluation for clinical open */}
+                {(() => {
+                  const canShowNotesToggle = (
+                    (displayMode === 'multi_qroc' && isCaseComplete && showResults) ||
+                    (hasOpen && isCaseComplete && showResults && evaluationComplete)
+                  );
+                  if (!canShowNotesToggle) return null;
+                  return (
                     <Button
                       variant="outline"
                       size="sm"
@@ -666,30 +758,28 @@ export function ClinicalCaseQuestion({
                       <StickyNote className="h-4 w-4" />
                       <span className="hidden sm:inline">{showNotesArea ? 'Fermer les notes' : (notesHasContent ? 'Mes notes' : 'Prendre une note')}</span>
                     </Button>
-
-                    <Button onClick={onNext} size="sm" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold">
-                      Suivant
-                      <ChevronRight className="h-4 w-4 ml-2" />
-                    </Button>
-                  </>
-                )}
+                  );
+                })()}
               </div>
             </div>
+            {hasOpen && (
             <div id={`clinical-case-notes-${clinicalCase.caseNumber}`} className="space-y-6">
               {(showNotesArea || notesHasContent) && (
                 <QuestionNotes 
-                  questionId={`clinical-case-${clinicalCase.caseNumber}`} 
+                  questionId={displayMode === 'multi_qroc' ? `group-qroc-${clinicalCase.caseNumber}` : `clinical-case-${clinicalCase.caseNumber}`}
                   onHasContentChange={setNotesHasContent}
-                  autoEdit={showNotesArea && !notesHasContent} // Auto-edit when manually opened and empty
+                  autoEdit={showNotesArea && !notesHasContent}
                 />
               )}
               {isCaseComplete && (
-                <QuestionComments questionId={`clinical-case-${clinicalCase.caseNumber}`} />
+                <QuestionComments questionId={displayMode === 'multi_qroc' ? `group-qroc-${clinicalCase.caseNumber}` : `clinical-case-${clinicalCase.caseNumber}`} />
               )}
-            </div>
+            </div>)}
           </div>
         </CardContent>
       </Card>
+        );
+      })()}
 
       <Dialog open={showCaseDialog} onOpenChange={setShowCaseDialog}>
         <DialogTrigger asChild>
@@ -700,7 +790,12 @@ export function ClinicalCaseQuestion({
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />Cas Clinique {clinicalCase.caseNumber}
+              <FileText className="h-5 w-5" />
+              {displayMode === 'multi_qcm'
+                ? `Multi QCM ${clinicalCase.caseNumber}`
+                : displayMode === 'multi_qroc'
+                  ? `Multi QROC ${clinicalCase.caseNumber}`
+                  : `Cas Clinique ${clinicalCase.caseNumber}`}
             </DialogTitle>
           </DialogHeader>
           <div className="mt-4 prose max-w-none text-sm leading-relaxed whitespace-pre-wrap text-foreground">
@@ -709,7 +804,31 @@ export function ClinicalCaseQuestion({
         </DialogContent>
       </Dialog>
       {openCaseEdit && (
-        <ClinicalCaseEditDialog caseNumber={clinicalCase.caseNumber} questions={clinicalCase.questions} isOpen={openCaseEdit} onOpenChange={setOpenCaseEdit} onSaved={() => { try { window.location.reload(); } catch {} }} />
+        <ClinicalCaseEditDialog
+          caseNumber={clinicalCase.caseNumber}
+          questions={clinicalCase.questions}
+          isOpen={openCaseEdit}
+          onOpenChange={setOpenCaseEdit}
+          onSaved={() => { try { window.location.reload(); } catch {} }}
+        />
+      )}
+      {openGroupQrocEdit && (
+        <GroupedQrocEditDialog
+          caseNumber={clinicalCase.caseNumber}
+          questions={clinicalCase.questions}
+          isOpen={openGroupQrocEdit}
+          onOpenChange={setOpenGroupQrocEdit}
+          onSaved={() => { try { window.location.reload(); } catch {} }}
+        />
+      )}
+      {openGroupMcqEdit && (
+        <GroupedMcqEditDialog
+          caseNumber={clinicalCase.caseNumber}
+          questions={clinicalCase.questions}
+          isOpen={openGroupMcqEdit}
+          onOpenChange={setOpenGroupMcqEdit}
+          onSaved={() => { try { window.location.reload(); } catch {} }}
+        />
       )}
       {reportTargetQuestion && (
         <ReportQuestionDialog

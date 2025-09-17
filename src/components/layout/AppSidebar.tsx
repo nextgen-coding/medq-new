@@ -22,8 +22,7 @@ import { Button } from '@/components/ui/button';
 import { LayoutDashboard, UserCircle, Settings, Users, LogOut, BookOpen, Moon, Sun, FileText, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useTranslation } from 'react-i18next';
-import { toast } from '@/hooks/use-toast';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { toast } from 'sonner';
 
 export function AppSidebar() {
   const { user, isAdmin, logout } = useAuth();
@@ -57,11 +56,7 @@ export function AppSidebar() {
       router.push('/auth');
     } catch (err) {
       console.error('Unexpected sign out error:', err);
-      toast({
-        title: t('auth.signOutError'),
-        description: t('auth.unexpectedError'),
-        variant: "destructive",
-      });
+      toast.error(t('auth.unexpectedError'));
     }
   };
 
@@ -127,7 +122,6 @@ export function AppSidebar() {
                       <SidebarMenuItem key={item.href}>
                         <SidebarMenuButton 
                           asChild 
-                          tooltip={item.label}
                           className={
                             `group transition-all duration-200 font-medium rounded-xl ${
                               state === 'expanded' 
@@ -163,7 +157,6 @@ export function AppSidebar() {
                           <SidebarMenuItem key={item.href}>
                             <SidebarMenuButton 
                               asChild 
-                              tooltip={item.label}
                               className={
                                 `group transition-all duration-200 font-medium rounded-xl ${
                                   state === 'expanded' 
@@ -200,7 +193,6 @@ export function AppSidebar() {
                       <SidebarMenuItem key={adminItem.href}>
                         <SidebarMenuButton 
                           asChild 
-                          tooltip={adminItem.label}
                           className={
                             `group transition-all duration-200 font-medium rounded-xl ${
                               state === 'expanded' 
@@ -231,52 +223,38 @@ export function AppSidebar() {
         
         <SidebarFooter className="border-t border-border/40 bg-gradient-to-r from-muted/50 to-muted/30 dark:from-muted/30 dark:to-muted/10 p-2">
           <div className="space-y-2">
-            {/* Theme Toggle Button */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={`w-full font-medium rounded-xl transition-all duration-200 justify-center p-0 min-h-[44px] text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 hover:text-blue-700 dark:hover:text-blue-300`}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    console.log('Theme toggle clicked, current theme:', theme);
-                    const newTheme = theme === 'dark' ? 'light' : 'dark';
-                    console.log('Setting theme to:', newTheme);
-                    setTheme(newTheme);
-                  }}
-                  title={theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
-                >
-                  {theme === 'dark' ? (
-                    <Sun className={`${iconSize} flex-shrink-0`} />
-                  ) : (
-                    <Moon className={`${iconSize} flex-shrink-0`} />
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right" align="center" className="bg-background/95 backdrop-blur-sm border-border/50">
-                <p>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</p>
-              </TooltipContent>
-            </Tooltip>
+            {/* Theme Toggle Button (tooltip removed) */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className={`w-full font-medium rounded-xl transition-all duration-200 justify-center p-0 min-h-[44px] text-blue-600 dark:text-blue-400 hover:bg-blue-500/10 hover:text-blue-700 dark:hover:text-blue-300`}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const newTheme = theme === 'dark' ? 'light' : 'dark';
+                setTheme(newTheme);
+              }}
+              title={theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+              aria-label={theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+            >
+              {theme === 'dark' ? (
+                <Sun className={`${iconSize} flex-shrink-0`} />
+              ) : (
+                <Moon className={`${iconSize} flex-shrink-0`} />
+              )}
+            </Button>
 
-            {/* Logout Button */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={`w-full font-medium rounded-xl transition-all duration-200 justify-center p-0 min-h-[44px] text-red-600 dark:text-red-400 hover:bg-red-500/10 hover:text-red-700 dark:hover:text-red-300`}
-                  onClick={handleSignOut}
-                  title={t('auth.signOut')}
-                >
-                  <LogOut className={`${iconSize} flex-shrink-0`} />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="right" align="center" className="bg-background/95 backdrop-blur-sm border-border/50">
-                <p>{t('auth.signOut')}</p>
-              </TooltipContent>
-            </Tooltip>
+            {/* Logout Button (tooltip removed) */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className={`w-full font-medium rounded-xl transition-all duration-200 justify-center p-0 min-h-[44px] text-red-600 dark:text-red-400 hover:bg-red-500/10 hover:text-red-700 dark:hover:text-red-300`}
+              onClick={handleSignOut}
+              title={t('auth.signOut')}
+              aria-label={t('auth.signOut')}
+            >
+              <LogOut className={`${iconSize} flex-shrink-0`} />
+            </Button>
           </div>
         </SidebarFooter>
       </Sidebar>

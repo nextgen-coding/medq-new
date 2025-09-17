@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { authenticateRequest } from '@/lib/auth-middleware';
+import * as XLSX from 'xlsx';
 
-export async function GET(request: NextRequest, { params }: { params: { jobId: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ jobId: string }> }) {
   try {
     const authReq = await authenticateRequest(request);
     if (!authReq?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { jobId } = params;
+    const { jobId } = await params;
 
     const job = await prisma.aiValidationJob.findUnique({
       where: { id: jobId },
@@ -27,6 +28,7 @@ export async function GET(request: NextRequest, { params }: { params: { jobId: s
         startedAt: true,
         completedAt: true,
         config: true,
+        outputUrl: true,
       }
     });
 
@@ -39,38 +41,39 @@ export async function GET(request: NextRequest, { params }: { params: { jobId: s
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
-    // Mock preview data structure - in a real implementation, this would come from job processing
-    const mockExplanations = [
-      {
-        id: '1',
-        sheet: 'QCM',
-        rowNumber: 2,
-        questionText: 'Quelle est la cause la plus fréquente d\'hypertension artérielle?',
-        optionExplanations: [
-          'Option A: L\'hypertension essentielle représente 90-95% des cas...',
-          'Option B: Les causes rénales sont moins fréquentes...',
-        ],
-        hasAiAnalysis: true,
-      },
-      {
-        id: '2',
-        sheet: 'QROC',
-        rowNumber: 5,
-        questionText: 'Citez les principales complications de l\'infarctus du myocarde.',
-        optionExplanations: [
-          'Réponse: Arythmies, insuffisance cardiaque, rupture myocardique...'
-        ],
-        hasAiAnalysis: true,
-      }
-    ];
-
-    const summary = {
+    let explanations: any[] = [];
+    let summary = {
       totalExplanations: job.processedItems || 0,
-      validExplanations: Math.floor((job.processedItems || 0) * 0.95),
-      questionsWithAI: Math.floor((job.processedItems || 0) * 0.8),
-      questionsWithoutAI: Math.floor((job.processedItems || 0) * 0.2),
-      warnings: job.status === 'failed' ? ['Erreur de traitement détectée'] : [],
+      validExplanations: 0,
+      questionsWithAI: 0,
+      questionsWithoutAI: 0,
+      warnings: job.status === 'failed' ? ['Erreur de traitement détectée'] : [] as string[],
     };
+
+    // If we have an output workbook, parse real error rows to surface a preview
+    if (job.outputUrl && job.outputUrl.startsWith('data:')) {
+      try {
+        const base64 = job.outputUrl.substring(job.outputUrl.indexOf(',') + 1);
+        const buf = Buffer.from(base64, 'base64');
+        const wb = XLSX.read(buf, { type: 'buffer' });
+        const errWs = wb.Sheets['Erreurs'];
+        if (errWs) {
+          const rows = XLSX.utils.sheet_to_json<Record<string, any>>(errWs, { defval: '' });
+          explanations = rows.slice(0, 10).map((r, i) => ({
+            id: String(i + 1),
+            sheet: r.sheet || 'unknown',
+            rowNumber: r.row || 0,
+            questionText: r.question || '',
+            reason: r.reason || '',
+            hasAiAnalysis: false,
+          }));
+          summary.totalExplanations = rows.length;
+          summary.questionsWithoutAI = rows.length;
+        }
+      } catch (e) {
+        summary.warnings.push('Impossible de parser le fichier de sortie');
+      }
+    }
 
     const progressInfo = job.status === 'processing' ? {
       progress: job.progress || 0,
@@ -85,11 +88,7 @@ export async function GET(request: NextRequest, { params }: { params: { jobId: s
       lastUpdateTime: Date.now(),
     } : undefined;
 
-    return NextResponse.json({
-      explanations: mockExplanations.slice(0, Math.min(10, job.processedItems || 0)),
-      summary,
-      progressInfo,
-    });
+    return NextResponse.json({ explanations, summary, progressInfo });
 
   } catch (error) {
     console.error('Error fetching job preview:', error);

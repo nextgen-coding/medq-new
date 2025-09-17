@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { authenticateRequest } from '@/lib/auth-middleware';
 
-export async function GET(request: NextRequest, { params }: { params: { jobId: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ jobId: string }> }) {
   try {
     const authReq = await authenticateRequest(request);
     if (!authReq?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { jobId } = params;
+    const { jobId } = await params;
 
     const job = await prisma.aiValidationJob.findUnique({
       where: { id: jobId },
@@ -38,23 +38,33 @@ export async function GET(request: NextRequest, { params }: { params: { jobId: s
       }, { status: 400 });
     }
 
-    // For now, return a mock Excel file response
-    // In a real implementation, this would fetch the file from storage
+    // If we don't have an outputUrl, that's an error
     if (!job.outputUrl) {
       return NextResponse.json({ 
         error: 'Output file not available' 
       }, { status: 404 });
     }
 
-    // Mock Excel file generation
-    const mockExcelData = generateMockExcelFile(job.fileName);
-    
+    // If outputUrl is a data URL, decode and return it
+    if (job.outputUrl.startsWith('data:')) {
+      const base64 = job.outputUrl.substring(job.outputUrl.indexOf(',') + 1)
+      const buf = Buffer.from(base64, 'base64')
+      return new NextResponse(buf as any, {
+        headers: {
+          'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'Content-Disposition': `attachment; filename="enhanced_${job.fileName}"`,
+        },
+      })
+    }
+
+    // Otherwise, fallback to old mock behavior (temporary)
+    const mockExcelData = generateMockExcelFile(job.fileName)
     return new NextResponse(mockExcelData as any, {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'Content-Disposition': `attachment; filename="enhanced_${job.fileName}"`,
       },
-    });
+    })
 
   } catch (error) {
     console.error('Error downloading job result:', error);

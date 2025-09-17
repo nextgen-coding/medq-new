@@ -29,10 +29,10 @@ export default function CourseManagementPage() {
   const [loadingLecture, setLoadingLecture] = useState(true);
   const [loadingQuestions, setLoadingQuestions] = useState(true);
   const [openCreator, setOpenCreator] = useState(false); // panel visibility
-  const [creationMode, setCreationMode] = useState<'single' | 'clinical_case' | 'grouped_qroc'>('single');
+  const [creationMode, setCreationMode] = useState<'single' | 'clinical_case' | 'grouped_qroc' | 'grouped_qcm'>('single');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingGroupCaseNumber, setEditingGroupCaseNumber] = useState<number | null>(null);
-  const [editingGroupType, setEditingGroupType] = useState<'clinical_case' | 'grouped_qroc' | null>(null);
+  const [editingGroupType, setEditingGroupType] = useState<'clinical_case' | 'grouped_qroc' | 'grouped_qcm' | null>(null);
   const [originalGroupQuestionIds, setOriginalGroupQuestionIds] = useState<string[]>([]);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [groupToDelete, setGroupToDelete] = useState<null | { key:string; label:string; questions: Question[] }>(null);
@@ -42,8 +42,14 @@ export default function CourseManagementPage() {
 
   const [groupQrocSubmitting, setGroupQrocSubmitting] = useState(false);
   const [groupQrocSubs, setGroupQrocSubs] = useState<Array<{ id:string; text:string; answer:string }>>([]);
+  const [groupQrocCaseText, setGroupQrocCaseText] = useState<string>('');
 
-  const resetGroupedQroc = () => { setGroupQrocSubs([]); setGroupQrocSubmitting(false); };
+  // Grouped QCM state
+  const [groupQcmSubmitting, setGroupQcmSubmitting] = useState(false);
+  const [groupQcmSubs, setGroupQcmSubs] = useState<Array<{ id:string; text:string; options:string[]; correctAnswers:string[] }>>([]);
+  const [groupQcmCaseText, setGroupQcmCaseText] = useState<string>('');
+
+  const resetGroupedQroc = () => { setGroupQrocSubs([]); setGroupQrocSubmitting(false); setGroupQrocCaseText(''); };
   const addGroupedQroc = () => { setGroupQrocSubs(prev => [...prev, { id: crypto.randomUUID(), text:'', answer:'' }]); };
   const updateGroupedQroc = (id:string, patch: Partial<{ text:string; answer:string }>) => setGroupQrocSubs(prev => prev.map(s => s.id===id? { ...s, ...patch }: s));
   const removeGroupedQroc = (id:string) => setGroupQrocSubs(prev => prev.filter(s=>s.id!==id));
@@ -51,6 +57,10 @@ export default function CourseManagementPage() {
   const resetCaseBuilder = () => {
     setCaseQuestions([]); setCaseText(''); setCaseSubmitting(false);
   };
+  const resetGroupedQcm = () => { setGroupQcmSubs([]); setGroupQcmSubmitting(false); setGroupQcmCaseText(''); };
+  const addGroupedQcm = () => { setGroupQcmSubs(prev => [...prev, { id: crypto.randomUUID(), text:'', options:[], correctAnswers:[] }]); };
+  const updateGroupedQcm = (id:string, patch: Partial<{ text:string; options:string[]; correctAnswers:string[] }>) => setGroupQcmSubs(prev => prev.map(s => s.id===id? { ...s, ...patch }: s));
+  const removeGroupedQcm = (id:string) => setGroupQcmSubs(prev => prev.filter(s=>s.id!==id));
   const addCaseQuestion = (type: 'clinic_mcq' | 'clinic_croq') => {
     setCaseQuestions(prev => [...prev, { id: crypto.randomUUID(), type, text: '', options: [], correctAnswers: [], referenceAnswer: '' }]);
   };
@@ -125,7 +135,7 @@ export default function CourseManagementPage() {
         for (const id of toDelete) { await fetch(`/api/questions/${id}`, { method:'DELETE', credentials:'include' }); }
       }
       for (const s of groupQrocSubs) {
-        const body:any = { type:'qroc', text: s.text.trim(), caseNumber: targetCaseNumber, caseQuestionNumber: order, correctAnswers:[s.answer.trim()] };
+        const body:any = { type:'qroc', text: s.text.trim(), caseNumber: targetCaseNumber, caseQuestionNumber: order, caseText: groupQrocCaseText.trim() || undefined, correctAnswers:[s.answer.trim()] };
         if (editingGroupCaseNumber && originalGroupQuestionIds.includes(s.id)) {
           await fetch(`/api/questions/${s.id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify(body) });
         } else {
@@ -133,7 +143,7 @@ export default function CourseManagementPage() {
         }
         order++;
       }
-      toast({ title: editingGroupCaseNumber? 'Groupe QROC mis à jour' : 'Groupe QROC créé', description:`${groupQrocSubs.length} sous-question(s)` });
+      toast({ title: editingGroupCaseNumber? 'Multi QROC mis à jour' : 'Multi QROC créé', description:`${groupQrocSubs.length} sous-question(s)` });
       resetGroupedQroc();
       setEditingGroupCaseNumber(null); setEditingGroupType(null); setOriginalGroupQuestionIds([]);
       loadQuestions();
@@ -177,7 +187,7 @@ export default function CourseManagementPage() {
 
   const beginCreate = () => { setEditingId(null); setOpenCreator(true); setCreationMode('single'); };
   const beginEdit = (id: string) => { setEditingId(id); setOpenCreator(true); setCreationMode('single'); setEditingGroupCaseNumber(null); setEditingGroupType(null); };
-  const beginEditGroup = (group: { type:'clinical_case'|'grouped_qroc'; caseNumber:number; caseText?:string; questions: Question[] }) => {
+  const beginEditGroup = (group: { type:'clinical_case'|'grouped_qroc'|'grouped_qcm'; caseNumber:number; caseText?:string; questions: Question[] }) => {
     setEditingId(null);
     setOpenCreator(true);
     setEditingGroupCaseNumber(group.caseNumber);
@@ -188,10 +198,17 @@ export default function CourseManagementPage() {
       const mapped = group.questions.sort((a,b)=> (a.caseQuestionNumber||0)-(b.caseQuestionNumber||0)).map(q=>({ id:q.id, type: q.type as any, text:q.text, options: (q.type==='clinic_mcq'? (q.options||[]):[]), correctAnswers: q.correctAnswers||[], referenceAnswer: (q.type==='clinic_croq'?(q.correctAnswers?.[0]||''):'') }));
       setCaseQuestions(mapped as any);
       setOriginalGroupQuestionIds(group.questions.map(q=>q.id));
-    } else {
+    } else if (group.type==='grouped_qroc') {
       setCreationMode('grouped_qroc');
       const mapped = group.questions.sort((a,b)=> (a.caseQuestionNumber||0)-(b.caseQuestionNumber||0)).map(q=>({ id:q.id, text:q.text, answer: q.correctAnswers?.[0]||'' }));
       setGroupQrocSubs(mapped);
+      setGroupQrocCaseText(group.caseText || '');
+      setOriginalGroupQuestionIds(group.questions.map(q=>q.id));
+    } else if (group.type==='grouped_qcm') {
+      setCreationMode('grouped_qcm');
+      const mapped = group.questions.sort((a,b)=> (a.caseQuestionNumber||0)-(b.caseQuestionNumber||0)).map(q=>({ id:q.id, text:q.text, options: (q.options||[]).map(o=> (typeof o==='string'? o : (o as any).text || '')), correctAnswers: q.correctAnswers||[] }));
+      setGroupQcmSubs(mapped);
+      setGroupQcmCaseText(group.caseText || '');
       setOriginalGroupQuestionIds(group.questions.map(q=>q.id));
     }
   };
@@ -256,9 +273,10 @@ export default function CourseManagementPage() {
                   <div className="flex items-center gap-3">
                     {!editingId && (
                       <>
-                        <Button size="sm" variant={creationMode==='single'? 'default':'outline'} onClick={()=>{ setCreationMode('single'); resetCaseBuilder(); resetGroupedQroc(); }} className={creationMode==='single'? 'bg-blue-600 hover:bg-blue-700 text-white' : 'border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30'}>Question simple</Button>
-                        <Button size="sm" variant={creationMode==='clinical_case'? 'default':'outline'} onClick={()=>{ setCreationMode('clinical_case'); resetGroupedQroc(); resetCaseBuilder(); }} className={`h-8 flex items-center gap-2 ${creationMode==='clinical_case'? 'bg-blue-600 hover:bg-blue-700 text-white' : 'border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30'}`}><FileText className="h-4 w-4" /> Cas clinique</Button>
-                        <Button size="sm" variant={creationMode==='grouped_qroc'? 'default':'outline'} onClick={()=>{ setCreationMode('grouped_qroc'); resetCaseBuilder(); resetGroupedQroc(); addGroupedQroc(); }} className={`h-8 flex items-center gap-2 ${creationMode==='grouped_qroc'? 'bg-blue-600 hover:bg-blue-700 text-white' : 'border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30'}`}><ListPlus className="h-4 w-4" /> Groupe QROC</Button>
+                        <Button size="sm" variant={creationMode==='single'? 'default':'outline'} onClick={()=>{ setCreationMode('single'); resetCaseBuilder(); resetGroupedQroc(); resetGroupedQcm(); }} className={creationMode==='single'? 'bg-blue-600 hover:bg-blue-700 text-white' : 'border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30'}>Question simple</Button>
+                        <Button size="sm" variant={creationMode==='clinical_case'? 'default':'outline'} onClick={()=>{ setCreationMode('clinical_case'); resetGroupedQroc(); resetGroupedQcm(); resetCaseBuilder(); }} className={`h-8 flex items-center gap-2 ${creationMode==='clinical_case'? 'bg-blue-600 hover:bg-blue-700 text-white' : 'border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30'}`}><FileText className="h-4 w-4" /> Cas clinique</Button>
+                        <Button size="sm" variant={creationMode==='grouped_qroc'? 'default':'outline'} onClick={()=>{ setCreationMode('grouped_qroc'); resetCaseBuilder(); resetGroupedQcm(); resetGroupedQroc(); addGroupedQroc(); }} className={`h-8 flex items-center gap-2 ${creationMode==='grouped_qroc'? 'bg-blue-600 hover:bg-blue-700 text-white' : 'border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30'}`}><ListPlus className="h-4 w-4" /> Multi QROC</Button>
+                        <Button size="sm" variant={creationMode==='grouped_qcm'? 'default':'outline'} onClick={()=>{ setCreationMode('grouped_qcm'); resetCaseBuilder(); resetGroupedQroc(); resetGroupedQcm(); addGroupedQcm(); }} className={`h-8 flex items-center gap-2 ${creationMode==='grouped_qcm'? 'bg-blue-600 hover:bg-blue-700 text-white' : 'border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30'}`}><ListPlus className="h-4 w-4" /> Multi QCM</Button>
                       </>
                     )}
                     {editingId && <span className="text-lg font-semibold text-blue-900 dark:text-blue-100">Modifier la question</span>}
@@ -331,8 +349,13 @@ export default function CourseManagementPage() {
         {creationMode==='grouped_qroc' && !editingId && (
                   <div className="space-y-6">
                     <div className="flex items-center gap-3 flex-wrap">
-                      <h2 className="text-lg font-semibold flex items-center gap-3 text-blue-900 dark:text-blue-100"><ListPlus className="h-5 w-5 text-amber-600" /> {editingGroupCaseNumber? `Modifier groupe QROC #${editingGroupCaseNumber}`:'Nouveau groupe QROC'}</h2>
+                      <h2 className="text-lg font-semibold flex items-center gap-3 text-blue-900 dark:text-blue-100"><ListPlus className="h-5 w-5 text-amber-600" /> {editingGroupCaseNumber? `Modifier Multi QROC #${editingGroupCaseNumber}`:'Nouveau Multi QROC'}</h2>
                       <Button size="sm" variant="outline" onClick={addGroupedQroc} className="border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30">+ Ajouter sous-question</Button>
+                    </div>
+                    {/* Optional case text for the multi QROC group */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-blue-700 dark:text-blue-300">Texte du cas (optionnel)</label>
+                      <textarea value={groupQrocCaseText} onChange={e=>setGroupQrocCaseText(e.target.value)} rows={3} className="w-full rounded-md border border-blue-200 bg-background dark:bg-muted/30 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/20 focus-visible:border-blue-400" placeholder="Texte commun (contexte) affiché au-dessus du groupe" />
                     </div>
                     {groupQrocSubs.length === 0 && <p className="text-sm text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200">Ajoutez des sous-questions QROC pour créer un groupe thématique.</p>}
                     <div className="space-y-4">
@@ -358,7 +381,92 @@ export default function CourseManagementPage() {
                     </div>
                     <div className="flex justify-end gap-3 pt-4 border-t border-blue-100">
                       <Button variant="outline" size="sm" onClick={()=>{ resetGroupedQroc(); setOpenCreator(false); }} className="border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30">Annuler</Button>
-                      <Button size="sm" disabled={groupQrocSubmitting} onClick={submitGroupedQroc} className="bg-amber-600 hover:bg-amber-700 disabled:opacity-60 text-white shadow-md px-6">{groupQrocSubmitting? (editingGroupCaseNumber? 'Mise à jour...' : 'Création...') : (editingGroupCaseNumber? 'Mettre à jour le groupe' : 'Créer le groupe QROC')}</Button>
+                      <Button size="sm" disabled={groupQrocSubmitting} onClick={submitGroupedQroc} className="bg-amber-600 hover:bg-amber-700 disabled:opacity-60 text-white shadow-md px-6">{groupQrocSubmitting? (editingGroupCaseNumber? 'Mise à jour...' : 'Création...') : (editingGroupCaseNumber? 'Mettre à jour le groupe' : 'Créer le Multi QROC')}</Button>
+                    </div>
+                  </div>
+                )}
+
+                {creationMode==='grouped_qcm' && !editingId && (
+                  <div className="space-y-6">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <h2 className="text-lg font-semibold flex items-center gap-3 text-blue-900 dark:text-blue-100"><ListPlus className="h-5 w-5 text-emerald-600" /> {editingGroupCaseNumber? `Modifier Multi QCM #${editingGroupCaseNumber}`:'Nouveau Multi QCM'}</h2>
+                      <Button size="sm" variant="outline" onClick={addGroupedQcm} className="border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30">+ Ajouter sous-question</Button>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-blue-700 dark:text-blue-300">Texte du cas (optionnel)</label>
+                      <textarea value={groupQcmCaseText} onChange={e=>setGroupQcmCaseText(e.target.value)} rows={3} className="w-full rounded-md border border-blue-200 bg-background dark:bg-muted/30 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/20 focus-visible:border-blue-400" placeholder="Texte commun (contexte) affiché au-dessus du groupe" />
+                    </div>
+                    {groupQcmSubs.length === 0 && <p className="text-sm text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/20 p-4 rounded-lg border border-blue-200">Ajoutez des sous-questions QCM pour créer un groupe thématique.</p>}
+                    <div className="space-y-4">
+                      {groupQcmSubs.map((s,i)=>(
+                        <div key={s.id} className="border border-blue-200 rounded-xl p-5 bg-white/60 dark:bg-muted/40 backdrop-blur-sm space-y-3 transition-colors shadow-sm">
+                          <div className="flex items-center gap-3 text-sm font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+                            <span className="px-3 py-1 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">Question #{i+1}</span>
+                            <span>QCM</span>
+                            <Button size="sm" variant="ghost" className="ml-auto h-8 px-3 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30" onClick={()=>removeGroupedQcm(s.id)}><Trash className="h-4 w-4" /></Button>
+                          </div>
+                          <div className="space-y-3">
+                            <div>
+                              <label className="text-sm font-medium text-blue-700 dark:text-blue-300 mb-2 block">Énoncé de la question</label>
+                              <textarea value={s.text} onChange={e=>updateGroupedQcm(s.id,{ text:e.target.value })} rows={3} className="w-full rounded-md border border-blue-200 bg-background dark:bg-muted/30 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/20 focus-visible:border-blue-400" placeholder="Énoncé de la sous-question QCM" />
+                            </div>
+                            <div className="space-y-3">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium text-blue-700 dark:text-blue-300">Options de réponse</span>
+                                <Button size="sm" variant="outline" className="h-8 px-3 border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30" onClick={()=>updateGroupedQcm(s.id,{ options:[...s.options,''] })}>+ Ajouter option</Button>
+                              </div>
+                              <div className="space-y-2">
+                                {s.options.map((opt,idx)=>(
+                                  <div key={idx} className="flex items-center gap-3">
+                                    <input value={opt} onChange={e=>{ const copy=[...s.options]; copy[idx]=e.target.value; updateGroupedQcm(s.id,{ options:copy }); }} className="flex-1 rounded-md border border-blue-200 bg-background dark:bg-muted/30 px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/20 focus-visible:border-blue-400" placeholder={`Option ${String.fromCharCode(65+idx)}`} />
+                                    <Button size="sm" variant={s.correctAnswers.includes(String.fromCharCode(65+idx))? 'default':'outline'} className={`h-10 px-4 ${s.correctAnswers.includes(String.fromCharCode(65+idx))? 'bg-green-600 hover:bg-green-700 text-white' : 'border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30'}`} type="button" onClick={()=>{ const key=String.fromCharCode(65+idx); updateGroupedQcm(s.id,{ correctAnswers: s.correctAnswers.includes(key)? s.correctAnswers.filter(a=>a!==key): [...s.correctAnswers,key] }); }}>{String.fromCharCode(65+idx)}</Button>
+                                    <Button size="sm" variant="ghost" className="h-10 px-3 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30" onClick={()=>{ const opts=[...s.options]; opts.splice(idx,1); const newCorrect = s.correctAnswers.filter(a=>a!==String.fromCharCode(65+idx)); updateGroupedQcm(s.id,{ options:opts, correctAnswers:newCorrect }); }}>✕</Button>
+                                  </div>
+                                ))}
+                              </div>
+                              <div className="text-sm text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/20 p-3 rounded-lg">Cliquez sur une lettre pour marquer la réponse comme correcte (plusieurs réponses possibles).</div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex justify-end gap-3 pt-4 border-t border-blue-100">
+                      <Button variant="outline" size="sm" onClick={()=>{ resetGroupedQcm(); setOpenCreator(false); }} className="border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30">Annuler</Button>
+                      <Button size="sm" disabled={groupQcmSubmitting} onClick={async()=>{
+                        if (groupQcmSubmitting) return;
+                        if (groupQcmSubs.length===0) { toast({ title:'Validation', description:'Ajoutez au moins une sous-question', variant:'destructive'}); return; }
+                        for (const s of groupQcmSubs) {
+                          if (!s.text.trim()) { toast({ title:'Validation', description:'Chaque sous-question doit avoir un énoncé', variant:'destructive'}); return; }
+                          if ((s.options||[]).filter(o=>o.trim()).length < 2) { toast({ title:'Validation', description:'Chaque QCM nécessite au moins 2 options', variant:'destructive'}); return; }
+                          if ((s.correctAnswers||[]).length === 0) { toast({ title:'Validation', description:'Marquez au moins une bonne réponse', variant:'destructive'}); return; }
+                        }
+                        setGroupQcmSubmitting(true);
+                        try {
+                          let targetCaseNumber = editingGroupCaseNumber;
+                          if (!targetCaseNumber) {
+                            const existing = questions.filter(q => q.type==='mcq' && (q as any).caseNumber).map(q => (q as any).caseNumber as number).filter(Boolean);
+                            targetCaseNumber = (existing.length? Math.max(...existing):0) + 1;
+                          }
+                          if (editingGroupCaseNumber && editingGroupType==='grouped_qcm') {
+                            const toDelete = originalGroupQuestionIds.filter(id => !groupQcmSubs.some(s=>s.id===id));
+                            for (const id of toDelete) { await fetch(`/api/questions/${id}`, { method:'DELETE', credentials:'include' }); }
+                          }
+                          let order = 1;
+                          for (const s of groupQcmSubs) {
+                            const body:any = { type:'mcq', text: s.text.trim(), options: s.options.map(o=>o.trim()).filter(Boolean), correctAnswers: s.correctAnswers, caseNumber: targetCaseNumber, caseQuestionNumber: order, caseText: groupQcmCaseText.trim() || undefined };
+                            if (editingGroupCaseNumber && originalGroupQuestionIds.includes(s.id)) {
+                              await fetch(`/api/questions/${s.id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify(body) });
+                            } else {
+                              await fetch('/api/questions', { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify({ ...body, lectureId }) });
+                            }
+                            order++;
+                          }
+                          toast({ title: editingGroupCaseNumber? 'Multi QCM mis à jour' : 'Multi QCM créé', description:`${groupQcmSubs.length} sous-question(s)` });
+                          resetGroupedQcm();
+                          setEditingGroupCaseNumber(null); setEditingGroupType(null); setOriginalGroupQuestionIds([]);
+                          loadQuestions();
+                        } catch(e){ console.error(e); toast({ title:'Erreur', description:'Création groupe QCM impossible', variant:'destructive'}); setGroupQcmSubmitting(false); }
+                      }} className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white shadow-md px-6">{groupQcmSubmitting? (editingGroupCaseNumber? 'Mise à jour...' : 'Création...') : (editingGroupCaseNumber? 'Mettre à jour le groupe' : 'Créer le Multi QCM')}</Button>
                     </div>
                   </div>
                 )}
@@ -412,17 +520,25 @@ export default function CourseManagementPage() {
                       // Build grouped display list
                       const clinicGroups = new Map<number, Question[]>();
                       const qrocGroups = new Map<number, Question[]>();
+                      const qcmGroups = new Map<number, Question[]>();
                       for (const q of filtered) {
-                        if (q.caseNumber) {
-                          if ((q.type==='clinic_mcq' || q.type==='clinic_croq') || (q as any).caseText) {
-                            const arr = clinicGroups.get(q.caseNumber) || []; arr.push(q); clinicGroups.set(q.caseNumber, arr);
-                          } else if (q.type==='qroc') {
-                            const arr = qrocGroups.get(q.caseNumber) || []; arr.push(q); qrocGroups.set(q.caseNumber, arr);
-                          }
+                        if (!q.caseNumber) continue;
+                        // Clinical cases are ONLY explicit clinic_* types. Presence of caseText alone should not force clinical grouping.
+                        if (q.type==='clinic_mcq' || q.type==='clinic_croq') {
+                          const arr = clinicGroups.get(q.caseNumber) || []; arr.push(q); clinicGroups.set(q.caseNumber, arr);
+                          continue;
+                        }
+                        if (q.type==='qroc') {
+                          const arr = qrocGroups.get(q.caseNumber) || []; arr.push(q); qrocGroups.set(q.caseNumber, arr);
+                          continue;
+                        }
+                        if (q.type==='mcq') {
+                          const arr = qcmGroups.get(q.caseNumber) || []; arr.push(q); qcmGroups.set(q.caseNumber, arr);
+                          continue;
                         }
                       }
                       const groupedKeys = new Set<string>();
-                      const items: Array<{kind:'clinical'; group:{caseNumber:number; caseText?:string; questions:Question[]}} | {kind:'grouped_qroc'; group:{caseNumber:number; questions:Question[]}} | {kind:'single'; question:Question}> = [];
+                      const items: Array<{kind:'clinical'; group:{caseNumber:number; caseText?:string; questions:Question[]}} | {kind:'grouped_qroc'; group:{caseNumber:number; caseText?:string; questions:Question[]}} | {kind:'grouped_qcm'; group:{caseNumber:number; caseText?:string; questions:Question[]}} | {kind:'single'; question:Question}> = [];
                       // Clinical groups
                       clinicGroups.forEach((qs, num)=>{
                         items.push({ kind:'clinical', group:{ caseNumber:num, caseText: (qs[0] as any).caseText, questions: qs.sort((a,b)=> (a.caseQuestionNumber||0)-(b.caseQuestionNumber||0)) }});
@@ -430,13 +546,18 @@ export default function CourseManagementPage() {
                       });
                       // QROC groups (only if more than 1)
                       qrocGroups.forEach((qs, num)=>{
-                        if (qs.length>1) { items.push({ kind:'grouped_qroc', group:{ caseNumber:num, questions: qs.sort((a,b)=> (a.caseQuestionNumber||0)-(b.caseQuestionNumber||0)) }}); groupedKeys.add('gqroc-'+num); }
+                        if (qs.length>1) { const ctext = (qs.find(q=> (q as any).caseText) as any)?.caseText; items.push({ kind:'grouped_qroc', group:{ caseNumber:num, caseText: ctext, questions: qs.sort((a,b)=> (a.caseQuestionNumber||0)-(b.caseQuestionNumber||0)) }}); groupedKeys.add('gqroc-'+num); }
+                      });
+                      // QCM groups (only if more than 1)
+                      qcmGroups.forEach((qs, num)=>{
+                        if (qs.length>1) { const ctext = (qs.find(q=> (q as any).caseText) as any)?.caseText; items.push({ kind:'grouped_qcm', group:{ caseNumber:num, caseText: ctext, questions: qs.sort((a,b)=> (a.caseQuestionNumber||0)-(b.caseQuestionNumber||0)) }}); groupedKeys.add('gqcm-'+num); }
                       });
                       // Singles
                       for (const q of filtered) {
                         if (q.caseNumber) {
                           if ((q.type==='clinic_mcq'||q.type==='clinic_croq') && clinicGroups.get(q.caseNumber)) continue;
                           if (q.type==='qroc' && qrocGroups.get(q.caseNumber) && (qrocGroups.get(q.caseNumber) as any).length>1) continue;
+                          if (q.type==='mcq' && qcmGroups.get(q.caseNumber) && (qcmGroups.get(q.caseNumber) as any).length>1) continue;
                         }
                         items.push({ kind:'single', question:q });
                       }
@@ -471,11 +592,13 @@ export default function CourseManagementPage() {
                         }
                         const g = it.group;
                         const isClinic = it.kind==='clinical';
-                        const title = isClinic? `Cas clinique #${g.caseNumber}` : `Groupe QROC #${g.caseNumber}`;
-                        const bgColor = isClinic ? 'from-violet-50/50 to-white dark:from-violet-950/10 dark:to-background' : 'from-amber-50/50 to-white dark:from-amber-950/10 dark:to-background';
-                        const borderColor = isClinic ? 'border-violet-300 dark:border-violet-600' : 'border-amber-300 dark:border-amber-600';
-                        const iconColor = isClinic ? 'text-violet-600' : 'text-amber-600';
-                        const badgeColor = isClinic ? 'bg-violet-100 text-violet-700 border-violet-200' : 'bg-amber-100 text-amber-700 border-amber-200';
+                        const isQrocGroup = it.kind==='grouped_qroc';
+                        const isQcmGroup = it.kind==='grouped_qcm';
+                        const title = isClinic? `Cas clinique #${g.caseNumber}` : isQrocGroup? `Multi QROC #${g.caseNumber}` : `Multi QCM #${g.caseNumber}`;
+                        const bgColor = isClinic ? 'from-violet-50/50 to-white dark:from-violet-950/10 dark:to-background' : isQrocGroup ? 'from-amber-50/50 to-white dark:from-amber-950/10 dark:to-background' : 'from-emerald-50/50 to-white dark:from-emerald-950/10 dark:to-background';
+                        const borderColor = isClinic ? 'border-violet-300 dark:border-violet-600' : isQrocGroup ? 'border-amber-300 dark:border-amber-600' : 'border-emerald-300 dark:border-emerald-600';
+                        const iconColor = isClinic ? 'text-violet-600' : isQrocGroup ? 'text-amber-600' : 'text-emerald-600';
+                        const badgeColor = isClinic ? 'bg-violet-100 text-violet-700 border-violet-200' : isQrocGroup ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-emerald-100 text-emerald-700 border-emerald-200';
                         
                         return (
                           <div key={(isClinic?'clinic':'gqroc')+g.caseNumber} className={`group border-2 ${borderColor} rounded-xl p-6 flex flex-col gap-4 hover:border-blue-300 transition-all duration-200 bg-gradient-to-br ${bgColor} shadow-sm hover:shadow-md hover:shadow-blue-500/25`}>
@@ -486,9 +609,11 @@ export default function CourseManagementPage() {
                                   {isClinic ? <FileText className={`h-5 w-5 ${iconColor}`} /> : <ListPlus className={`h-5 w-5 ${iconColor}`} />}
                                   <p className="text-lg font-semibold leading-relaxed text-blue-900 dark:text-blue-100" title={title}>{title}</p>
                                 </div>
-                                {isClinic && (g as any).caseText && <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed bg-white/50 dark:bg-muted/20 p-3 rounded-lg border border-blue-100" title={(g as any).caseText}>{(g as any).caseText}</p>}
+                                {((isClinic && (g as any).caseText) || (!isClinic && (g as any).caseText)) && (
+                                  <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed bg-white/50 dark:bg-muted/20 p-3 rounded-lg border border-blue-100" title={(g as any).caseText}>{(g as any).caseText}</p>
+                                )}
                                 <div className="flex flex-wrap gap-2 text-xs font-medium">
-                                  <Badge variant="outline" className={`px-2 py-1 ${badgeColor}`}>{isClinic? 'CAS CLINIQUE' : 'GROUPE QROC'}</Badge>
+                                  <Badge variant="outline" className={`px-2 py-1 ${badgeColor}`}>{isClinic? 'CAS CLINIQUE' : (isQrocGroup ? 'MULTI QROC' : 'MULTI QCM')}</Badge>
                                   <Badge variant="secondary" className="px-2 py-1 bg-blue-100 text-blue-700">{g.questions.length} sous-questions</Badge>
                                 </div>
                                 <div className="pl-3 space-y-2 border-l-2 border-blue-200">
@@ -497,7 +622,7 @@ export default function CourseManagementPage() {
                                 </div>
                               </div>
                               <div className="flex gap-2 flex-shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
-                                <Button size="sm" variant="outline" onClick={()=>beginEditGroup({ type: isClinic?'clinical_case':'grouped_qroc', caseNumber:g.caseNumber, caseText:(g as any).caseText, questions:g.questions })} className="h-9 border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30"><Edit className="h-4 w-4" /></Button>
+                                <Button size="sm" variant="outline" onClick={()=>beginEditGroup({ type: isClinic?'clinical_case': (isQrocGroup? 'grouped_qroc':'grouped_qcm'), caseNumber:g.caseNumber, caseText:(g as any).caseText, questions:g.questions })} className="h-9 border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30"><Edit className="h-4 w-4" /></Button>
                                 {/* Delete whole group via custom dialog */}
                                 <Button size="sm" variant="outline" disabled={deletingId===('group-'+g.caseNumber)} onClick={()=>{ if (deletingId) return; setGroupToDelete({ key:'group-'+g.caseNumber, label: title, questions: g.questions }); }} className="h-9 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-950/30">{deletingId===('group-'+g.caseNumber)? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash className="h-4 w-4" />}</Button>
                               </div>
