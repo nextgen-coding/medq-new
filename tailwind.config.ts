@@ -80,6 +80,20 @@ export default withUt({
         info: {
           DEFAULT: 'hsl(var(--info))',
           foreground: 'hsl(var(--info-foreground))'
+        },
+        // MedQ brand color palette
+        medblue: {
+          50: '#f2f9fd',    // Very light blue for backgrounds
+          100: '#e6f2fa',   // Light blue for cards/containers
+          150: '#d9ecf7',   // Extra light (if needed)
+          200: '#c0e0f3',   // Soft blue for borders/accents
+          300: '#9acfeb',   // Medium light blue
+          400: '#55ace0',   // Bright blue for highlights
+          500: '#1f8fd4',   // Primary blue (main brand color)
+          600: '#0d78bb',   // Darker blue for CTAs/headers
+          700: '#0b6095',   // Deep blue for text/strong elements
+          800: '#094b74',   // Very dark blue for gradients
+          900: '#06324d'    // Darkest blue for contrast
         }
       },
       borderRadius: {

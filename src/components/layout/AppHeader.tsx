@@ -43,7 +43,7 @@ export function AppHeader() {
   return (
     <header className="border-b border-border/40 bg-gradient-to-r from-background via-background to-muted/20 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80 sticky top-0 z-40 shadow-sm">
       <div className="flex h-16 items-center gap-2 sm:gap-4 px-3 sm:px-6">
-        {/* Left Section: Sidebar toggle + Branding */}
+        {/* Left Section: Sidebar toggle only */}
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <Button 
             variant="ghost" 
@@ -54,16 +54,6 @@ export function AppHeader() {
             {open || openMobile ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             <span className="sr-only">Toggle sidebar</span>
           </Button>
-          <Button 
-            variant="link" 
-            className="font-bold text-lg sm:text-xl p-0 flex items-center gap-2 whitespace-nowrap hover:no-underline group" 
-            onClick={() => router.push('/dashboard')}
-          >
-            <span className="flex items-center justify-center bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-xl w-8 h-8 sm:w-9 sm:h-9 shadow-lg shadow-blue-500/25 group-hover:shadow-blue-500/40 transition-all duration-200">
-              <Stethoscope className="h-4 w-4 sm:h-5 sm:w-5" />
-            </span>
-            <span className="hidden md:inline-block bg-gradient-to-r from-blue-600 to-blue-800 dark:from-blue-400 dark:to-blue-600 bg-clip-text text-transparent">{t('app.name')}</span>
-          </Button>
         </div>
 
   {/* Center Section: (search removed) preserve flex spacing */}
@@ -73,23 +63,6 @@ export function AppHeader() {
         <div className="ml-auto flex items-center gap-1 sm:gap-2">
           {user && (
             <>
-              {/* Notifications */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="relative hover:bg-blue-500/10 hover:text-blue-600 dark:hover:text-blue-400 transition-all duration-200 rounded-xl">
-                    <Bell className="h-5 w-5" />
-                    <span className="sr-only">Notifications</span>
-                    {/* Notification badge */}
-                    <span className="absolute -top-1 -right-1 h-2 w-2 bg-gradient-to-r from-red-500 to-red-600 rounded-full shadow-sm"></span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-80 border-border/50 bg-background/95 backdrop-blur-sm">
-                  <div className="flex items-center justify-center p-4 text-muted-foreground text-sm">
-                    <p>{t('common.noNotifications')}</p>
-                  </div>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
               {/* Theme Toggle (tooltip removed to avoid ref loops) */}
               <Button
                 variant="ghost"
@@ -106,17 +79,6 @@ export function AppHeader() {
                 )}
                 <span className="sr-only">Toggle theme</span>
               </Button>
-
-              {isAdmin && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => router.push('/admin')}
-                  className="font-medium bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 hidden sm:inline-flex rounded-xl px-3 sm:px-4 shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 transition-all duration-200"
-                >
-                  {t('admin.adminPanel')}
-                </Button>
-              )}
               
               {/* User Menu */}
               <DropdownMenu>
@@ -133,15 +95,6 @@ export function AppHeader() {
                       {isAdmin ? t('profile.administrator') : t('profile.student')}
                     </p>
                   </div>
-                  <DropdownMenuSeparator className="bg-border/50" />
-                  <DropdownMenuItem onClick={() => router.push('/profile')} className="hover:bg-blue-500/10 focus:bg-blue-500/10 rounded-md mx-1">
-                    <User className="mr-2 h-4 w-4 text-blue-600 dark:text-blue-400" />
-                    <span>{t('profile.title')}</span>
-                  </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => router.push('/settings')} className="hover:bg-blue-500/10 focus:bg-blue-500/10 rounded-md mx-1">
-                    <Settings className="mr-2 h-4 w-4 text-blue-600 dark:text-blue-400" />
-                    <span>{t('sidebar.settings')}</span>
-                  </DropdownMenuItem>
                   <DropdownMenuSeparator className="bg-border/50" />
                   <DropdownMenuItem onClick={handleSignOut} className="hover:bg-red-500/10 focus:bg-red-500/10 text-red-600 dark:text-red-400 rounded-md mx-1">
                     <LogOut className="mr-2 h-4 w-4" />

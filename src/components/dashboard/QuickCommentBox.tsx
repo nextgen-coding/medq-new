@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { MessageSquarePlus, RefreshCcw, Send, Loader2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface QuickComment {
   id: string;
@@ -20,6 +21,7 @@ interface SpecialtyLite { id: string; name: string; pinned?: boolean }
 
 export const QuickCommentBox: React.FC = () => {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [specialties, setSpecialties] = useState<SpecialtyLite[]>([]);
   const [lectures, setLectures] = useState<LectureLite[]>([]);
   const [selectedSpecialty, setSelectedSpecialty] = useState('');
@@ -101,9 +103,9 @@ export const QuickCommentBox: React.FC = () => {
       <CardHeader className="pb-2 flex flex-row items-start justify-between gap-4">
         <CardTitle className="flex items-center gap-2 text-xl font-semibold bg-gradient-to-r from-blue-600 to-blue-800 dark:from-blue-400 dark:to-blue-600 bg-clip-text text-transparent">
           <MessageSquarePlus className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-          Commentaire rapide
+          {t('dashboard.quickComment.title', { defaultValue: 'Commentaire rapide' })}
         </CardTitle>
-        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={()=> setRefreshKey(k=>k+1)} title="Rafraîchir" aria-label="Rafraîchir">
+        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={()=> setRefreshKey(k=>k+1)} title={t('dashboard.quickComment.refresh', { defaultValue: 'Rafraîchir' })} aria-label={t('dashboard.quickComment.refresh', { defaultValue: 'Rafraîchir' })}>
           <RefreshCcw className="h-4 w-4" />
         </Button>
       </CardHeader>
@@ -133,7 +135,7 @@ export const QuickCommentBox: React.FC = () => {
                 value={selectedSpecialty}
                 onChange={e=>{ setSelectedSpecialty(e.target.value); setSelectedLecture(''); }}
               >
-                <option value="">Spécialité</option>
+                <option value="">{t('dashboard.quickComment.selectSpecialty', { defaultValue: 'Spécialité' })}</option>
                 {specialties.map(s => <option key={s.id} value={s.id}>{s.name}{s.pinned? ' ★':''}</option>)}
               </select>
             </div>
@@ -144,7 +146,7 @@ export const QuickCommentBox: React.FC = () => {
                 ref={textareaRef}
                 value={comment}
                 onChange={e=> setComment(e.target.value)}
-                placeholder={selectedLecture? 'Votre commentaire...' : 'Choisissez un cours pour publier un commentaire'}
+                placeholder={selectedLecture? t('dashboard.quickComment.placeholder', { defaultValue: 'Votre commentaire...' }) : t('dashboard.quickComment.selectCourseFirst', { defaultValue: 'Choisissez un cours pour publier un commentaire' })}
                 disabled={!selectedLecture}
                 className="min-h-[90px] resize-none text-sm bg-background/60 disabled:opacity-50"
                 onKeyDown={e=>{ if(e.key==='Enter' && !e.shiftKey && comment.trim()){ e.preventDefault(); submit(); }}}
@@ -155,18 +157,18 @@ export const QuickCommentBox: React.FC = () => {
                   value={selectedLecture}
                   onChange={e=> setSelectedLecture(e.target.value)}
                 >
-                  <option value="">Choisir un cours (pour publier)</option>
+                  <option value="">{t('dashboard.quickComment.selectCourse', { defaultValue: 'Choisir un cours (pour publier)' })}</option>
                   {filteredLectures.map(l => <option key={l.id} value={l.id}>{l.title}</option>)}
                 </select>
               )}
               <div className="flex items-center justify-between gap-3">
                 <label className="flex items-center gap-2 text-[11px] cursor-pointer select-none">
                   <Checkbox className="h-3.5 w-3.5" checked={anon} disabled={!selectedLecture} onCheckedChange={v=> setAnon(!!v)} />
-                  <span>Anonyme</span>
+                  <span>{t('dashboard.quickComment.anonymous', { defaultValue: 'Anonyme' })}</span>
                 </label>
                 <Button size="sm" disabled={!comment.trim() || !selectedLecture || sending} onClick={submit} className="gap-1">
                   {sending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-                  {sending? 'Envoi...' : 'Envoyer'}
+                  {sending? t('dashboard.quickComment.sending', { defaultValue: 'Envoi...' }) : t('dashboard.quickComment.send', { defaultValue: 'Envoyer' })}
                 </Button>
               </div>
             </div>
@@ -197,11 +199,11 @@ export const QuickCommentBox: React.FC = () => {
               })}
               {!loadingComments && selectedSpecialty && comments.length===0 && (
                 <div className="text-[11px] text-muted-foreground italic py-6 text-center border border-dashed border-border/50 rounded-md">
-                  Aucun commentaire.
+                  {t('dashboard.quickComment.noComments', { defaultValue: 'Aucun commentaire.' })}
                 </div>
               )}
               {!selectedSpecialty && (
-                <div className="text-[11px] text-muted-foreground italic py-4 text-center">Choisissez une spécialité.</div>
+                <div className="text-[11px] text-muted-foreground italic py-4 text-center">{t('dashboard.quickComment.chooseSpecialty', { defaultValue: 'Choisissez une spécialité.' })}</div>
               )}
             </div>
           </>

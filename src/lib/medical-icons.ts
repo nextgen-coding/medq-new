@@ -92,8 +92,8 @@ export const MEDICAL_ICONS: Record<string, MedicalIcon> = {
     name: 'eye',
     icon: Eye,
     label: 'Ophtalmologie',
-    color: 'text-blue-500',
-    darkColor: 'dark:text-blue-400',
+    color: 'text-medblue-500',
+    darkColor: 'dark:text-medblue-400',
     keywords: ['ophta', 'eye', 'oeil', 'ophtalmologie']
   },
   
@@ -172,8 +172,8 @@ export const MEDICAL_ICONS: Record<string, MedicalIcon> = {
     name: 'test-tube',
     icon: TestTube,
     label: 'Médecine de Laboratoire',
-    color: 'text-blue-400',
-    darkColor: 'dark:text-blue-300',
+    color: 'text-medblue-400',
+    darkColor: 'dark:text-medblue-300',
     keywords: ['lab', 'laboratoire', 'biology', 'biologie']
   },
   
@@ -282,8 +282,8 @@ export const MEDICAL_ICONS: Record<string, MedicalIcon> = {
     name: 'users',
     icon: Users,
     label: 'Santé Publique',
-    color: 'text-blue-600',
-    darkColor: 'dark:text-blue-400',
+    color: 'text-medblue-600',
+    darkColor: 'dark:text-medblue-400',
     keywords: ['public', 'health', 'santé', 'population', 'epidemiology']
   }
 };

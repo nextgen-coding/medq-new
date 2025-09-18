@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Activity } from 'lucide-react';
 import { Bar, BarChart, XAxis, YAxis, Tooltip, ResponsiveContainer, LabelList, Cell, ReferenceLine } from 'recharts';
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export interface ActivityPoint { date: string; total: number }
 interface DailyLearningChartProps { data?: ActivityPoint[]; isLoading?: boolean; streak?: number }
@@ -11,6 +12,7 @@ interface DailyLearningChartProps { data?: ActivityPoint[]; isLoading?: boolean;
 const DAY_WINDOWS = [7,14,30];
 
 export function DailyLearningChart({ data, isLoading: extLoading=false, streak }: DailyLearningChartProps) {
+  const { t } = useTranslation();
   const [days, setDays] = useState<number>(()=> (typeof window!=='undefined'? parseInt(localStorage.getItem('daily_activity_days')||'7',10):7));
   const [localData, setLocalData] = useState<ActivityPoint[]>([]);
   const [loading, setLoading] = useState(false);
@@ -38,7 +40,7 @@ export function DailyLearningChart({ data, isLoading: extLoading=false, streak }
         if(Array.isArray(j)) setLocalData(j as any);
   else if(j.dailyData) { setLocalData(j.dailyData.map((d:any)=> ({ date:d.date, total:d.total })) ); setMeta(j); }
         else setLocalData([]);
-      } catch(e:any){ if(e.name!=='AbortError'){ setError(e.message||'Erreur chargement'); setLocalData([]);} }
+      } catch(e:any){ if(e.name!=='AbortError'){ setError(e.message||t('dashboard.chart.loadError', { defaultValue: 'Erreur chargement' })); setLocalData([]);} }
       finally { setLoading(false); }
     })();
     return ()=>controller.abort();
@@ -138,11 +140,11 @@ export function DailyLearningChart({ data, isLoading: extLoading=false, streak }
     <CardTitle className="flex items-center gap-3 flex-wrap text-lg font-semibold tracking-tight">
           <span className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-800 dark:from-blue-400 dark:to-blue-600 bg-clip-text text-transparent">
             <Activity className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-            Activité quotidienne
+            {t('dashboard.chart.dailyActivity', { defaultValue: 'Activité quotidienne' })}
           </span>
           {showStreak>0 && (
             <div className={`relative inline-flex items-center justify-center ${streakIsCurrent? 'animate-pulse':'opacity-75'}`}
-              title={streakIsCurrent? (maxStreak && maxStreak!==showStreak? `Série actuelle: ${showStreak} jours (max: ${maxStreak})`:`Série actuelle: ${showStreak} jours`):`Meilleure série: ${showStreak} jours`}>
+              title={streakIsCurrent? (maxStreak && maxStreak!==showStreak? t('dashboard.chart.currentStreakWithMax', { defaultValue: 'Série actuelle: {{current}} jours (max: {{max}})', current: showStreak, max: maxStreak }):t('dashboard.chart.currentStreak', { defaultValue: 'Série actuelle: {{streak}} jours', streak: showStreak })):t('dashboard.chart.bestStreak', { defaultValue: 'Meilleure série: {{streak}} jours', streak: showStreak })}>
               {/* Fire emoji background */}
               <span className="text-4xl select-none filter drop-shadow-lg">🔥</span>
               {/* Streak number overlay */}
@@ -151,7 +153,7 @@ export function DailyLearningChart({ data, isLoading: extLoading=false, streak }
               </span>
             </div>
           )}
-          <span className="ml-auto text-xs text-slate-500 dark:text-slate-400">Moy: {avg.toFixed(1)}/j</span>
+          <span className="ml-auto text-xs text-slate-500 dark:text-slate-400">{t('dashboard.chart.average', { defaultValue: 'Moy: {{avg}}/j', avg: avg.toFixed(1) })}</span>
           <div className="flex items-center gap-1">
             {DAY_WINDOWS.map(d => (
               <button key={d} onClick={()=>setDays(d)} className={`px-2 py-0.5 rounded text-[11px] font-medium border transition ${days===d? 'bg-blue-600 text-white border-blue-600 shadow-sm':'bg-transparent dark:text-slate-300 border-border/40 hover:bg-blue-500/10'}`}>{d}j</button>
@@ -163,8 +165,8 @@ export function DailyLearningChart({ data, isLoading: extLoading=false, streak }
         <div className="w-full h-[280px] relative" style={{ minWidth: '300px', minHeight: '280px' }}>
           {error && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-sm text-red-600 dark:text-red-400">
-              <span>Erreur: {error}</span>
-              <a href={`/api/dashboard/daily-activity?days=${days}&debug=1`} target="_blank" className="text-blue-600 dark:text-blue-400 hover:underline text-xs">Débug API</a>
+              <span>{t('dashboard.chart.error', { defaultValue: 'Erreur: {{error}}', error })}</span>
+              <a href={`/api/dashboard/daily-activity?days=${days}&debug=1`} target="_blank" className="text-blue-600 dark:text-blue-400 hover:underline text-xs">{t('dashboard.chart.debugApi', { defaultValue: 'Débug API' })}</a>
             </div>
           )}
           {!error && chartData.length>0 && mounted && (
@@ -173,7 +175,7 @@ export function DailyLearningChart({ data, isLoading: extLoading=false, streak }
                 <XAxis dataKey="date" tick={<CustomTick />} axisLine={false} tickLine={false} interval={0} />
                 <YAxis tick={{ fontSize: 12, fill: 'currentColor' }} axisLine={false} tickLine={false} allowDecimals={false} domain={[0, maxVal===0? 4: Math.max(maxVal+1, Math.ceil(maxVal*1.05))]} />
                 <Tooltip content={<CustomTooltip />} cursor={{fill:'rgba(148,163,184,0.12)'}} wrapperStyle={{pointerEvents:'none'}} />
-                {avg>0 && <ReferenceLine y={avg} stroke="#64748b" strokeDasharray="4 4" label={{ value: 'Moy.', position: 'right', fill: 'currentColor', fontSize: 10 }} />}
+                {avg>0 && <ReferenceLine y={avg} stroke="#64748b" strokeDasharray="4 4" label={{ value: t('dashboard.chart.avgLabel', { defaultValue: 'Moy.' }), position: 'right', fill: 'currentColor', fontSize: 10 }} />}
                 <Bar dataKey="displayTotal" fill="#3b82f6" radius={[6,6,0,0]} minPointSize={10} barSize={days===7?70: days===14?20:12}>
                   {chartData.map((e,i)=>(
                     <Cell key={i} fill={e.total===0? 'rgba(59,130,246,0.25)':'#3b82f6'} stroke={e.date===todayKey? '#1d4ed8': undefined} strokeWidth={e.date===todayKey?2:0} />
@@ -185,8 +187,8 @@ export function DailyLearningChart({ data, isLoading: extLoading=false, streak }
           )}
           {!error && (chartData.length===0 || chartData.every(d=>d.total===0)) && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-xs text-muted-foreground">
-              <span>Aucune activité</span>
-              <a href={`/api/dashboard/daily-activity?days=${days}&debug=1`} target="_blank" className="text-blue-600 hover:underline">Vérifier l'API</a>
+              <span>{t('dashboard.chart.noActivity', { defaultValue: 'Aucune activité' })}</span>
+              <a href={`/api/dashboard/daily-activity?days=${days}&debug=1`} target="_blank" className="text-blue-600 hover:underline">{t('dashboard.chart.checkApi', { defaultValue: 'Vérifier l\'API' })}</a>
             </div>
           )}
         </div>

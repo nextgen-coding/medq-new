@@ -3,12 +3,14 @@ import React, { useEffect, useState, useMemo } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { PieChart as PieIcon } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
+import { useTranslation } from 'react-i18next';
 
 // Colors aligned with dashboard theme (emerald, rose, amber)
 const COLORS = ["#059669", "#dc2626", "#f59e0b"]; // tweak green to match tailwind emerald-600
 const TIMEFRAMES = [1, 7, 30, 90];
 
 export const PerformancePie: React.FC = () => {
+  const { t } = useTranslation();
   const [mounted, setMounted] = useState(false);
   const [isDark, setIsDark] = useState(false);
   const [timeframe, setTimeframe] = useState<number>(() => {
@@ -53,11 +55,11 @@ export const PerformancePie: React.FC = () => {
   const data = useMemo(() => {
     if (!perf) return [];
     return [
-  { key: 'correct', label: 'Juste', value: perf.correct, pct: perf.percentCorrect },
-  { key: 'wrong', label: 'Faux', value: perf.wrong, pct: perf.percentWrong },
-  { key: 'partial', label: 'Partiel', value: perf.partial, pct: perf.percentPartial }
+  { key: 'correct', label: t('dashboard.performance.correct', { defaultValue: 'Juste' }), value: perf.correct, pct: perf.percentCorrect },
+  { key: 'wrong', label: t('dashboard.performance.wrong', { defaultValue: 'Faux' }), value: perf.wrong, pct: perf.percentWrong },
+  { key: 'partial', label: t('dashboard.performance.partial', { defaultValue: 'Partiel' }), value: perf.partial, pct: perf.percentPartial }
     ].filter(d => d.value > 0);
-  }, [perf]);
+  }, [perf, t]);
 
   const total = perf?.total || 0;
   const successPct = perf?.percentCorrect ?? 0;
@@ -69,7 +71,7 @@ export const PerformancePie: React.FC = () => {
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-lg font-semibold tracking-tight bg-gradient-to-r from-blue-600 to-blue-800 dark:from-blue-400 dark:to-blue-600 bg-clip-text text-transparent">
             <PieIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-            Performance
+            {t('dashboard.performance.title', { defaultValue: 'Performance' })}
           </CardTitle>
         </CardHeader>
         {/* Match loaded layout: chart area ~220x220 + legend area */}
@@ -91,7 +93,7 @@ export const PerformancePie: React.FC = () => {
       <CardHeader className="pb-2 flex flex-row items-start justify-between gap-4">
   <CardTitle className="flex items-center gap-2 text-lg font-semibold tracking-tight bg-gradient-to-r from-blue-600 to-blue-800 dark:from-blue-400 dark:to-blue-600 bg-clip-text text-transparent">
           <PieIcon className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-          Performance
+          {t('dashboard.performance.title', { defaultValue: 'Performance' })}
         </CardTitle>
         <div className="flex gap-1 mt-1">
           {TIMEFRAMES.map(d => (
@@ -105,7 +107,7 @@ export const PerformancePie: React.FC = () => {
           <button
             onClick={() => setShowPercent(p => !p)}
             className={`ml-1 px-2 py-0.5 rounded text-[11px] font-medium border border-border/40 hover:bg-emerald-500/10 ${showPercent ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-500 dark:text-slate-300'}`}
-            title="Basculer valeurs (%) / absolues"
+            title={t('dashboard.performance.toggleValues', { defaultValue: 'Basculer valeurs (%) / absolues' })}
           >{showPercent ? '%': '#'}
           </button>
         </div>
@@ -115,13 +117,13 @@ export const PerformancePie: React.FC = () => {
         {/* Donut chart or empty placeholder */}
         <div className="relative" style={{width:220, height:208}}>
           {loadingPerf && !perf ? (
-            <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">Mise à jour...</div>
+            <div className="absolute inset-0 flex items-center justify-center text-xs text-muted-foreground">{t('dashboard.performance.updating', { defaultValue: 'Mise à jour...' })}</div>
           ) : total === 0 ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-center">
               <div className="w-36 h-36 rounded-full border-4 border-dashed border-slate-200 dark:border-slate-600 flex items-center justify-center">
-                <span className="text-[11px] text-slate-500 dark:text-slate-400 px-2 leading-tight">Aucune donnée<br/>pour {timeframe}j</span>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400 px-2 leading-tight">{t('dashboard.performance.noData', { defaultValue: 'Aucune donnée' })}<br/>{t('dashboard.performance.forDays', { defaultValue: 'pour' })} {timeframe}j</span>
               </div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 max-w-[150px] leading-snug">Répondez à des questions pour voir vos statistiques.</p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 max-w-[150px] leading-snug">{t('dashboard.performance.answerQuestions', { defaultValue: 'Répondez à des questions pour voir vos statistiques.' })}</p>
             </div>
           ) : (
             <>
@@ -168,8 +170,8 @@ export const PerformancePie: React.FC = () => {
               {/* Center overlay when we have data */}
               <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
                 <span className="text-3xl font-bold tracking-tight bg-gradient-to-r from-emerald-400 to-emerald-500 bg-clip-text text-transparent">{showPercent ? successPct + '%' : perf.correct}</span>
-                <span className="mt-1 text-[9px] tracking-wide text-muted-foreground uppercase">{showPercent ? 'Taux de réussite' : 'Justes'}</span>
-                <span className="mt-0.5 text-[9px] text-muted-foreground">{total} essais · {timeframe}j</span>
+                <span className="mt-1 text-[9px] tracking-wide text-muted-foreground uppercase">{showPercent ? t('dashboard.performance.successRate', { defaultValue: 'Taux de réussite' }) : t('dashboard.performance.corrects', { defaultValue: 'Justes' })}</span>
+                <span className="mt-0.5 text-[9px] text-muted-foreground">{total} {t('dashboard.performance.attempts', { defaultValue: 'essais' })} · {timeframe}j</span>
               </div>
             </>
           )}

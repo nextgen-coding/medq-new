@@ -21,7 +21,7 @@ export default function AdminUsersPage() {
               </div>
               <h1 className="text-2xl sm:text-4xl font-bold text-foreground mb-2 sm:mb-4">{t('admin.users')}</h1>
               <p className="text-base sm:text-xl text-muted-foreground max-w-2xl mx-auto">
-                Manage user accounts and roles
+                {t('admin.usersSubtitle', { defaultValue: 'Gérer les comptes et les rôles des utilisateurs' })}
               </p>
             </div>
             <UsersTab />

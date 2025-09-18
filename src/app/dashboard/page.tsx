@@ -49,7 +49,7 @@ export default function DashboardPage() {
             <SidebarInset className="flex-1 flex flex-col overflow-hidden">
               {/* Universal Header */}
               <UniversalHeader
-                title="Dashboard"
+                title={t('dashboard.title', { defaultValue: 'Tableau de bord' })}
               />
 
               {/* Main Content (single natural scroll, no nested scroll area) */}
@@ -69,7 +69,7 @@ export default function DashboardPage() {
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
-                  {t('dashboard.error', { error })}
+                  {t('dashboard.error', { defaultValue: 'Erreur lors du chargement des données', error })}
                 </AlertDescription>
               </Alert>
             )}

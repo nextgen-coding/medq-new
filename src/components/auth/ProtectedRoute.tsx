@@ -2,7 +2,7 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect } from 'react';
-import { AuthLoadingScreen } from './AuthLoadingScreen';
+import { CompactAuthLoader } from './CompactAuthLoader';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -31,10 +31,8 @@ export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRout
     }
   }, [user, isAdmin, isLoading, requireAdmin, router, pathname]);
 
-  // Show loading state while checking authentication
-  if (isLoading) {
-    return <AuthLoadingScreen />;
-  }
+  // Show a compact, non-intrusive loader while the auth state initializes
+  if (isLoading) return <CompactAuthLoader />;
 
   // Don&apos;t render anything if user is not authenticated or doesn&apos;t have required role
   if (!user || (requireAdmin && !isAdmin)) {

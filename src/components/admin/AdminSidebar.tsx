@@ -55,30 +55,30 @@ export function AdminSidebar() {
   );
   
   const studentPanelItem = React.useMemo(() => ({
-    label: t('admin.studentPanel') || 'Student Panel',
+    label: t('admin.studentPanel', { defaultValue: 'Tableau de bord étudiant' }),
     icon: GraduationCap,
     href: '/dashboard',
-    description: 'Go to student dashboard'
+    description: 'Aller au tableau de bord étudiant'
   }), [t]);
   
   const isAdmin = user?.role === 'admin';
   const isMaintainer = user?.role === 'maintainer';
 
   const adminMenuItems = React.useMemo(() => [
-    { label: t('admin.dashboard'), icon: LayoutDashboard, href: '/admin/dashboard', description: t('admin.manageContent') },
-    { label: t('admin.management') || 'Management', icon: BookOpen, href: '/admin/management', description: 'Manage specialties, courses, and questions' },
-    { label: 'Validation', icon: CheckCircle, href: '/admin/validation', description: 'AI validation system' },
-    { label: 'Sessions', icon: FileText, href: '/admin/sessions', description: 'Manage/import sessions' },
-    { label: 'Notifications', icon: Bell, href: '/admin/notifications', description: 'Send targeted notifications to users' },
-    { label: t('admin.users'), icon: Users, href: '/admin/users', description: 'Manage users' },
-    { label: t('admin.importQuestions'), icon: Upload, href: '/admin/import', description: 'Import QROC questions' },
-    { label: t('admin.reports'), icon: AlertTriangle, href: '/admin/reports', description: 'View reports' },
+    { label: t('admin.dashboard', { defaultValue: 'Tableau de bord' }), icon: LayoutDashboard, href: '/admin/dashboard', description: t('admin.manageContent', { defaultValue: 'Gérer le contenu' }) },
+    { label: t('admin.management', { defaultValue: 'Gestion Cours' }), icon: BookOpen, href: '/admin/management', description: 'Gérer les spécialités, cours et questions' },
+    { label: 'Gestion Sessions', icon: FileText, href: '/admin/sessions', description: 'Gérer/importer les sessions' },
+    { label: 'Validation', icon: CheckCircle, href: '/admin/validation', description: 'Système de validation IA' },
+    { label: t('admin.importQuestions', { defaultValue: 'Importation' }), icon: Upload, href: '/admin/import', description: 'Importer des questions QROC' },
+    { label: 'Notifications', icon: Bell, href: '/admin/notifications', description: 'Envoyer des notifications ciblées aux utilisateurs' },
+    { label: t('admin.reports', { defaultValue: 'Rapports' }), icon: AlertTriangle, href: '/admin/reports', description: 'Voir les signalements' },
+    { label: t('admin.users', { defaultValue: 'Utilisateurs' }), icon: Users, href: '/admin/users', description: 'Gérer les utilisateurs' },
     studentPanelItem
   ], [t, studentPanelItem]);
 
   const maintainerMenuItems = React.useMemo(() => [
-    { label: 'Sessions', icon: FileText, href: '/maintainer/sessions', description: 'Créer des sessions' },
-    { label: t('admin.reports'), icon: AlertTriangle, href: '/maintainer/reports', description: 'Rapports par niveau' },
+    { label: 'Gestion Sessions', icon: FileText, href: '/maintainer/sessions', description: 'Créer des sessions' },
+    { label: t('admin.reports', { defaultValue: 'Signalements' }), icon: AlertTriangle, href: '/maintainer/reports', description: 'Rapports par niveau' },
     studentPanelItem
   ], [t, studentPanelItem]);
 
@@ -93,8 +93,8 @@ export function AdminSidebar() {
       router.push('/auth');
     } catch (err) {
       console.error('Unexpected sign out error:', err);
-      toast.error(t('auth.signOutError'), {
-        description: t('auth.unexpectedError'),
+      toast.error(t('auth.signOutError', { defaultValue: 'Erreur de déconnexion' }), {
+        description: t('auth.unexpectedError', { defaultValue: 'Une erreur inattendue s\'est produite' }),
       });
     }
   }, [logout, router, t]);
@@ -125,24 +125,32 @@ export function AdminSidebar() {
                   className="md:hidden hover:bg-muted"
                 >
                   <X className="h-5 w-5" />
-                  <span className="sr-only">Close sidebar</span>
+                  <span className="sr-only">Fermer la barre latérale</span>
                 </Button>
               )}
               {state === "expanded" ? (
                 <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center shadow-lg">
-                    <Brain className="w-4 h-4 text-white" />
+                  <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shadow-lg border border-gray-100">
+                    <img 
+                      src="https://r5p6ptp1nn.ufs.sh/f/6mc1qMI9JcraFSYUmbide7MKPVFpROQi36XnZbchzSA1G4ax" 
+                      alt="Medq Logo" 
+                      className="w-6 h-6 object-contain"
+                    />
                   </div>
                   <div className="flex flex-col">
                     <span className="font-bold text-base sm:text-lg bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
                       MedQ
                     </span>
-                    <span className="text-[10px] sm:text-xs text-muted-foreground">Admin Panel</span>
+                    <span className="text-[10px] sm:text-xs text-muted-foreground">Panneau Admin</span>
                   </div>
                 </div>
               ) : (
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center shadow-lg">
-                  <Brain className="w-5 h-5 text-white" />
+                <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg border border-gray-100">
+                  <img 
+                    src="https://r5p6ptp1nn.ufs.sh/f/6mc1qMI9JcraFSYUmbide7MKPVFpROQi36XnZbchzSA1G4ax" 
+                    alt="Medq Logo" 
+                    className="w-7 h-7 object-contain"
+                  />
                 </div>
               )}
             </div>
@@ -245,10 +253,10 @@ export function AdminSidebar() {
                   : 'w-full h-[44px] p-0 flex items-center justify-center'
               }`}
               onClick={handleSignOut}
-              title={t('auth.signOut')}
+              title={t('auth.signOut', { defaultValue: 'Se déconnecter' })}
             >
               <LogOut className="h-5 w-5 flex-shrink-0" />
-              {state === "expanded" && <span className="ml-3 font-medium text-sm">{t('auth.signOut')}</span>}
+              {state === "expanded" && <span className="ml-3 font-medium text-sm">{t('auth.signOut', { defaultValue: 'Se déconnecter' })}</span>}
             </Button>
           </div>
         </SidebarFooter>

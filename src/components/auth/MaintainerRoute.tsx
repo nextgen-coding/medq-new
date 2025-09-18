@@ -2,7 +2,7 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect } from 'react';
-import { AuthLoadingScreen } from './AuthLoadingScreen';
+import { CompactAuthLoader } from './CompactAuthLoader';
 
 interface MaintainerRouteProps {
   children: React.ReactNode;
@@ -29,9 +29,7 @@ export function MaintainerRoute({ children }: MaintainerRouteProps) {
     }
   }, [user, isLoading, isMaintainerOrAdmin, router, pathname]);
 
-  if (isLoading) {
-    return <AuthLoadingScreen />;
-  }
+  if (isLoading) return <CompactAuthLoader />;
 
   if (!user || !isMaintainerOrAdmin) {
     return null;

@@ -335,7 +335,7 @@ export function PersistentAiJob({ onJobCreated }: PersistentAiJobProps) {
   const StatusBadge = ({ phase }: { phase: string }) => {
     const variants: Record<string, { color: string; icon: any }> = {
       queued: { color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300', icon: Clock },
-      running: { color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300', icon: Brain },
+      running: { color: 'bg-medblue-100 text-medblue-800 dark:bg-medblue-900/30 dark:text-medblue-300', icon: Brain },
       complete: { color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300', icon: CheckCircle },
       error: { color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300', icon: XCircle },
     };
@@ -361,7 +361,7 @@ export function PersistentAiJob({ onJobCreated }: PersistentAiJobProps) {
         <div
           className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
             isDragOver 
-              ? 'border-blue-400 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400' 
+              ? 'border-medblue-400 bg-medblue-50 dark:bg-medblue-900/20 dark:border-medblue-400' 
               : file
                 ? 'border-green-500 bg-green-50 dark:bg-green-900/20 dark:border-green-400'
                 : 'border-gray-300 hover:border-gray-400 dark:border-gray-700 dark:hover:border-gray-600'
@@ -381,7 +381,7 @@ export function PersistentAiJob({ onJobCreated }: PersistentAiJobProps) {
           />
           <label htmlFor="ai-file" className="cursor-pointer">
             <Brain className={`mx-auto h-12 w-12 ${
-              isDragOver ? 'text-blue-500' : file ? 'text-green-500' : 'text-gray-400 dark:text-gray-500'
+              isDragOver ? 'text-medblue-500' : file ? 'text-green-500' : 'text-gray-400 dark:text-gray-500'
             }`} />
             <div className="mt-2">
               <p className="text-sm font-medium">
@@ -390,7 +390,7 @@ export function PersistentAiJob({ onJobCreated }: PersistentAiJobProps) {
               <p className="text-xs text-muted-foreground">
                 ou cliquez pour sélectionner • Excel (.xlsx, .xls) ou CSV
               </p>
-              <p className="text-xs text-blue-600 mt-1 dark:text-blue-400">
+              <p className="text-xs text-medblue-600 mt-1 dark:text-medblue-400">
                 Traitement IA avec explications détaillées
               </p>
             </div>
@@ -430,7 +430,7 @@ export function PersistentAiJob({ onJobCreated }: PersistentAiJobProps) {
 
         {/* Current Session Progress */}
         {currentSession && currentSession.phase === 'running' && (
-          <div className="border rounded-lg p-4 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-800">
+          <div className="border rounded-lg p-4 bg-medblue-50 dark:bg-medblue-900/20 dark:border-medblue-800">
             <div className="flex items-center gap-2 mb-2">
               <StatusBadge phase={currentSession.phase} />
               <span className="text-sm font-medium">En cours de traitement...</span>

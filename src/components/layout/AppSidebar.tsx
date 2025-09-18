@@ -34,19 +34,19 @@ export function AppSidebar() {
   // Internal smooth toggle handled by header button now (removed external floating arrow)
   
   const regularMenuItems = [
-    { label: t('sidebar.dashboard'), icon: LayoutDashboard, href: '/dashboard' },
-    { label: t('sidebar.exercices'), icon: BookOpen, href: '/matieres' },
-    { label: t('sidebar.sessions'), icon: FileText, href: '/session' },
-    { label: t('sidebar.profile'), icon: UserCircle, href: '/profile' },
-    { label: t('sidebar.settings'), icon: Settings, href: '/settings' },
+    { label: t('sidebar.dashboard', { defaultValue: 'Tableau de bord' }), icon: LayoutDashboard, href: '/dashboard' },
+    { label: t('sidebar.exercices', { defaultValue: 'Exercices' }), icon: BookOpen, href: '/matieres' },
+    { label: t('sidebar.sessions', { defaultValue: 'Sessions' }), icon: FileText, href: '/session' },
+    { label: t('sidebar.profile', { defaultValue: 'Profil' }), icon: UserCircle, href: '/profile' },
+    { label: t('sidebar.settings', { defaultValue: 'Paramètres' }), icon: Settings, href: '/settings' },
   ];
 
-  const adminItem = isAdmin ? { label: t('sidebar.admin'), icon: Users, href: '/admin' } : null;
+  const adminItem = isAdmin ? { label: t('sidebar.admin', { defaultValue: 'Administration' }), icon: Users, href: '/admin' } : null;
   const isMaintainer = user?.role === 'maintainer';
   const maintainerItems = isMaintainer
     ? [
-        { label: t('sidebar.sessions'), icon: FileText, href: '/maintainer/sessions' },
-        { label: t('admin.reports'), icon: AlertTriangle, href: '/maintainer/reports' },
+        { label: t('sidebar.sessions', { defaultValue: 'Sessions' }), icon: FileText, href: '/maintainer/sessions' },
+        { label: t('admin.reports', { defaultValue: 'Rapports' }), icon: AlertTriangle, href: '/maintainer/reports' },
       ]
     : [];
 
@@ -73,15 +73,19 @@ export function AppSidebar() {
           >
             {/* Logo/Brand */}
             <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-xl w-10 h-10 shadow-lg shadow-blue-500/25">
-                <BookOpen className="h-5 w-5" />
+              <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center shadow-lg border border-gray-100">
+                <img 
+                  src="https://r5p6ptp1nn.ufs.sh/f/6mc1qMI9JcraFSYUmbide7MKPVFpROQi36XnZbchzSA1G4ax" 
+                  alt="Medq Logo" 
+                  className="w-7 h-7 object-contain"
+                />
               </div>
               {state === 'expanded' && (
                 <div className="flex flex-col">
                   <span className="font-bold text-lg bg-gradient-to-r from-blue-600 to-blue-800 dark:from-blue-400 dark:to-blue-600 bg-clip-text text-transparent">
                     MedQ
                   </span>
-                  <span className="text-xs text-muted-foreground">Student Panel</span>
+                  <span className="text-xs text-muted-foreground">Panneau Étudiant</span>
                 </div>
               )}
             </div>
@@ -94,7 +98,7 @@ export function AppSidebar() {
             <div className={`flex ${state==='expanded' ? 'justify-end pr-3 pt-3':'justify-center pt-3'} pb-1`}> 
               <button
                 onClick={(e)=> { e.preventDefault(); e.stopPropagation(); toggleSidebar(); }}
-                aria-label={state === 'expanded' ? t('sidebar.collapseSidebar') : t('sidebar.expandSidebar')}
+                aria-label={state === 'expanded' ? t('sidebar.collapseSidebar', { defaultValue: 'Réduire la barre latérale' }) : t('sidebar.expandSidebar', { defaultValue: 'Étendre la barre latérale' })}
                 className={`relative flex items-center gap-2 rounded-lg border border-blue-400/30 dark:border-blue-300/20
                   bg-white/70 dark:bg-blue-950/40 backdrop-blur-sm px-2 ${state==='expanded'?'h-8':'h-9 w-9 justify-center'}
                   shadow-sm hover:shadow-md hover:bg-white/90 dark:hover:bg-blue-950/60 transition-all duration-300 group focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60`}
@@ -103,12 +107,12 @@ export function AppSidebar() {
                 {state === 'expanded' ? (
                   <>
                     <ChevronLeft className="h-4 w-4 text-blue-600 dark:text-blue-300 transition-transform duration-300 group-hover:-translate-x-0.5" />
-                    <span className="sr-only">{t('sidebar.collapseSidebar')}</span>
+                    <span className="sr-only">{t('sidebar.collapseSidebar', { defaultValue: 'Réduire la barre latérale' })}</span>
                   </>
                 ) : (
                   <>
                     <ChevronRight className="h-4 w-4 text-blue-600 dark:text-blue-300 transition-transform duration-300 group-hover:translate-x-0.5" />
-                    <span className="sr-only">{t('sidebar.expandSidebar')}</span>
+                    <span className="sr-only">{t('sidebar.expandSidebar', { defaultValue: 'Étendre la barre latérale' })}</span>
                   </>
                 )}
               </button>
@@ -234,8 +238,8 @@ export function AppSidebar() {
                 const newTheme = theme === 'dark' ? 'light' : 'dark';
                 setTheme(newTheme);
               }}
-              title={theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
-              aria-label={theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+              title={theme === 'dark' ? 'Mode Clair' : 'Mode Sombre'}
+              aria-label={theme === 'dark' ? 'Mode Clair' : 'Mode Sombre'}
             >
               {theme === 'dark' ? (
                 <Sun className={`${iconSize} flex-shrink-0`} />
@@ -250,8 +254,8 @@ export function AppSidebar() {
               size="sm"
               className={`w-full font-medium rounded-xl transition-all duration-200 justify-center p-0 min-h-[44px] text-red-600 dark:text-red-400 hover:bg-red-500/10 hover:text-red-700 dark:hover:text-red-300`}
               onClick={handleSignOut}
-              title={t('auth.signOut')}
-              aria-label={t('auth.signOut')}
+              title={t('auth.signOut', { defaultValue: 'Se déconnecter' })}
+              aria-label={t('auth.signOut', { defaultValue: 'Se déconnecter' })}
             >
               <LogOut className={`${iconSize} flex-shrink-0`} />
             </Button>
