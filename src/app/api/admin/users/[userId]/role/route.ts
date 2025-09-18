@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdmin, AuthenticatedRequest } from '@/lib/auth-middleware';
 
-async function putHandler(request: AuthenticatedRequest, { params }: { params: { userId: string } }) {
-  const { userId } = params;
+async function putHandler(request: AuthenticatedRequest, { params }: { params: Promise<{ userId: string }> }) {
+  const { userId } = await params;
   const { role } = await request.json();
 
   if (!['student', 'maintainer', 'admin'].includes(role)) {

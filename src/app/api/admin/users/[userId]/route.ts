@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdmin, AuthenticatedRequest } from '@/lib/auth-middleware';
 
-async function getHandler(request: AuthenticatedRequest, { params }: { params: { userId: string } }) {
-  const { userId } = params;
+async function getHandler(request: AuthenticatedRequest, { params }: { params: Promise<{ userId: string }> }) {
+  const { userId } = await params;
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -49,8 +49,8 @@ async function getHandler(request: AuthenticatedRequest, { params }: { params: {
   return NextResponse.json(formattedUser);
 }
 
-async function deleteHandler(request: AuthenticatedRequest, { params }: { params: { userId: string } }) {
-  const { userId } = params;
+async function deleteHandler(request: AuthenticatedRequest, { params }: { params: Promise<{ userId: string }> }) {
+  const { userId } = await params;
 
   // Check if user exists
   const user = await prisma.user.findUnique({
