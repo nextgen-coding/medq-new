@@ -44,7 +44,7 @@ export default function DashboardPage() {
     <ProtectedRoute>
       <ProfileCompletionGuard>
         <AppSidebarProvider>
-          <div className="flex min-h-screen w-full max-h-screen overflow-hidden">
+          <div className="flex min-h-screen w-full max-h-screen overflow-hidden flex-col md:flex-row">
             <AppSidebar />
             <SidebarInset className="flex-1 flex flex-col overflow-hidden">
               {/* Universal Header */}
@@ -54,14 +54,16 @@ export default function DashboardPage() {
 
               {/* Main Content (single natural scroll, no nested scroll area) */}
               <div className="flex-1 bg-gray-50 dark:bg-gray-900 overflow-y-auto">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-6">
+                <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 pt-3 sm:pt-4 md:pt-6 pb-6 sm:pb-8">
                   {/* Welcome Text (inline, inside container) */}
                   {user && (
-                    <span className="block mb-6 text-xl font-bold text-blue-900 dark:text-blue-200">
-                      Bonjour {user.name}! Medq vous souhaite un bon travail.
-                    </span>
+                    <div className="mb-4 sm:mb-6">
+                      <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-blue-900 dark:text-blue-200">
+                        Bonjour {user.name}! MedQ vous souhaite un bon travail.
+                      </h1>
+                    </div>
                   )}
-                  <div className="space-y-4 sm:space-y-6">
+                  <div className="space-y-3 sm:space-y-4 md:space-y-6">
             {/* Upsell Banner for Free Users */}
             {shouldShowUpsell && (
               <UpsellBanner
@@ -81,42 +83,49 @@ export default function DashboardPage() {
             )}
 
             {/* Main Dashboard Grid */}
-            <div className="hidden xl:grid gap-6" style={{gridTemplateColumns: '330px 1fr'}}>
+            <div className="hidden xl:grid gap-4 md:gap-6" style={{gridTemplateColumns: 'minmax(300px, 330px) 1fr'}}>
               {/* Left column stacked */}
-              <div className="flex flex-col gap-6">
+              <div className="flex flex-col gap-4 md:gap-6">
                 <ContinueLearning lastLecture={stats?.lastLecture} isLoading={isLoading} />
                 <SpecialtyAverageSlider />
                 <QuickCommentBox />
               </div>
               {/* Right column stacked */}
-              <div className="flex flex-col gap-6">
+              <div className="flex flex-col gap-4 md:gap-6">
                 <PerformancePie />
-                <div className="border-border/50 bg-white/50 dark:bg-muted/30 backdrop-blur-sm shadow-lg rounded-lg">
-                  <DailyLearningChart data={activityPoints} isLoading={isLoading} streak={stats?.learningStreak} />
-                </div>
+                <DailyLearningChart data={activityPoints} isLoading={isLoading} streak={stats?.learningStreak} />
                 <CoursesToReview />
               </div>
             </div>
 
             {/* Responsive layout (< xl) */}
-            <div className="xl:hidden grid gap-6 sm:grid-cols-2 lg:grid-cols-3 auto-rows-max">
-              {/* Full width stats already above */}
-              <div className="sm:col-span-2 lg:col-span-1 order-10 sm:order-none">
+            <div className="xl:hidden grid gap-3 sm:gap-4 md:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 auto-rows-max">
+              {/* Continue Learning - Full width on mobile, 2 cols on sm */}
+              <div className="sm:col-span-2 lg:col-span-1 order-1 min-h-0">
                 <ContinueLearning lastLecture={stats?.lastLecture} isLoading={isLoading} />
               </div>
-              <div className="sm:col-span-1 order-20">
+              {/* Performance Pie - 1 col on sm, 1 col on lg */}
+              <div className="sm:col-span-1 lg:col-span-1 order-2 min-h-0">
                 <PerformancePie />
               </div>
-              <div className="sm:col-span-2 lg:col-span-2 order-30">
-                <DailyLearningChart data={activityPoints} isLoading={isLoading} streak={stats?.learningStreak} />
+              {/* Daily Learning Chart - Full width on mobile, 2 cols on sm, 2 cols on lg */}
+              <div className="col-span-1 sm:col-span-2 lg:col-span-2 order-3 min-h-0 px-0 sm:px-0">
+                <div className="w-full flex justify-center">
+                  <div className="w-full max-w-none">
+                    <DailyLearningChart data={activityPoints} isLoading={isLoading} streak={stats?.learningStreak} />
+                  </div>
+                </div>
               </div>
-              <div className="sm:col-span-1 order-40">
+              {/* Specialty Average Slider - 1 col on sm, 1 col on lg */}
+              <div className="sm:col-span-1 lg:col-span-1 order-4 min-h-0">
                 <SpecialtyAverageSlider />
               </div>
-              <div className="sm:col-span-1 order-50">
+              {/* Quick Comment Box - 1 col on sm, 1 col on lg */}
+              <div className="sm:col-span-1 lg:col-span-1 order-5 min-h-0">
                 <QuickCommentBox />
               </div>
-              <div className="sm:col-span-2 lg:col-span-1 order-60">
+              {/* Courses to Review - 2 cols on sm, 1 col on lg */}
+              <div className="sm:col-span-2 lg:col-span-1 order-6 min-h-0">
                 <CoursesToReview />
               </div>
             </div>
