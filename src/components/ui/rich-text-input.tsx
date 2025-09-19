@@ -152,52 +152,37 @@ export function RichTextInput({
     const editor = editorRef.current;
     if (!editor) return value;
     
-    let result = '';
+    let content = '';
     
-    const processNode = (node: Node): string => {
+    const processNode = (node: Node): void => {
       if (node.nodeType === Node.TEXT_NODE) {
-        return node.textContent || '';
+        // Remove zero-width spaces that we use for cursor positioning
+        const text = (node.textContent || '').replace(/\u200B/g, '');
+        content += text;
       } else if (node.nodeType === Node.ELEMENT_NODE) {
         const el = node as HTMLElement;
-        const tagName = el.tagName.toLowerCase();
-        
-        // Handle line breaks
-        if (tagName === 'br') {
-          return '\n';
-        }
-        
-        // Handle div elements (usually created by Enter key)
-        if (tagName === 'div') {
-          let content = '';
-          el.childNodes.forEach(child => {
-            content += processNode(child);
-          });
-          // Add newline after div content (except for the first div if it's at the start)
-          return content + '\n';
-        }
         
         // Handle image elements
         if (el.dataset.imageId) {
-          return `[IMAGE:${el.dataset.imageId}]`;
+          content += `[IMAGE:${el.dataset.imageId}]`;
+          return;
         }
         
-        // Handle other elements - process their children
-        let content = '';
-        el.childNodes.forEach(child => {
-          content += processNode(child);
-        });
-        return content;
+        // Handle line breaks
+        if (el.tagName.toLowerCase() === 'br') {
+          content += '\n';
+          return;
+        }
+        
+        // For other elements, just process their children
+        el.childNodes.forEach(child => processNode(child));
       }
-      return '';
     };
     
-    editor.childNodes.forEach((node, index) => {
-      const content = processNode(node);
-      result += content;
-    });
+    editor.childNodes.forEach(node => processNode(node));
     
-    // Clean up: remove trailing newline and normalize multiple newlines
-    return result.replace(/\n+$/, '').replace(/\n{3,}/g, '\n\n');
+    // Clean up: normalize multiple newlines but preserve intended line breaks
+    return content.replace(/\n{3,}/g, '\n\n');
   }, [value]);
 
   // Hoisted: update image width so both renderer & cursor insertion can use it
@@ -635,6 +620,46 @@ export function RichTextInput({
   const pendingUpdateRef = useRef<number | null>(null);
   const savedSelectionRef = useRef<{ start: number; end: number } | null>(null);
 
+  const handleEditorKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      
+      // Insert a <br> tag followed by a zero-width space to ensure proper cursor positioning
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0) {
+        const range = sel.getRangeAt(0);
+        
+        // Delete any selected content first
+        range.deleteContents();
+        
+        // Create a <br> element and a zero-width space text node
+        const br = document.createElement('br');
+        const zwsp = document.createTextNode('\u200B'); // Zero-width space
+        
+        range.insertNode(br);
+        range.setStartAfter(br);
+        range.insertNode(zwsp);
+        
+        // Move cursor after the zero-width space
+        range.setStartAfter(zwsp);
+        range.setEndAfter(zwsp);
+        sel.removeAllRanges();
+        sel.addRange(range);
+        
+        // Trigger input event to update the value
+        const editor = editorRef.current;
+        if (editor) {
+          // Use setTimeout to allow DOM to settle before triggering input
+          setTimeout(() => {
+            editor.dispatchEvent(new Event('input', { bubbles: true }));
+          }, 0);
+        }
+      }
+    }
+  }, []);
+
   const handleEditorInput = useCallback((e: React.FormEvent<HTMLDivElement> | React.FocusEvent<HTMLDivElement>) => {
     if (!useInlineImages) return;
     e.stopPropagation();
@@ -787,9 +812,7 @@ export function RichTextInput({
               e.target.style.unicodeBidi = 'plaintext'; 
             }}
             onClick={(e) => { e.stopPropagation(); }}
-            onKeyDown={(e) => {
-              e.stopPropagation();
-            }}
+            onKeyDown={handleEditorKeyDown}
             role="textbox"
             aria-multiline="true"
             data-placeholder={placeholder}

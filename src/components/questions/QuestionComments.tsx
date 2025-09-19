@@ -171,7 +171,7 @@ export function QuestionComments({ questionId }: QuestionCommentsProps) {
 
   const add = async (parentId?: string, contentOverride?: string, imageList?: string[]) => {
     if (!ownerId) { 
-      toast({ title: 'Sign in required', description: 'Please sign in to comment', variant: 'destructive' }); 
+      toast({ title: 'Connexion requise', description: 'Veuillez vous connecter pour commenter', variant: 'destructive' }); 
       return; 
     }
     
@@ -211,7 +211,7 @@ export function QuestionComments({ questionId }: QuestionCommentsProps) {
         setImages([]);
       }
     } catch { 
-      toast({ title: 'Error', description: 'Failed to add comment', variant: 'destructive' }); 
+      toast({ title: 'Erreur', description: 'Échec de l\'ajout du commentaire', variant: 'destructive' }); 
     } finally { 
       setSubmitting(false); 
     }
@@ -246,7 +246,7 @@ export function QuestionComments({ questionId }: QuestionCommentsProps) {
   setComments(prev => updateNode(prev, id, () => updated));
       cancelEdit();
     } catch { 
-      toast({ title: 'Error', description: 'Failed to update comment', variant: 'destructive' }); 
+      toast({ title: 'Erreur', description: 'Échec de la mise à jour du commentaire', variant: 'destructive' }); 
     }
   };
 
@@ -257,7 +257,7 @@ export function QuestionComments({ questionId }: QuestionCommentsProps) {
       if (!res.ok) throw new Error('Failed');
       setComments(prev => removeNode(prev, id));
     } catch { 
-      toast({ title: 'Error', description: 'Failed to delete comment', variant: 'destructive' }); 
+      toast({ title: 'Erreur', description: 'Échec de la suppression du commentaire', variant: 'destructive' }); 
     }
   };
 
@@ -388,7 +388,7 @@ export function QuestionComments({ questionId }: QuestionCommentsProps) {
             }}
             onFocus={handleFocus}
             onKeyDown={handleKeyDown}
-            placeholder={`Reply to ${parentUserName}...`}
+            placeholder={`Répondre à ${parentUserName}...`}
             className="force-ltr flex-1 bg-transparent border-none outline-none resize-none text-sm placeholder:text-gray-500 dark:placeholder:text-gray-400"
             style={{ 
               minHeight: '20px', 
@@ -461,7 +461,7 @@ export function QuestionComments({ questionId }: QuestionCommentsProps) {
                     const results = await Promise.all(files.map(processFile));
                     setReplyImages(prev => [...prev, ...results].slice(0, 4)); // Max 4 images
                   } catch (err) {
-                    toast({ title: 'Error', description: 'Failed to process images', variant: 'destructive' });
+                    toast({ title: 'Erreur', description: 'Échec du traitement des images', variant: 'destructive' });
                   }
                   
                   e.target.value = '';
@@ -530,7 +530,7 @@ export function QuestionComments({ questionId }: QuestionCommentsProps) {
                 <div className="font-semibold text-sm mb-1 flex items-center gap-2">
                   {displayName}
                   {comment.isAnonymous && isAdmin && (
-                    <span title="Posted anonymously">
+                    <span title="Posté anonymement">
                       <EyeOff className="h-3.5 w-3.5 text-amber-600" />
                     </span>
                   )}
@@ -602,7 +602,7 @@ export function QuestionComments({ questionId }: QuestionCommentsProps) {
                     }}
                     images={editImages}
                     onImagesChange={setEditImages}
-                    placeholder="Edit your comment..."
+                    placeholder="Modifier votre commentaire..."
                     useInlineImages={true}
                     hidePreview={true}
                     hideInstructions={true}
@@ -611,10 +611,10 @@ export function QuestionComments({ questionId }: QuestionCommentsProps) {
                 </div>
                 <div className="flex gap-2 mt-2">
                   <Button size="sm" variant="outline" onClick={cancelEdit}>
-                    Cancel
+                    Annuler
                   </Button>
                   <Button size="sm" disabled={!editText.trim() && editImages.length === 0} onClick={() => saveEdit(comment.id)}>
-                    Save
+                    Sauvegarder
                   </Button>
                 </div>
               </div>
@@ -628,7 +628,7 @@ export function QuestionComments({ questionId }: QuestionCommentsProps) {
                 onClick={() => startReply(comment.id)}
                 className="text-xs font-semibold text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
               >
-                Reply
+                Répondre
               </button>
               
               {isOwner && !isEditing && (
@@ -636,7 +636,7 @@ export function QuestionComments({ questionId }: QuestionCommentsProps) {
                   onClick={() => beginEdit(comment)}
                   className="text-xs font-semibold text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
                 >
-                  Edit
+                  Modifier
                 </button>
               )}
               
@@ -645,12 +645,12 @@ export function QuestionComments({ questionId }: QuestionCommentsProps) {
                   onClick={() => remove(comment.id)}
                   className="text-xs font-semibold text-red-600 hover:text-red-800 transition-colors"
                 >
-                  Delete
+                  Supprimer
                 </button>
               )}
               
               {comment.updatedAt && comment.updatedAt !== comment.createdAt && (
-                <span className="text-xs text-gray-500 italic">edited</span>
+                <span className="text-xs text-gray-500 italic">modifié</span>
               )}
             </div>
 
@@ -666,7 +666,7 @@ export function QuestionComments({ questionId }: QuestionCommentsProps) {
                 >
                   <div className="w-6 h-px bg-gray-400"></div>
                   <span>
-                    {isExpanded ? 'Hide' : 'View'} {replyCount} {replyCount === 1 ? 'reply' : 'replies'}
+                    {isExpanded ? 'Masquer' : 'Voir'} {replyCount} {replyCount === 1 ? 'réponse' : 'réponses'}
                   </span>
                 </button>
               </div>
@@ -697,7 +697,7 @@ export function QuestionComments({ questionId }: QuestionCommentsProps) {
         <div className="flex items-center gap-2">
           <MessageSquare className="h-5 w-5 text-gray-600 dark:text-gray-400" />
           <span className="font-semibold text-gray-900 dark:text-gray-100">
-            Comments ({comments.length})
+            Commentaires ({comments.length})
           </span>
         </div>
       </div>
@@ -783,7 +783,7 @@ export function QuestionComments({ questionId }: QuestionCommentsProps) {
                           setImages([]);
                         }
                       }}
-                      placeholder="Write a comment..."
+                      placeholder="Écrire un commentaire..."
                       className="force-ltr flex-1 bg-transparent border-none outline-none resize-none text-sm placeholder:text-gray-500 dark:placeholder:text-gray-400"
                       style={{ 
                         minHeight: '24px', 
@@ -857,7 +857,7 @@ export function QuestionComments({ questionId }: QuestionCommentsProps) {
                       if (!files.length) return;
                       const remaining = 6 - images.length;
                       if (remaining <= 0) {
-                        toast({ title: 'Limit reached', description: 'Maximum 6 images allowed', variant: 'destructive' });
+                        toast({ title: 'Limite atteinte', description: 'Maximum 6 images autorisées', variant: 'destructive' });
                         return;
                       }
                       const slice = files.slice(0, remaining);
@@ -892,13 +892,13 @@ export function QuestionComments({ questionId }: QuestionCommentsProps) {
                       if (results.length) {
                         setImages(prev => [...prev, ...results].slice(0, 6));
                         toast({ 
-                          title: 'Images added', 
+                          title: 'Images ajoutées', 
                           description: `${results.length} image(s) processed${skipped ? `, ${skipped} skipped` : ''}` 
                         });
                       } else if (skipped) {
                         toast({ 
-                          title: 'Upload failed', 
-                          description: `${skipped} image(s) were too large or invalid`, 
+                          title: 'Échec du téléchargement',
+                          description: `${skipped} image(s) étaient trop volumineuses ou invalides`, 
                           variant: 'destructive' 
                         });
                       }
@@ -923,7 +923,7 @@ export function QuestionComments({ questionId }: QuestionCommentsProps) {
                       onCheckedChange={(v) => setPostAnonymous(!!v)} 
                       className="h-4 w-4" 
                     />
-                    Anonymous
+                    Anonyme
                   </label>
                 </div>
               </div>
@@ -932,7 +932,7 @@ export function QuestionComments({ questionId }: QuestionCommentsProps) {
             <div className="flex items-center gap-3 py-2">
               <UserRound className="h-5 w-5 text-gray-400" />
               <span className="text-gray-500 dark:text-gray-400">
-                Sign in to join the discussion.
+                Connectez-vous pour participer à la discussion.
               </span>
             </div>
           )}

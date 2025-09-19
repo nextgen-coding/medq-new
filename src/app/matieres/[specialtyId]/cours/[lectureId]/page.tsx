@@ -518,6 +518,7 @@ export default function CoursPageRoute() {
       }
       return (
         <ClinicalCaseQuestion
+          key={`case-${clinicalCase.caseNumber}`}
           clinicalCase={clinicalCase}
           onSubmit={handleClinicalCaseComplete}
           onNext={handleNext}
@@ -555,6 +556,7 @@ export default function CoursPageRoute() {
   if (currentQuestion.type === 'mcq') {
       return (
         <MCQQuestion
+          key={currentQuestion.id}
           question={currentQuestion}
           onSubmit={handleMCQSubmit}
           onNext={handleNext}
@@ -569,11 +571,13 @@ export default function CoursPageRoute() {
           hideMeta
           enableOptionHighlighting={true}
           hideActions={revisionMode}
+          showNotesAfterSubmit={isAnswered}
         />
       );
     } else {
       return (
         <OpenQuestion
+          key={currentQuestion.id}
           question={currentQuestion}
           onSubmit={handleOpenSubmit}
           onNext={handleNext}
@@ -588,6 +592,7 @@ export default function CoursPageRoute() {
           hideMeta={(currentQuestion as any).type === 'qroc'}
           enableAnswerHighlighting={true}
           hideActions={revisionMode}
+          showNotesAfterSubmit={isAnswered}
         />
       );
     }
@@ -707,7 +712,7 @@ export default function CoursPageRoute() {
                           ) : (
                             <Pin className="h-4 w-4 mr-2" />
                           )}
-                          <span className="hidden sm:inline">{isPinned ? 'Unpin' : 'Pin'}</span>
+                          <span className="hidden sm:inline">{isPinned ? 'Détacher' : 'Épingler'}</span>
                         </Button>
                       )}
                       
@@ -880,6 +885,7 @@ export default function CoursPageRoute() {
                 isComplete={isComplete}
                 pinnedIds={pinnedQuestionIds}
                 onQuit={handleBackToSpecialtyNested}
+                mode={mode}
               />
             </div>
           </div>
@@ -897,6 +903,7 @@ export default function CoursPageRoute() {
               isComplete={isComplete}
               pinnedIds={pinnedQuestionIds}
               onQuit={handleBackToSpecialtyNested}
+              mode={mode}
             />
           </div>
             

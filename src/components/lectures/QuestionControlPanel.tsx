@@ -35,6 +35,7 @@ interface QuestionControlPanelProps {
   pinnedIds?: string[]; // optional list of pinned question IDs
   organizerState?: Record<ColumnKey, OrganizerEntry[]> | null; // optional organizer override
   onQuit?: () => void; // optional quit handler
+  mode?: string | null; // mode to determine display behavior
 }
 
 export function QuestionControlPanel({
@@ -48,7 +49,8 @@ export function QuestionControlPanel({
   isComplete,
   pinnedIds = [],
   organizerState,
-  onQuit
+  onQuit,
+  mode
 }: QuestionControlPanelProps) {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -396,7 +398,9 @@ export function QuestionControlPanel({
                   animate={isCurrent ? { scale: 1.08 } : { scale: 1 }}
                   transition={{ type: 'spring', stiffness: 180, damping: 18 }}
                 >
-                  {isAnswered ? (
+                  {mode === 'revision' ? (
+                    <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                  ) : isAnswered ? (
                     isCorrect === true ? (
                       <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
                     ) : isCorrect === 'partial' ? (
@@ -673,7 +677,9 @@ export function QuestionControlPanel({
                         animate={isCurrent ? { scale: 1.08 } : { scale: 1 }}
                         transition={{ type: 'spring', stiffness: 180, damping: 18 }}
                       >
-                        {isAnswered ? (
+                        {mode === 'revision' ? (
+                          <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                        ) : isAnswered ? (
                           isCorrect === true ? (
                             <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
                           ) : isCorrect === 'partial' ? (
@@ -778,7 +784,9 @@ export function QuestionControlPanel({
                         {anyPinned && <Pin className="h-4 w-4 text-pink-600 dark:text-pink-400" />}
                         {allHidden && <EyeOff className="h-4 w-4 text-red-500" />}
                         <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-700">
-                        {isAnswered ? (
+                        {mode === 'revision' ? (
+                          <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                        ) : isAnswered ? (
                           isCorrect === true ? (
                             <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
                           ) : isCorrect === 'partial' ? (
