@@ -61,6 +61,12 @@ export type Specialty = {
   };
 };
 
+export type Niveau = {
+  id: string;
+  name: string;
+  order: number;
+};
+
 export type Semester = {
   id: string;
   name: string;
