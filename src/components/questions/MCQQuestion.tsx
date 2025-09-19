@@ -97,16 +97,14 @@ export function MCQQuestion({
     }
   }, [notesHasContent, notesManuallyControlled]);
 
-  // Force show notes after submission if showNotesAfterSubmit is enabled
+  // Force show notes after submission if showNotesAfterSubmit is enabled, but only if notes have content
   useEffect(() => {
     if (showNotesAfterSubmit && isAnswered && !notesManuallyControlled) {
-      // Only auto-show if there's content or if we want to encourage note-taking
-      setShowNotesArea(true);
+      setShowNotesArea(notesHasContent);
     } else if (!showNotesAfterSubmit && !notesManuallyControlled) {
-      // Hide notes when showNotesAfterSubmit is false to reset state
       setShowNotesArea(false);
     }
-  }, [showNotesAfterSubmit, isAnswered, notesManuallyControlled]);
+  }, [showNotesAfterSubmit, isAnswered, notesManuallyControlled, notesHasContent]);
   // Server aggregated stats
   const [optionStats, setOptionStats] = useState<Record<string, number>>({});
   const [totalSubmissions, setTotalSubmissions] = useState(0);

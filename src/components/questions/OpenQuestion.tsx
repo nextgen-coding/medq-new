@@ -106,16 +106,14 @@ export function OpenQuestion({
     }
   }, [notesHasContent, notesManuallyControlled]);
 
-  // Force show notes after submission if showNotesAfterSubmit is enabled
+  // Force show notes after submission if showNotesAfterSubmit is enabled, but only if notes have content
   useEffect(() => {
     if (showNotesAfterSubmit && isAnswered && !notesManuallyControlled) {
-      // Only auto-show if there's content or if we want to encourage note-taking
-      setShowNotesArea(true);
+      setShowNotesArea(notesHasContent);
     } else if (!showNotesAfterSubmit && !notesManuallyControlled) {
-      // Hide notes when showNotesAfterSubmit is false to reset state
       setShowNotesArea(false);
     }
-  }, [showNotesAfterSubmit, isAnswered, notesManuallyControlled]);
+  }, [showNotesAfterSubmit, isAnswered, notesManuallyControlled, notesHasContent]);
   const notesRef = useRef<HTMLDivElement | null>(null);
   const hasSubmittedRef = useRef(false); // Immediate synchronous access to submission state
   const selfAssessmentRef = useRef<HTMLDivElement | null>(null);
