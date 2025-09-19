@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -90,17 +90,43 @@ export function UniversalHeader({
       .slice(0, 2);
   };
 
+  const formatTime = (d: string | Date) => {
+    const date = typeof d === 'string' ? new Date(d) : d;
+    const diff = (Date.now() - date.getTime()) / 1000;
+    if (diff < 60) return `${Math.floor(diff)}s`;
+    if (diff < 3600) return `${Math.floor(diff/60)}m`;
+    if (diff < 86400) return `${Math.floor(diff/3600)}h`;
+    return date.toLocaleDateString();
+  };
+
+  const stripAdmin = (s: string) => s?.replace(/^\[ADMIN\]\s*/i, '') ?? s;
+
+  const reloadNotifications = useCallback(async () => {
+    try {
+      if (!user) {
+        setNotificationCount(0);
+        setRecentNotifications([]);
+        return;
+      }
+      const res = await fetch('/api/notifications?limit=5', { credentials: 'include' });
+      if (!res.ok) return;
+      const json = await res.json();
+      const stripAdmin = (s: string) => s?.replace(/^\[ADMIN\]\s*/i, '') ?? s;
+      const list = (json.notifications || []).map((n: any) => ({
+        id: n.id,
+        title: stripAdmin(n.title),
+        time: n.createdAt ? formatTime(n.createdAt) : '',
+        read: !!n.isRead,
+      }));
+      setRecentNotifications(list);
+      setNotificationCount(list.filter((n: RecentNotification) => !n.read).length);
+    } catch {
+      // ignore transient failures
+    }
+  }, [user]);
+
   useEffect(() => {
     let isMounted = true;
-    const formatTime = (d: string | Date) => {
-      const date = typeof d === 'string' ? new Date(d) : d;
-      const diff = (Date.now() - date.getTime()) / 1000;
-      if (diff < 60) return `${Math.floor(diff)}s`;
-      if (diff < 3600) return `${Math.floor(diff/60)}m`;
-      if (diff < 86400) return `${Math.floor(diff/3600)}h`;
-      return date.toLocaleDateString();
-    };
-    const stripAdmin = (s: string) => s?.replace(/^\[ADMIN\]\s*/i, '') ?? s;
     const load = async () => {
       try {
         if (!user) {
@@ -301,7 +327,8 @@ export function UniversalHeader({
       {/* Notifications Dialog */}
       <NotificationsDialog 
         open={notificationsOpen} 
-        onOpenChange={setNotificationsOpen} 
+        onOpenChange={setNotificationsOpen}
+        onNotificationsUpdated={reloadNotifications}
       />
     </div>
   );

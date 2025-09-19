@@ -55,6 +55,12 @@ export default function DashboardPage() {
               {/* Main Content (single natural scroll, no nested scroll area) */}
               <div className="flex-1 bg-gray-50 dark:bg-gray-900 overflow-y-auto">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-6">
+                  {/* Welcome Text (inline, inside container) */}
+                  {user && (
+                    <span className="block mb-6 text-xl font-bold text-blue-900 dark:text-blue-200">
+                      Bonjour {user.name}! Medq vous souhaite un bon travail.
+                    </span>
+                  )}
                   <div className="space-y-4 sm:space-y-6">
             {/* Upsell Banner for Free Users */}
             {shouldShowUpsell && (
