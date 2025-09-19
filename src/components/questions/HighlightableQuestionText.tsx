@@ -221,7 +221,6 @@ export const HighlightableQuestionText: React.FC<HighlightableQuestionTextProps>
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail as { questionId?: string } | undefined;
       if (!detail || detail.questionId !== questionId) return;
-      // No-op: refreshFromStorage removed, backend now always used
     };
     window.addEventListener('question-highlight-changed', handler as EventListener);
     return () => window.removeEventListener('question-highlight-changed', handler as EventListener);
