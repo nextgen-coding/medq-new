@@ -117,19 +117,11 @@ export default function CoursPageRoute() {
     }
   }
 
-  if (isLoading) {
-    return (
-      <ProtectedRoute>
-        <div className="min-h-screen bg-gradient-to-br from-blue-50/50 via-white to-blue-50/50 dark:from-blue-950/20 dark:via-gray-900 dark:to-blue-950/20">
-          <div className="container mx-auto px-4 py-6">
-             <LectureLoadingState />
-          </div>
-        </div>
-      </ProtectedRoute>
-    );
-  }
 
-  if (!lecture) {
+  // Always render the page layout, but show skeletons for question area and icons while loading
+
+
+  if (!isLoading && !lecture) {
     return (
       <ProtectedRoute>
         <div className="min-h-screen bg-gradient-to-br from-blue-50/50 via-white to-blue-50/50 dark:from-blue-950/20 dark:via-gray-900 dark:to-blue-950/20">
@@ -170,7 +162,7 @@ export default function CoursPageRoute() {
               questions={questions}
               answers={answers}
               answerResults={answerResults}
-              lectureTitle={lecture.title}
+              lectureTitle={lecture ? lecture.title : ''}
               lectureId={lectureId}
             />
           </div>
@@ -892,8 +884,7 @@ export default function CoursPageRoute() {
                 pinnedIds={pinnedQuestionIds}
                 onQuit={handleBackToSpecialtyNested}
                 mode={mode}
-                onNotesVisibilityChange={handleNotesVisibilityChange}
-                showAllNotes={showAllNotes}
+                // onNotesVisibilityChange and showAllNotes removed
               />
             </div>
           </div>
@@ -912,8 +903,7 @@ export default function CoursPageRoute() {
               pinnedIds={pinnedQuestionIds}
               onQuit={handleBackToSpecialtyNested}
               mode={mode}
-              onNotesVisibilityChange={handleNotesVisibilityChange}
-              showAllNotes={showAllNotes}
+              // onNotesVisibilityChange and showAllNotes removed
             />
           </div>
             

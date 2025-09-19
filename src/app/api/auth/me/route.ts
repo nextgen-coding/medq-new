@@ -6,7 +6,7 @@ async function handler(request: AuthenticatedRequest) {
   try {
     const user = await prisma.user.findUnique({
       where: { id: request.user?.userId },
-      select: {
+  select: {
         id: true,
         email: true,
         name: true,
@@ -16,11 +16,12 @@ async function handler(request: AuthenticatedRequest) {
         passwordUpdatedAt: true,
         createdAt: true,
         updatedAt: true,
-        // Profile fields
-        sexe: true,
-        niveauId: true,
-        semesterId: true,
-        profileCompleted: true,
+  // Profile fields
+  sexe: true,
+  niveauId: true,
+  semesterId: true,
+  faculty: true,
+  profileCompleted: true,
         // Subscription fields
         hasActiveSubscription: true,
         subscriptionExpiresAt: true,

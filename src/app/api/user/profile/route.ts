@@ -13,10 +13,10 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-  const { name, sexe, niveauId, semesterId } = await request.json();
-    
+  const { name, sexe, niveauId, semesterId, faculty, image } = await request.json();
+
     // Validate input
-  if (!name || !sexe || !niveauId) {
+    if (!name || !sexe || !niveauId) {
       return NextResponse.json(
         { error: 'All fields are required' },
         { status: 400 }
@@ -32,7 +32,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // Verify niveau exists
-  const niveau = await prisma.niveau.findUnique({ where: { id: niveauId } });
+    const niveau = await prisma.niveau.findUnique({ where: { id: niveauId } });
 
     if (!niveau) {
       return NextResponse.json({ error: 'Invalid niveau selected' }, { status: 400 });
@@ -56,9 +56,11 @@ export async function PUT(request: NextRequest) {
         sexe,
         niveauId,
         semesterId: validSemesterId, // null if not provided or no semesters
+        faculty: faculty ?? null,
+        image: image ?? undefined,
         profileCompleted: true,
       },
-  include: { niveau: true },
+      include: { niveau: true },
     });
 
     // Remove sensitive data
@@ -69,8 +71,10 @@ export async function PUT(request: NextRequest) {
       sexe: updatedUser.sexe,
       role: updatedUser.role,
       niveauId: updatedUser.niveauId,
-  niveau: (updatedUser as any).niveau,
-  semesterId: (updatedUser as any).semesterId ?? null,
+      niveau: updatedUser.niveau,
+      semesterId: updatedUser.semesterId ?? null,
+      faculty: updatedUser.faculty ?? null,
+      image: updatedUser.image ?? null,
       profileCompleted: updatedUser.profileCompleted,
       createdAt: updatedUser.createdAt,
       updatedAt: updatedUser.updatedAt

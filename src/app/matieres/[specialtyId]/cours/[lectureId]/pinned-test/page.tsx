@@ -411,7 +411,7 @@ export default function QuestionsEpingleesTestPage() {
     )
   }
 
-  if (questions.length === 0) {
+  if (!isLoading && questions.length === 0) {
     return (
       <ProtectedRoute>
         <div className="min-h-screen bg-gradient-to-br from-blue-50/50 via-white to-blue-50/50 dark:from-blue-950/20 dark:via-gray-900 dark:to-blue-950/20">

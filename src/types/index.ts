@@ -1,16 +1,11 @@
 
-export type Niveau = {
-  id: string;
-  name: string;
-  order: number;
-};
-
 export type User = {
   id: string;
   email: string;
   role: 'student' | 'maintainer' | 'admin';
   name?: string;
   image?: string;
+  faculty?: string | null;
   password?: string;
   passwordUpdatedAt?: string;
   // Profile fields
