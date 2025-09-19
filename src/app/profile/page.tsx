@@ -87,15 +87,39 @@ export default function ProfilePageRoute() {
 
   const handlePasswordChange = async () => {
     try {
+      // Client-side password validation
+      if (passwordData.newPassword.length < 8) {
+        toast({ title: 'Erreur', description: 'Le mot de passe doit contenir au moins 8 caractères.', variant: 'destructive' });
+        return;
+      }
+      if (!/[A-Z]/.test(passwordData.newPassword)) {
+        toast({ title: 'Erreur', description: 'Le mot de passe doit contenir au moins une lettre majuscule.', variant: 'destructive' });
+        return;
+      }
+      if (!/[a-z]/.test(passwordData.newPassword)) {
+        toast({ title: 'Erreur', description: 'Le mot de passe doit contenir au moins une lettre minuscule.', variant: 'destructive' });
+        return;
+      }
+      const isGoogleUser = !!user?.google_id;
+      // Only send the fields required by the backend
+      const payload = isGoogleUser
+        ? { newPassword: passwordData.newPassword }
+        : { currentPassword: passwordData.currentPassword, newPassword: passwordData.newPassword };
       const res = await fetch('/api/user/password', {
-        method: 'POST',
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(passwordData),
+        body: JSON.stringify(payload),
       })
-      if (!res.ok) throw new Error('Erreur lors du changement de mot de passe')
-      toast({ title: 'Succès', description: 'Mot de passe mis à jour', variant: 'default' })
+      if (!res.ok) {
+        const errorData = await res.json();
+        toast({ title: 'Erreur', description: errorData.error || 'Impossible de changer le mot de passe', variant: 'destructive' });
+        return;
+      }
+      toast({ title: 'Succès', description: isGoogleUser ? 'Mot de passe défini' : 'Mot de passe mis à jour', variant: 'default' })
       setShowChangePassword(false)
       setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' })
+      // Refresh user context so UI updates to require current password next time
+      if (refreshUser) await refreshUser();
     } catch (e) {
       toast({ title: 'Erreur', description: 'Impossible de changer le mot de passe', variant: 'destructive' })
     }
@@ -415,39 +439,42 @@ export default function ProfilePageRoute() {
                               onClick={() => setShowChangePassword(!showChangePassword)}
                             >
                               <Lock className="h-4 w-4 mr-2" />
-                              Changer
+                              {user?.password ? 'Changer' : 'Définir le mot de passe'}
                             </Button>
                           </div>
 
-                          {/* Change Password Form */}
+                          {/* Change/Set Password Form */}
                           {showChangePassword && (
                             <div className="space-y-4 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg border border-blue-200 dark:border-blue-800 animate-in slide-in-from-top-2 duration-300">
-                              <h4 className="font-semibold text-gray-900 dark:text-white mb-4">Changer le mot de passe</h4>
+                              <h4 className="font-semibold text-gray-900 dark:text-white mb-4">{user?.password ? 'Changer le mot de passe' : 'Définir le mot de passe'}</h4>
 
                               <div className="grid gap-4 md:grid-cols-1">
-                                <div className="space-y-2">
-                                  <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    Mot de passe actuel
-                                  </Label>
-                                  <div className="relative">
-                                    <Input
-                                      type={showPasswords.current ? "text" : "password"}
-                                      value={passwordData.currentPassword}
-                                      onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
-                                      className="bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 focus:border-blue-500 focus:ring-blue-500/20 pr-10 transition-all duration-200"
-                                      placeholder="Votre mot de passe actuel"
-                                    />
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="sm"
-                                      className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-600"
-                                      onClick={() => setShowPasswords(prev => ({ ...prev, current: !prev.current }))}
-                                    >
-                                      {showPasswords.current ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                    </Button>
+                                {/* Only show current password if user has a password set */}
+                                {user?.password && (
+                                  <div className="space-y-2">
+                                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                      Mot de passe actuel
+                                    </Label>
+                                    <div className="relative">
+                                      <Input
+                                        type={showPasswords.current ? "text" : "password"}
+                                        value={passwordData.currentPassword}
+                                        onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
+                                        className="bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 focus:border-blue-500 focus:ring-blue-500/20 pr-10 transition-all duration-200"
+                                        placeholder="Votre mot de passe actuel"
+                                      />
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-600"
+                                        onClick={() => setShowPasswords(prev => ({ ...prev, current: !prev.current }))}
+                                      >
+                                        {showPasswords.current ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                      </Button>
+                                    </div>
                                   </div>
-                                </div>
+                                )}
 
                                 <div className="space-y-2">
                                   <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -502,9 +529,13 @@ export default function ProfilePageRoute() {
                                 <Button
                                   onClick={handlePasswordChange}
                                   className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
-                                  disabled={!passwordData.currentPassword || !passwordData.newPassword || passwordData.newPassword !== passwordData.confirmPassword}
+                                  disabled={
+                                    user?.google_id
+                                      ? (!passwordData.newPassword || passwordData.newPassword !== passwordData.confirmPassword)
+                                      : (!passwordData.currentPassword || !passwordData.newPassword || passwordData.newPassword !== passwordData.confirmPassword)
+                                  }
                                 >
-                                  Mettre à jour
+                                  {user?.google_id ? 'Définir' : 'Mettre à jour'}
                                 </Button>
                                 <Button
                                   variant="outline"

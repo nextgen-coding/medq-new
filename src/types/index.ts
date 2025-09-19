@@ -8,6 +8,8 @@ export type User = {
   faculty?: string | null;
   password?: string;
   passwordUpdatedAt?: string;
+  // Social login fields
+  google_id?: string;
   // Profile fields
   sexe?: 'M' | 'F';
   niveauId?: string;
