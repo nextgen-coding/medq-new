@@ -27,6 +27,8 @@ export type User = {
     order: number;
     niveauId: string;
   };
+  // Highlight color for souligner
+  highlightColor?: string | null;
 };
 
 export type Specialty = {

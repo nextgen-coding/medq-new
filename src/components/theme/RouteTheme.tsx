@@ -17,7 +17,6 @@ export default function RouteTheme() {
       p.startsWith('/matieres') ||
       p.startsWith('/lecture') ||
       p.startsWith('/profile') ||
-      p.startsWith('/settings') ||
       p.startsWith('/specialty')
 
     if (isMedicalBlueArea) {

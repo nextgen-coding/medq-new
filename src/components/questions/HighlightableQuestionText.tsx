@@ -85,7 +85,7 @@ export const HighlightableQuestionText: React.FC<HighlightableQuestionTextProps>
           <mark
             key={i + '-hl'}
             className="souligner-highlight"
-            style={{ background: '#bef264', color: '#222', borderRadius: '3px', padding: '0 2px', cursor: 'pointer' }}
+            style={{ background: user?.highlightColor || '#fde68a', color: '#222', borderRadius: '3px', padding: '0 2px', cursor: 'pointer' }}
             onClick={e => { e.stopPropagation(); removeHighlightAt(highlights.findIndex(h => h.start <= offsetBase + hl.start && h.end >= offsetBase + hl.end)); }}
             title="Cliquer pour retirer le surlignage"
           >

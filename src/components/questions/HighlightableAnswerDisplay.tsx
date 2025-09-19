@@ -175,8 +175,21 @@ export const HighlightableAnswerDisplay: React.FC<HighlightableAnswerDisplayProp
       
       // Add highlighted text
       const highlightedText = answer.slice(highlight.start, highlight.end);
+      // Sanitize highlightColor to ensure it's a valid hex color
+      let highlightColor = user?.highlightColor;
+      if (!highlightColor || typeof highlightColor !== 'string' || !/^#([0-9A-Fa-f]{3}){1,2}$/.test(highlightColor)) {
+        highlightColor = '#fde68a'; // fallback to yellow-200
+      }
       parts.push(
-        <span key={`highlight-${i}`} className="bg-yellow-200 dark:bg-yellow-800/50">
+        <span
+          key={`highlight-${i}`}
+          style={{
+            backgroundColor: highlightColor,
+            borderRadius: 4,
+            padding: '0 2px',
+            transition: 'background-color 0.2s',
+          }}
+        >
           {highlightedText}
         </span>
       );

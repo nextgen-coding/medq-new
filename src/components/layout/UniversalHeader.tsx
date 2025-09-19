@@ -18,7 +18,6 @@ import {
   Bell, 
   Search, 
   User, 
-  Settings, 
   LogOut,
   UserCircle,
   Menu,
@@ -171,9 +170,9 @@ export function UniversalHeader({
           </div>
 
           {/* Right Section: (search if right aligned) + rightActions + notifications + profile */}
-          <div className="flex items-center space-x-2 sm:space-x-3">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-shrink-0">
             {showSearch && searchAlign === 'right' && (
-              <div className="block w-72 sm:w-80 lg:w-96 xl:w-[28rem]">
+              <div className="hidden sm:block w-64 lg:w-72 xl:w-80 min-w-0">
                 <Input
                   value={searchValue}
                   onChange={(e) => onSearchChange?.(e.target.value)}
@@ -185,7 +184,7 @@ export function UniversalHeader({
             
             {/* Right Actions - appears before notifications */}
             {rightActions && (
-              <div className="flex items-center space-x-1 sm:space-x-2">
+              <div className="flex items-center gap-1 sm:gap-2 min-w-0">
                 {rightActions}
               </div>
             )}
@@ -205,14 +204,14 @@ export function UniversalHeader({
                   )}
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-80 sm:w-96">
+              <DropdownMenuContent align="end" className="w-72 sm:w-80 lg:w-96">
                 <DropdownMenuLabel className="text-base font-semibold">Notifications</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 {recentNotifications.length > 0 ? (
                   recentNotifications.map((n) => (
                     <DropdownMenuItem key={n.id} className="p-4">
-                      <div className="flex flex-col space-y-1 w-full">
-                        <p className="text-sm font-medium">{n.title}</p>
+                      <div className="flex flex-col space-y-1 w-full min-w-0">
+                        <p className="text-sm font-medium truncate">{n.title}</p>
                         <p className="text-xs text-muted-foreground">{n.time}</p>
                       </div>
                     </DropdownMenuItem>
@@ -246,11 +245,11 @@ export function UniversalHeader({
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuContent align="end" className="w-48 sm:w-56">
                 <DropdownMenuLabel className="font-normal">
-                  <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{user?.name || 'User'}</p>
-                    <p className="text-xs leading-none text-muted-foreground">
+                  <div className="flex flex-col space-y-1 min-w-0">
+                    <p className="text-sm font-medium leading-none truncate">{user?.name || 'User'}</p>
+                    <p className="text-xs leading-none text-muted-foreground truncate">
                       {user?.email}
                     </p>
                   </div>
@@ -259,10 +258,6 @@ export function UniversalHeader({
                 <DropdownMenuItem onClick={() => router.push('/profile')}>
                   <User className="mr-2 h-4 w-4" />
                   <span>Profile</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => router.push('/settings')}>
-                  <Settings className="mr-2 h-4 w-4" />
-                  <span>Settings</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleSignOut}>
@@ -278,11 +273,11 @@ export function UniversalHeader({
       {/* Actions Row - Below Header */}
       {actions && (
         <div className={`bg-gray-50 dark:bg-gray-900 ${hideSeparator ? '' : 'border-t border-gray-200 dark:border-gray-700'}`}>
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-3">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4 min-w-0">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-3 min-w-0">
               {/* Right actions - typically other action buttons */}
               {actions && (
-                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 ml-auto">
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 ml-auto min-w-0">
                   {actions}
                 </div>
               )}
@@ -293,12 +288,12 @@ export function UniversalHeader({
       
       {/* Mobile search (only when enabled) */}
   {showSearch && (
-        <div className="px-4 pb-4 md:hidden">
+        <div className="px-4 pb-4 md:hidden min-w-0">
           <Input
             value={searchValue}
             onChange={(e) => onSearchChange?.(e.target.value)}
             placeholder={searchPlaceholder}
-    className={`h-10 ${graySearch ? 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 placeholder:text-gray-500 dark:placeholder:text-gray-400 focus-visible:ring-0 focus:ring-0' : ''}`}
+    className={`h-10 w-full ${graySearch ? 'bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 placeholder:text-gray-500 dark:placeholder:text-gray-400 focus-visible:ring-0 focus:ring-0' : ''}`}
           />
         </div>
       )}

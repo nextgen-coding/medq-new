@@ -182,6 +182,8 @@ export function QuestionControlPanel({
     const idsToFetch = regularQuestionIds.filter((id) => notesMap[id] === undefined);
     if (idsToFetch.length === 0) return;
 
+    console.log('QuestionControlPanel: Fetching notes for question IDs:', idsToFetch);
+
     const controller = new AbortController();
 
     (async () => {
@@ -190,24 +192,31 @@ export function QuestionControlPanel({
           idsToFetch.map(async (id) => {
             try {
               const res = await fetch(`/api/user-question-state?userId=${encodeURIComponent(user.id)}&questionId=${encodeURIComponent(id)}` , { signal: controller.signal });
-              if (!res.ok) return [id, false] as [string, boolean];
+              if (!res.ok) {
+                console.log(`QuestionControlPanel: API call failed for question ${id}, status: ${res.status}`);
+                return [id, false] as [string, boolean];
+              }
               const data = await res.json();
               const hasNote = !!(data?.notes && String(data.notes).trim().length > 0);
+              console.log(`QuestionControlPanel: Notes for question ${id}:`, { hasNote, notes: data?.notes, data });
               return [id, hasNote] as [string, boolean];
-            } catch {
+            } catch (error) {
+              console.log(`QuestionControlPanel: Error fetching notes for question ${id}:`, error);
               return [id, false] as [string, boolean];
             }
           })
         );
+        console.log('QuestionControlPanel: Setting notes map with results:', results);
         setNotesMap((prev) => {
           const next = { ...prev };
           results.forEach(([id, has]) => {
             next[id] = has;
           });
+          console.log('QuestionControlPanel: Updated notes map:', next);
           return next;
         });
-      } catch {
-        // ignore
+      } catch (error) {
+        console.log('QuestionControlPanel: Error in notes fetching:', error);
       }
     })();
 
@@ -332,6 +341,7 @@ export function QuestionControlPanel({
       
       isCurrent = actualIndex === currentQuestionIndex && !isComplete;
       const hasNote = notesMap[entry.id] === true;
+      console.log(`QuestionControlPanel: Entry ${entry.id}, hasNote: ${hasNote}, notesMap value: ${notesMap[entry.id]}, notesMap keys:`, Object.keys(notesMap));
       const isPinned = pinnedIds.includes(entry.id);
 
       return (

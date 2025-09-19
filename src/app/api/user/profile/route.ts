@@ -13,7 +13,7 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-  const { name, sexe, niveauId, semesterId, faculty, image } = await request.json();
+    const { name, sexe, niveauId, semesterId, faculty, image, highlightColor } = await request.json();
 
     // Validate input
     if (!name || !sexe || !niveauId) {
@@ -58,9 +58,25 @@ export async function PUT(request: NextRequest) {
         semesterId: validSemesterId, // null if not provided or no semesters
         faculty: faculty ?? null,
         image: image ?? undefined,
+        highlightColor: highlightColor ?? undefined,
         profileCompleted: true,
       },
-      include: { niveau: true },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        sexe: true,
+        role: true,
+        niveauId: true,
+        niveau: true,
+        semesterId: true,
+        faculty: true,
+        image: true,
+        highlightColor: true,
+        profileCompleted: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
 
     // Remove sensitive data
@@ -75,6 +91,7 @@ export async function PUT(request: NextRequest) {
       semesterId: updatedUser.semesterId ?? null,
       faculty: updatedUser.faculty ?? null,
       image: updatedUser.image ?? null,
+      highlightColor: updatedUser.highlightColor ?? null,
       profileCompleted: updatedUser.profileCompleted,
       createdAt: updatedUser.createdAt,
       updatedAt: updatedUser.updatedAt

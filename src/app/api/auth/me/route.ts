@@ -7,40 +7,41 @@ async function handler(request: AuthenticatedRequest) {
     const user = await prisma.user.findUnique({
       where: { id: request.user?.userId },
   select: {
+    id: true,
+    email: true,
+    name: true,
+    role: true,
+    image: true,
+    password: true,
+    passwordUpdatedAt: true,
+    createdAt: true,
+    updatedAt: true,
+    // Profile fields
+    sexe: true,
+    niveauId: true,
+    semesterId: true,
+    faculty: true,
+    profileCompleted: true,
+    highlightColor: true,
+    // Subscription fields
+    hasActiveSubscription: true,
+    subscriptionExpiresAt: true,
+    niveau: {
+      select: {
         id: true,
-        email: true,
         name: true,
-        role: true,
-        image: true,
-        password: true,
-        passwordUpdatedAt: true,
-        createdAt: true,
-        updatedAt: true,
-  // Profile fields
-  sexe: true,
-  niveauId: true,
-  semesterId: true,
-  faculty: true,
-  profileCompleted: true,
-        // Subscription fields
-        hasActiveSubscription: true,
-        subscriptionExpiresAt: true,
-        niveau: {
-          select: {
-            id: true,
-            name: true,
-            order: true,
-          }
-        },
-        semester: {
-          select: {
-            id: true,
-            name: true,
-            order: true,
-            niveauId: true,
-          }
-        }
+        order: true,
       }
+    },
+    semester: {
+      select: {
+        id: true,
+        name: true,
+        order: true,
+        niveauId: true,
+      }
+    }
+  }
     });
     
     if (!user) {
