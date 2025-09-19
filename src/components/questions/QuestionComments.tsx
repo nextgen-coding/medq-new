@@ -89,25 +89,12 @@ export function QuestionComments({ questionId }: QuestionCommentsProps) {
     e.target.style.direction = 'ltr';
     const value = normalizeLTR(e.target.value);
     setText(value);
-    
-    // Force cursor to end to prevent backward behavior
-    setTimeout(() => {
-      const len = value.length;
-      e.target.setSelectionRange(len, len);
-      e.target.scrollTop = e.target.scrollHeight;
-    }, 0);
   };
 
   const handleMainInputFocus = (e: React.FocusEvent<HTMLTextAreaElement>) => {
     e.target.style.direction = 'ltr';
     e.target.style.textAlign = 'left';
     e.target.style.unicodeBidi = 'plaintext';
-    
-    // Force cursor to end on focus
-    setTimeout(() => {
-      const len = e.target.value.length;
-      e.target.setSelectionRange(len, len);
-    }, 10);
   };  const load = useMemo(() => async () => {
     try {
       setLoading(true);
@@ -333,25 +320,12 @@ export function QuestionComments({ questionId }: QuestionCommentsProps) {
       e.target.style.direction = 'ltr';
       const value = normalizeLTR(e.target.value);
       setReplyText(value);
-      
-      // Force cursor to end to prevent backward behavior
-      setTimeout(() => {
-        const len = value.length;
-        e.target.setSelectionRange(len, len);
-        e.target.scrollTop = e.target.scrollHeight;
-      }, 0);
     };
 
     const handleFocus = (e: React.FocusEvent<HTMLTextAreaElement>) => {
       e.target.style.direction = 'ltr';
       e.target.style.textAlign = 'left';
       e.target.style.unicodeBidi = 'plaintext';
-      
-      // Force cursor to end on focus
-      setTimeout(() => {
-        const len = e.target.value.length;
-        e.target.setSelectionRange(len, len);
-      }, 10);
     };    const handleSubmitReply = () => {
       if (canPostReply) {
         add(parentId, replyText);
@@ -541,17 +515,17 @@ export function QuestionComments({ questionId }: QuestionCommentsProps) {
                 
                 {/* Clickable Images */}
                 {comment.imageUrls && comment.imageUrls.length > 0 && (
-                  <div className="mt-3 grid grid-cols-2 gap-2">
+                  <div className="mt-3 flex flex-wrap gap-2">
                     {comment.imageUrls.slice(0, 4).map((url: string, idx: number) => {
                       if (url.startsWith('blob:')) return null;
                       return (
                         <Dialog key={idx}>
                           <DialogTrigger asChild>
-                            <div className="cursor-pointer group relative">
+                            <div className="cursor-pointer group relative flex-1 min-w-0 max-w-sm">
                               <img 
                                 src={url} 
                                 alt="attachment" 
-                                className="w-full h-24 object-cover rounded-lg border group-hover:opacity-90 transition-opacity"
+                                className="w-full h-auto max-h-64 object-contain rounded-lg border group-hover:opacity-90 transition-opacity"
                                 onError={(e) => {
                                   const target = e.target as HTMLImageElement;
                                   target.style.display = 'none';
@@ -729,10 +703,10 @@ export function QuestionComments({ questionId }: QuestionCommentsProps) {
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <MessageSquare className="h-12 w-12 text-gray-400 mb-4" />
               <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-                No comments yet
+                Aucun commentaire pour le moment
               </h3>
               <p className="text-gray-500 dark:text-gray-400">
-                Be the first to share your thoughts!
+                Soyez le premier à partager vos réflexions !
               </p>
             </div>
           )}
