@@ -61,17 +61,17 @@ export function RichTextInput({
       if (res && res[0]) {
         insertImageAtCursor(res[0].url, res[0].name);
         toast({
-          title: 'Image ajoutée',
-          description: 'L\'image a été téléchargée et insérée dans le texte.',
+    title: 'Image ajoutée',
+    description: "L'image a été téléchargée et insérée dans le texte.",
         });
       }
     },
     onUploadError: (error: Error) => {
       console.error("Upload error:", error);
       toast({
-        title: 'Erreur d\'upload',
-        description: error.message || 'Impossible d\'ajouter l\'image.',
-        variant: 'destructive',
+  title: 'Erreur lors du téléversement',
+  description: error.message || "Impossible d'ajouter l'image.",
+  variant: 'destructive',
       });
     },
   });
@@ -426,18 +426,18 @@ export function RichTextInput({
   const handleImageUpload = useCallback(async (file: File) => {
     if (!file.type.startsWith('image/')) {
       toast({
-        title: 'Type de fichier non supporté',
-        description: 'Veuillez sélectionner une image.',
-        variant: 'destructive',
+  title: 'Type de fichier non supporté',
+  description: 'Veuillez sélectionner une image.',
+  variant: 'destructive',
       });
       return;
     }
 
     if (file.size > maxImageSize) {
       toast({
-        title: 'Image trop volumineuse',
-        description: `La taille maximum est de ${Math.round(maxImageSize / (1024 * 1024))}MB.`,
-        variant: 'destructive',
+  title: 'Image trop volumineuse',
+  description: `La taille maximale est de ${Math.round(maxImageSize / (1024 * 1024))}MB.`,
+  variant: 'destructive',
       });
       return;
     }
@@ -445,7 +445,7 @@ export function RichTextInput({
     try {
       // Show loading state
       toast({
-        title: 'Upload en cours',
+        title: 'Téléversement en cours',
         description: 'Veuillez patienter...',
       });
 
@@ -456,7 +456,7 @@ export function RichTextInput({
       console.error('Error uploading image:', error);
       toast({
         title: 'Erreur',
-        description: error instanceof Error ? error.message : 'Impossible d\'ajouter l\'image.',
+        description: error instanceof Error ? error.message : "Impossible d'ajouter l'image.",
         variant: 'destructive',
       });
     }
