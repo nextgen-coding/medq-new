@@ -1,7 +1,7 @@
 'use client'
 
 import { useParams, useRouter } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useLecture } from '@/hooks/use-lecture'
 import { useAuth } from '@/contexts/AuthContext'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
@@ -19,12 +19,24 @@ import {
   Trophy,
   RotateCcw,
   Dumbbell,
-  ArrowLeft
+  ArrowLeft,
+  Pin,
+  PinOff,
+  Flag,
+  Pencil,
+  Trash2,
+  Eye,
+  EyeOff,
+  Settings
 } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
 import { MCQQuestion } from '@/components/questions/MCQQuestion'
 import { OpenQuestion } from '@/components/questions/OpenQuestion'
 import { QuestionControlPanel } from '@/components/lectures/QuestionControlPanel'
+import { QuestionEditDialog } from '@/components/questions/QuestionEditDialog'
+import { ReportQuestionDialog } from '@/components/questions/ReportQuestionDialog'
+import { LectureTimer } from '@/components/lectures/LectureTimer'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Question } from '@/types'
 
 interface TestAnswer {
@@ -42,14 +54,19 @@ export default function QuestionsEpingleesTestPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [answers, setAnswers] = useState<TestAnswer[]>([])
-  const [selectedAnswer, setSelectedAnswer] = useState<string>('')
   const [isTestComplete, setIsTestComplete] = useState(false)
   const [startTime, setStartTime] = useState<Date | null>(null)
   const [questionStartTime, setQuestionStartTime] = useState<Date | null>(null)
+  const [isPinned, setIsPinned] = useState(false)
+  const [isReportDialogOpen, setIsReportDialogOpen] = useState(false)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [openAdminDialog, setOpenAdminDialog] = useState(false)
+  const [answeredQuestions, setAnsweredQuestions] = useState<Set<string>>(new Set())
+  const [notesMap, setNotesMap] = useState<Record<string, boolean>>({})
   
   const lectureId = params?.lectureId as string
   const specialtyId = params?.specialtyId as string
-  const { lecture } = useLecture(lectureId)
+  const { lecture, answers: previousAnswers, answerResults: previousAnswerResults } = useLecture(lectureId)
 
   if (!lectureId) {
     return <div>ID de cours introuvable</div>
@@ -62,6 +79,11 @@ export default function QuestionsEpingleesTestPage() {
     } else {
       router.push('/matieres')
     }
+  }
+
+  // Handle quit button - go back to the specialty page
+  const handleQuit = () => {
+    router.push(`/matieres/${specialtyId}`)
   }
 
   // Load pinned questions for this lecture
@@ -115,6 +137,204 @@ export default function QuestionsEpingleesTestPage() {
   const currentQuestion = questions[currentQuestionIndex]
   const progress = questions.length > 0 ? ((currentQuestionIndex + 1) / questions.length) * 100 : 0
 
+  // Combine current session answers with previous answers
+  // Current session answers take precedence
+  const combinedAnswers = useMemo(() => {
+    const combined: Record<string, any> = { ...(previousAnswers || {}) }
+    
+    // Add current session answers 
+    answers.forEach(answer => {
+      if (answer.questionId && currentQuestion?.type === 'mcq') {
+        // For MCQ, convert comma-separated answer back to array
+        combined[answer.questionId] = answer.answer.split(',').filter(Boolean)
+      } else if (answer.questionId) {
+        // For other question types
+        combined[answer.questionId] = answer.answer
+      }
+    })
+    
+    return combined
+  }, [previousAnswers, answers, currentQuestion?.type])
+
+  // Combine current session results with previous results  
+  const combinedResults = useMemo(() => {
+    const combined: Record<string, boolean | 'partial'> = { ...(previousAnswerResults || {}) }
+    
+    // Add current session results
+    answers.forEach(answer => {
+      if (answer.questionId) {
+        combined[answer.questionId] = answer.isCorrect
+      }
+    })
+    
+    return combined
+  }, [previousAnswerResults, answers])
+
+  // Update pinned status when current question changes
+  useEffect(() => {
+    const checkPinnedStatus = async () => {
+      if (!currentQuestion || !user?.id) return
+      
+      try {
+        const response = await fetch(`/api/pinned-questions?userId=${user.id}`)
+        if (response.ok) {
+          const pinnedData = await response.json()
+          const isQuestionPinned = pinnedData.some((item: any) => item.questionId === currentQuestion.id)
+          setIsPinned(isQuestionPinned)
+        }
+      } catch (error) {
+        console.error('Error loading pinned question status:', error)
+      }
+    }
+
+    if (user?.id && currentQuestion?.id) {
+      checkPinnedStatus()
+    }
+  }, [currentQuestion?.id, user?.id])
+
+  // Fetch notes status for all pinned questions
+  useEffect(() => {
+    const fetchNotesStatus = async () => {
+      if (!user?.id || questions.length === 0) return
+      
+      console.log('Fetching notes status for pinned questions:', questions.map(q => q.id))
+      
+      try {
+        const results = await Promise.all(
+          questions.map(async (question) => {
+            try {
+              const res = await fetch(`/api/user-question-state?userId=${encodeURIComponent(user.id)}&questionId=${encodeURIComponent(question.id)}`);
+              if (!res.ok) return [question.id, false] as [string, boolean];
+              const data = await res.json();
+              const hasNote = !!(data?.notes && String(data.notes).trim().length > 0);
+              console.log(`Notes for question ${question.id}:`, { hasNote, notes: data?.notes });
+              return [question.id, hasNote] as [string, boolean];
+            } catch (error) {
+              console.error(`Failed to fetch notes for question ${question.id}:`, error);
+              return [question.id, false] as [string, boolean];
+            }
+          })
+        );
+        
+        const notesData: Record<string, boolean> = {};
+        results.forEach(([id, hasNote]) => {
+          notesData[id] = hasNote;
+        });
+        
+        console.log('Final notes map:', notesData);
+        setNotesMap(notesData);
+      } catch (error) {
+        console.error('Error fetching notes status:', error);
+      }
+    }
+
+    fetchNotesStatus()
+  }, [user?.id, questions])
+
+  // Pin/Unpin handlers
+  const handlePinQuestion = async () => {
+    if (!currentQuestion || !user?.id) return
+    
+    try {
+      const response = await fetch('/api/pinned-questions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: user.id,
+          questionId: currentQuestion.id,
+        }),
+      })
+
+      if (response.ok) {
+        setIsPinned(true)
+        toast({
+          title: "Question épinglée",
+          description: "Cette question a été ajoutée à votre collection.",
+        })
+        window.dispatchEvent(new Event('pinned-updated'))
+      } else {
+        toast({
+          title: "Erreur",
+          description: "Échec de l'épinglage de la question.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error('Error pinning question:', error)
+      toast({
+        title: "Erreur",
+        description: "Échec de l'épinglage de la question.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleUnpinQuestion = async () => {
+    if (!currentQuestion || !user?.id) return
+    
+    try {
+      const response = await fetch(`/api/pinned-questions?userId=${user.id}&questionId=${currentQuestion.id}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        setIsPinned(false)
+        toast({
+          title: "Question désépinglée",
+          description: "Cette question a été retirée de votre collection.",
+        })
+        
+        // Remove the question from the current test questions list
+        const updatedQuestions = questions.filter(q => q.id !== currentQuestion.id)
+        setQuestions(updatedQuestions)
+        
+        // Remove corresponding answer if it exists
+        setAnswers(prev => prev.filter(a => a.questionId !== currentQuestion.id))
+        
+        // Adjust current question index if needed
+        if (updatedQuestions.length === 0) {
+          // No more pinned questions - end the test if it was in progress
+          if (!isTestComplete) {
+            setIsTestComplete(true)
+          }
+          setCurrentQuestionIndex(0)
+        } else if (currentQuestionIndex >= updatedQuestions.length) {
+          // Current index is beyond the new list length, go to last question
+          setCurrentQuestionIndex(updatedQuestions.length - 1)
+        }
+        // If current index is still valid, it will automatically show the next question
+        
+        // Reset states for the new current question
+        if (updatedQuestions.length > 0) {
+          setQuestionStartTime(new Date())
+        }
+        
+        window.dispatchEvent(new Event('pinned-updated'))
+      } else {
+        toast({
+          title: "Erreur",
+          description: "Échec du désépinglage de la question.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error('Error unpinning question:', error)
+      toast({
+        title: "Erreur",
+        description: "Échec du désépinglage de la question.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleQuestionUpdate = (questionId: string, updates: Partial<Question>) => {
+    setQuestions(prev => prev.map(q => 
+      q.id === questionId ? { ...q, ...updates } : q
+    ))
+  }
+
   const handleAnswerSelect = (answer: string) => {
     if (!currentQuestion || !questionStartTime) return
 
@@ -140,8 +360,11 @@ export default function QuestionsEpingleesTestPage() {
     }
 
     setAnswers(prev => [...prev, newAnswer])
-    setSelectedAnswer('')
+    
+    // MCQQuestion component handles state internally, just track answer for results
+  }
 
+  const handleNextQuestion = () => {
     if (currentQuestionIndex < questions.length - 1) {
       setCurrentQuestionIndex(prev => prev + 1)
       setQuestionStartTime(new Date())
@@ -150,17 +373,9 @@ export default function QuestionsEpingleesTestPage() {
     }
   }
 
-  const handleNextQuestion = () => {
-    if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex(prev => prev + 1)
-      setQuestionStartTime(new Date())
-    }
-  }
-
   const handleRestartTest = () => {
     setCurrentQuestionIndex(0)
     setAnswers([])
-    setSelectedAnswer('')
     setIsTestComplete(false)
     setStartTime(new Date())
     setQuestionStartTime(new Date())
@@ -196,7 +411,7 @@ export default function QuestionsEpingleesTestPage() {
     )
   }
 
-  if (questions.length === 0) {
+  if (!isLoading && questions.length === 0) {
     return (
       <ProtectedRoute>
         <div className="min-h-screen bg-gradient-to-br from-blue-50/50 via-white to-blue-50/50 dark:from-blue-950/20 dark:via-gray-900 dark:to-blue-950/20">
@@ -258,71 +473,230 @@ export default function QuestionsEpingleesTestPage() {
 
               {currentQuestion && !isTestComplete && (
                 <div className="space-y-4 sm:space-y-6">
-                  <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 shadow-sm">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-2">
-                        <Star className="w-4 h-4 text-yellow-500" />
-                        <span className="text-sm text-gray-600 dark:text-gray-400">
-                          Question épinglée
-                        </span>
+                  {/* Header section with metadata and action buttons (like in target page) */}
+                  <div className="space-y-2">
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-4">
+                      <div className="flex flex-col">
+                        <h1 className="text-base md:text-lg font-semibold leading-tight text-gray-900 dark:text-gray-100">
+                          {(() => {
+                            const parts: string[] = [];
+                            
+                            // Add question type and number
+                            if (currentQuestion.type === 'mcq') {
+                              parts.push(`QCM ${currentQuestion.number ?? currentQuestionIndex + 1}`);
+                            } else if (currentQuestion.type === 'qroc' || currentQuestion.type === 'open') {
+                              parts.push(`QROC ${currentQuestion.number ?? currentQuestionIndex + 1}`);
+                            } else {
+                              parts.push(`${(currentQuestion.type || '').toUpperCase()} ${currentQuestion.number ?? currentQuestionIndex + 1}`);
+                            }
+                            
+                            // Add session if available
+                            if ((currentQuestion as any).session) {
+                              const sessionValue = (currentQuestion as any).session;
+                              let cleaned = sessionValue.replace(/^\(|\)$/g, '').trim();
+                              if (!/session/i.test(cleaned) && /^\d+$/.test(cleaned)) {
+                                cleaned = `Session ${cleaned}`;
+                              }
+                              if (cleaned) {
+                                parts.push(cleaned);
+                              }
+                            }
+                            
+                            return parts.join(' / ');
+                          })()}
+                        </h1>
+                        {(lecture?.title || lecture?.specialty?.name) && (
+                          <span className="text-xs md:text-sm text-gray-500 dark:text-gray-400 mt-0.5">
+                            {lecture?.specialty?.name ? `${lecture.specialty.name}${lecture?.title ? ' • ' : ''}` : ''}{lecture?.title || ''}
+                          </span>
+                        )}
+                        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 mt-1">
+                          <Star className="w-4 h-4 text-yellow-500" />
+                          <span>Question épinglée • {currentQuestionIndex + 1} sur {questions.length}</span>
+                        </div>
                       </div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">
-                        Question {currentQuestionIndex + 1} sur {questions.length}
+                      <div className="flex items-center gap-2 flex-wrap justify-end">
+                        {/* Pin button for current question */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={isPinned ? handleUnpinQuestion : handlePinQuestion}
+                          className="whitespace-nowrap backdrop-blur-sm bg-white/90 dark:bg-gray-800/90 border border-gray-200/60 dark:border-gray-700/60 rounded-xl shadow-md"
+                        >
+                          {isPinned ? (
+                            <PinOff className="h-4 w-4 mr-2" />
+                          ) : (
+                            <Pin className="h-4 w-4 mr-2" />
+                          )}
+                          <span className="hidden sm:inline">{isPinned ? 'Détacher' : 'Épingler'}</span>
+                        </Button>
+                        
+                        {/* Report button for current question */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setIsReportDialogOpen(true)}
+                          className="whitespace-nowrap backdrop-blur-sm bg-white/90 dark:bg-gray-800/90 border border-gray-200/60 dark:border-gray-700/60 rounded-xl shadow-md"
+                        >
+                          <Flag className="h-4 w-4 mr-2" />
+                          <span className="hidden sm:inline">Signaler</span>
+                        </Button>
+                        
+                        {/* Admin Dialog for other actions */}
+                        {(user?.role === 'admin' || user?.role === 'maintainer') && (
+                          <Dialog open={openAdminDialog} onOpenChange={setOpenAdminDialog}>
+                            <DialogTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="whitespace-nowrap backdrop-blur-sm bg-white/90 dark:bg-gray-800/90 border border-gray-200/60 dark:border-gray-700/60 rounded-xl shadow-md"
+                              >
+                                <Settings className="h-4 w-4 mr-2" />
+                                <span className="hidden sm:inline">Admin</span>
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-md">
+                              <DialogHeader>
+                                <DialogTitle>Actions administrateur</DialogTitle>
+                              </DialogHeader>
+                              <div className="grid gap-3 py-4">
+                                {/* Current Question Actions */}
+                                {currentQuestion && (
+                                  <>
+                                    <div className="text-sm text-gray-600 dark:text-gray-400 font-medium border-b pb-2 mb-2">
+                                      Question actuelle
+                                    </div>
+                                    
+                                    <Button
+                                      variant="outline"
+                                      onClick={() => {
+                                        setIsEditDialogOpen(true);
+                                        setOpenAdminDialog(false);
+                                      }}
+                                      className="justify-start"
+                                    >
+                                      <Pencil className="h-4 w-4 mr-2" />
+                                      Modifier la question
+                                    </Button>
+                                    
+                                    {user?.role === 'admin' && (
+                                      <Button
+                                        variant="outline"
+                                        onClick={async () => {
+                                          if (!confirm('Supprimer cette question ?')) return
+                                          try {
+                                            await fetch(`/api/questions/${currentQuestion.id}`, {
+                                              method: 'DELETE',
+                                              credentials: 'include'
+                                            })
+                                            toast({
+                                              title: "Question supprimée",
+                                              description: "La question a été supprimée avec succès.",
+                                            })
+                                            // Remove from questions list and navigate
+                                            const updatedQuestions = questions.filter(q => q.id !== currentQuestion.id)
+                                            setQuestions(updatedQuestions)
+                                            if (updatedQuestions.length === 0) {
+                                              setIsTestComplete(true)
+                                            } else if (currentQuestionIndex >= updatedQuestions.length) {
+                                              setCurrentQuestionIndex(updatedQuestions.length - 1)
+                                            }
+                                            setOpenAdminDialog(false);
+                                          } catch (error) {
+                                            toast({
+                                              title: "Erreur",
+                                              description: "Échec de la suppression de la question.",
+                                              variant: "destructive",
+                                            })
+                                          }
+                                        }}
+                                        className="justify-start text-destructive hover:text-destructive"
+                                      >
+                                        <Trash2 className="h-4 w-4 mr-2" />
+                                        Supprimer la question
+                                      </Button>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+                        )}
+                        
+                        {/* Timer at the very right */}
+                        <LectureTimer lectureId={lectureId} />
                       </div>
                     </div>
-                    
-                    <h2 className="text-lg font-semibold mb-6 text-gray-900 dark:text-gray-100">
-                      {currentQuestion.text}
-                    </h2>
-
-                    {currentQuestion.type === 'mcq' && currentQuestion.options ? (
-                      <div className="space-y-3">
-                        {currentQuestion.options.map((option, index) => (
-                          <Button
-                            key={option.id}
-                            variant={selectedAnswer === option.text ? "default" : "outline"}
-                            className="w-full justify-start p-4 h-auto text-left"
-                            onClick={() => {
-                              setSelectedAnswer(option.text)
-                              handleAnswerSelect(option.text)
-                            }}
-                          >
-                            <div className="flex items-center gap-3">
-                              <span className="font-medium">
-                                {String.fromCharCode(65 + index)}.
-                              </span>
-                              <span>{option.text}</span>
-                            </div>
-                          </Button>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        <Button
-                          variant={selectedAnswer === 'true' ? "default" : "outline"}
-                          className="w-full justify-start p-4 h-auto"
-                          onClick={() => {
-                            setSelectedAnswer('true')
-                            handleAnswerSelect('true')
-                          }}
-                        >
-                          <CheckCircle className="w-5 h-5 mr-3" />
-                          Vrai
-                        </Button>
-                        <Button
-                          variant={selectedAnswer === 'false' ? "default" : "outline"}
-                          className="w-full justify-start p-4 h-auto"
-                          onClick={() => {
-                            setSelectedAnswer('false')
-                            handleAnswerSelect('false')
-                          }}
-                        >
-                          <XCircle className="w-5 h-5 mr-3" />
-                          Faux
-                        </Button>
-                      </div>
-                    )}
+                    {/* Blue divider like in target page */}
+                    <div className="h-1 bg-blue-500 dark:bg-blue-600 rounded w-[250px]" />
                   </div>
+
+                  {/* Use the actual MCQQuestion component like in the target page */}
+                  {currentQuestion.type === 'mcq' ? (
+                    <MCQQuestion
+                      key={currentQuestion.id}
+                      question={currentQuestion}
+                      onSubmit={(selectedOptionIds: string[], isCorrect: boolean) => {
+                        // Handle the submission
+                        if (!questionStartTime) return
+                        
+                        const timeSpent = new Date().getTime() - questionStartTime.getTime()
+                        const newAnswer: TestAnswer = {
+                          questionId: currentQuestion.id,
+                          answer: selectedOptionIds.join(','),
+                          isCorrect,
+                          timeSpent
+                        }
+                        
+                        setAnswers(prev => [...prev, newAnswer])
+                        setAnsweredQuestions(prev => new Set(prev).add(currentQuestion.id))
+                      }}
+                      onNext={handleNextQuestion}
+                      lectureId={lectureId}
+                      lectureTitle={lecture?.title}
+                      specialtyName={lecture?.specialty?.name}
+                      isAnswered={combinedAnswers[currentQuestion.id] !== undefined}
+                      answerResult={combinedResults[currentQuestion.id]}
+                      userAnswer={combinedAnswers[currentQuestion.id]}
+                      onQuestionUpdate={handleQuestionUpdate}
+                      highlightConfirm={true}
+                      hideMeta={false}
+                      enableOptionHighlighting={true}
+                      showNotesAfterSubmit={combinedAnswers[currentQuestion.id] !== undefined}
+                    />
+                  ) : (
+                    <OpenQuestion
+                      key={currentQuestion.id}
+                      question={currentQuestion}
+                      onSubmit={(answer: string, resultValue: boolean | 'partial') => {
+                        // Handle the submission
+                        if (!questionStartTime) return
+                        
+                        const timeSpent = new Date().getTime() - questionStartTime.getTime()
+                        const newAnswer: TestAnswer = {
+                          questionId: currentQuestion.id,
+                          answer: answer,
+                          isCorrect: resultValue === true,
+                          timeSpent
+                        }
+                        
+                        setAnswers(prev => [...prev, newAnswer])
+                        setAnsweredQuestions(prev => new Set(prev).add(currentQuestion.id))
+                      }}
+                      onNext={handleNextQuestion}
+                      lectureId={lectureId}
+                      lectureTitle={lecture?.title}
+                      specialtyName={lecture?.specialty?.name}
+                      isAnswered={combinedAnswers[currentQuestion.id] !== undefined}
+                      answerResult={combinedResults[currentQuestion.id]}
+                      userAnswer={combinedAnswers[currentQuestion.id] as string}
+                      onQuestionUpdate={handleQuestionUpdate}
+                      highlightConfirm={true}
+                      hideMeta={false}
+                      enableAnswerHighlighting={true}
+                      showNotesAfterSubmit={combinedAnswers[currentQuestion.id] !== undefined}
+                    />
+                  )}
                 </div>
               )}
 
@@ -413,12 +787,13 @@ export default function QuestionsEpingleesTestPage() {
               <QuestionControlPanel
                 questions={questions}
                 currentQuestionIndex={currentQuestionIndex}
-                answers={{}}
-                answerResults={{}}
+                answers={combinedAnswers}
+                answerResults={combinedResults}
                 onQuestionSelect={(index: number) => setCurrentQuestionIndex(index)}
                 onPrevious={() => setCurrentQuestionIndex(Math.max(0, currentQuestionIndex - 1))}
                 onNext={handleNextQuestion}
                 isComplete={false}
+                onQuit={handleQuit}
               />
             </div>
           </div>
@@ -428,16 +803,39 @@ export default function QuestionsEpingleesTestPage() {
             <QuestionControlPanel
               questions={questions}
               currentQuestionIndex={currentQuestionIndex}
-              answers={{}}
-              answerResults={{}}
+              answers={combinedAnswers}
+              answerResults={combinedResults}
               onQuestionSelect={(index: number) => setCurrentQuestionIndex(index)}
               onPrevious={() => setCurrentQuestionIndex(Math.max(0, currentQuestionIndex - 1))}
               onNext={handleNextQuestion}
               isComplete={false}
+              onQuit={handleQuit}
             />
           </div>
         </div>
       </div>
+      
+      {/* Dialogs */}
+      {currentQuestion && (
+        <>
+          <QuestionEditDialog
+            question={currentQuestion}
+            isOpen={isEditDialogOpen}
+            onOpenChange={setIsEditDialogOpen}
+            onQuestionUpdated={() => {
+              // Reload questions after update
+              window.location.reload()
+            }}
+          />
+          
+          <ReportQuestionDialog
+            question={currentQuestion}
+            lectureId={lectureId!}
+            isOpen={isReportDialogOpen}
+            onOpenChange={setIsReportDialogOpen}
+          />
+        </>
+      )}
     </ProtectedRoute>
   )
 }

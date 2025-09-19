@@ -62,7 +62,19 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
 	try {
 		const body = await req.json();
-		const { userId, questionId, notes, highlights, attempts, lastScore, incrementAttempts, notesImageUrls } = body || {};
+				 const { userId, questionId, notes, highlights, attempts, lastScore, incrementAttempts, notesImageUrls } = body || {};
+				 console.log('POST /api/user-question-state payload:', {
+					 userId,
+					 questionId,
+					 notes,
+					 highlights,
+					 highlightsType: typeof highlights,
+					 highlightsIsArray: Array.isArray(highlights),
+					 attempts,
+					 lastScore,
+					 incrementAttempts,
+					 notesImageUrls
+				 });
 		if (!userId || !questionId) {
 			return NextResponse.json({ error: 'userId and questionId are required' }, { status: 400 });
 		}
@@ -90,44 +102,46 @@ export async function POST(req: Request) {
 				.slice(0,6)
 			: [];
 
-		// Always use raw SQL for maximum compatibility
-		try {
-			const result = await prisma.$transaction(async (tx) => {
-				const existing = await tx.$queryRaw<Array<any>>`SELECT id FROM question_user_data WHERE user_id = ${userId}::uuid AND question_id = ${questionId}::uuid LIMIT 1`;
-				
-				if (existing.length === 0) {
-					// Check if notes_image_urls column exists before including it
-					const hasImagesCol = await tx.$queryRaw<Array<any>>`SELECT 1 FROM information_schema.columns WHERE table_name='question_user_data' AND column_name='notes_image_urls' LIMIT 1`;
-					
-					if (hasImagesCol.length > 0) {
-						await tx.$executeRaw`
-							INSERT INTO question_user_data (user_id, question_id, notes, highlights, attempts, "lastScore", notes_image_urls) 
-							VALUES (${userId}::uuid, ${questionId}::uuid, ${notes ?? null}, ${highlights ?? null}, ${(nextAttempts ?? 0)}, ${lastScore ?? null}, ${sanitizedImages}::text[])
-						`;
-					} else {
-						await tx.$executeRaw`
-							INSERT INTO question_user_data (user_id, question_id, notes, highlights, attempts, "lastScore") 
-							VALUES (${userId}::uuid, ${questionId}::uuid, ${notes ?? null}, ${highlights ?? null}, ${(nextAttempts ?? 0)}, ${lastScore ?? null})
-						`;
-					}
-				} else {
-					// Update existing
-					const hasImagesCol = await tx.$queryRaw<Array<any>>`SELECT 1 FROM information_schema.columns WHERE table_name='question_user_data' AND column_name='notes_image_urls' LIMIT 1`;
-					
-					if (hasImagesCol.length > 0) {
-						await tx.$executeRaw`
-							UPDATE question_user_data 
-							SET notes = ${notes ?? null}, highlights = ${highlights ?? null}, attempts = ${(nextAttempts ?? attempts ?? 0)}, "lastScore" = ${lastScore ?? null}, notes_image_urls = ${sanitizedImages}::text[], updated_at = NOW() 
-							WHERE user_id = ${userId}::uuid AND question_id = ${questionId}::uuid
-						`;
-					} else {
-						await tx.$executeRaw`
-							UPDATE question_user_data 
-							SET notes = ${notes ?? null}, highlights = ${highlights ?? null}, attempts = ${(nextAttempts ?? attempts ?? 0)}, "lastScore" = ${lastScore ?? null}, updated_at = NOW() 
-							WHERE user_id = ${userId}::uuid AND question_id = ${questionId}::uuid
-						`;
-					}
-				}
+		   // Always use raw SQL for maximum compatibility
+		   // Serialize highlights as a single JSON value (not array type)
+		   const highlightsJson = highlights !== undefined ? JSON.stringify(highlights) : null;
+		   try {
+			   const result = await prisma.$transaction(async (tx) => {
+				   const existing = await tx.$queryRaw<Array<any>>`SELECT id FROM question_user_data WHERE user_id = ${userId}::uuid AND question_id = ${questionId}::uuid LIMIT 1`;
+               
+				   if (existing.length === 0) {
+					   // Check if notes_image_urls column exists before including it
+					   const hasImagesCol = await tx.$queryRaw<Array<any>>`SELECT 1 FROM information_schema.columns WHERE table_name='question_user_data' AND column_name='notes_image_urls' LIMIT 1`;
+                   
+					   if (hasImagesCol.length > 0) {
+						   await tx.$executeRaw`
+							   INSERT INTO question_user_data (user_id, question_id, notes, highlights, attempts, "lastScore", notes_image_urls) 
+							   VALUES (${userId}::uuid, ${questionId}::uuid, ${notes ?? null}, ${highlightsJson}::jsonb, ${(nextAttempts ?? 0)}, ${lastScore ?? null}, ${sanitizedImages}::text[])
+						   `;
+					   } else {
+						   await tx.$executeRaw`
+							   INSERT INTO question_user_data (user_id, question_id, notes, highlights, attempts, "lastScore") 
+							   VALUES (${userId}::uuid, ${questionId}::uuid, ${notes ?? null}, ${highlightsJson}::jsonb, ${(nextAttempts ?? 0)}, ${lastScore ?? null})
+						   `;
+					   }
+				   } else {
+					   // Update existing
+					   const hasImagesCol = await tx.$queryRaw<Array<any>>`SELECT 1 FROM information_schema.columns WHERE table_name='question_user_data' AND column_name='notes_image_urls' LIMIT 1`;
+                   
+					   if (hasImagesCol.length > 0) {
+						   await tx.$executeRaw`
+							   UPDATE question_user_data 
+							   SET notes = ${notes ?? null}, highlights = ${highlightsJson}::jsonb, attempts = ${(nextAttempts ?? attempts ?? 0)}, "lastScore" = ${lastScore ?? null}, notes_image_urls = ${sanitizedImages}::text[], updated_at = NOW() 
+							   WHERE user_id = ${userId}::uuid AND question_id = ${questionId}::uuid
+						   `;
+					   } else {
+						   await tx.$executeRaw`
+							   UPDATE question_user_data 
+							   SET notes = ${notes ?? null}, highlights = ${highlightsJson}::jsonb, attempts = ${(nextAttempts ?? attempts ?? 0)}, "lastScore" = ${lastScore ?? null}, updated_at = NOW() 
+							   WHERE user_id = ${userId}::uuid AND question_id = ${questionId}::uuid
+						   `;
+					   }
+				   }
 				
 				// Return the updated/created row
 				const hasImagesCol = await tx.$queryRaw<Array<any>>`SELECT 1 FROM information_schema.columns WHERE table_name='question_user_data' AND column_name='notes_image_urls' LIMIT 1`;
@@ -154,10 +168,10 @@ export async function POST(req: Request) {
 			});
 			
 			return NextResponse.json(result);
-		} catch (sqlErr: any) {
-			console.error('POST user-question-state SQL error', sqlErr?.message);
-			return NextResponse.json({ error: 'Database error' }, { status: 500 });
-		}
+		   } catch (sqlErr: any) {
+			   console.error('POST user-question-state SQL error', sqlErr);
+			   return NextResponse.json({ error: 'Database error', detail: sqlErr?.message || sqlErr }, { status: 500 });
+		   }
 	} catch (e) {
 		console.error('POST user-question-state error', e);
 		return NextResponse.json({ error: 'Internal error' }, { status: 500 });

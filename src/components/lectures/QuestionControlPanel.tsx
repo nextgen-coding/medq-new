@@ -35,6 +35,7 @@ interface QuestionControlPanelProps {
   pinnedIds?: string[]; // optional list of pinned question IDs
   organizerState?: Record<ColumnKey, OrganizerEntry[]> | null; // optional organizer override
   onQuit?: () => void; // optional quit handler
+  mode?: string | null; // mode to determine display behavior
 }
 
 export function QuestionControlPanel({
@@ -48,7 +49,8 @@ export function QuestionControlPanel({
   isComplete,
   pinnedIds = [],
   organizerState,
-  onQuit
+  onQuit,
+  mode
 }: QuestionControlPanelProps) {
   const { t } = useTranslation();
   const { user } = useAuth();
@@ -180,6 +182,8 @@ export function QuestionControlPanel({
     const idsToFetch = regularQuestionIds.filter((id) => notesMap[id] === undefined);
     if (idsToFetch.length === 0) return;
 
+    console.log('QuestionControlPanel: Fetching notes for question IDs:', idsToFetch);
+
     const controller = new AbortController();
 
     (async () => {
@@ -188,24 +192,31 @@ export function QuestionControlPanel({
           idsToFetch.map(async (id) => {
             try {
               const res = await fetch(`/api/user-question-state?userId=${encodeURIComponent(user.id)}&questionId=${encodeURIComponent(id)}` , { signal: controller.signal });
-              if (!res.ok) return [id, false] as [string, boolean];
+              if (!res.ok) {
+                console.log(`QuestionControlPanel: API call failed for question ${id}, status: ${res.status}`);
+                return [id, false] as [string, boolean];
+              }
               const data = await res.json();
               const hasNote = !!(data?.notes && String(data.notes).trim().length > 0);
+              console.log(`QuestionControlPanel: Notes for question ${id}:`, { hasNote, notes: data?.notes, data });
               return [id, hasNote] as [string, boolean];
-            } catch {
+            } catch (error) {
+              console.log(`QuestionControlPanel: Error fetching notes for question ${id}:`, error);
               return [id, false] as [string, boolean];
             }
           })
         );
+        console.log('QuestionControlPanel: Setting notes map with results:', results);
         setNotesMap((prev) => {
           const next = { ...prev };
           results.forEach(([id, has]) => {
             next[id] = has;
           });
+          console.log('QuestionControlPanel: Updated notes map:', next);
           return next;
         });
-      } catch {
-        // ignore
+      } catch (error) {
+        console.log('QuestionControlPanel: Error in notes fetching:', error);
       }
     })();
 
@@ -330,6 +341,7 @@ export function QuestionControlPanel({
       
       isCurrent = actualIndex === currentQuestionIndex && !isComplete;
       const hasNote = notesMap[entry.id] === true;
+      console.log(`QuestionControlPanel: Entry ${entry.id}, hasNote: ${hasNote}, notesMap value: ${notesMap[entry.id]}, notesMap keys:`, Object.keys(notesMap));
       const isPinned = pinnedIds.includes(entry.id);
 
       return (
@@ -396,7 +408,9 @@ export function QuestionControlPanel({
                   animate={isCurrent ? { scale: 1.08 } : { scale: 1 }}
                   transition={{ type: 'spring', stiffness: 180, damping: 18 }}
                 >
-                  {isAnswered ? (
+                  {mode === 'revision' ? (
+                    <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                  ) : isAnswered ? (
                     isCorrect === true ? (
                       <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
                     ) : isCorrect === 'partial' ? (
@@ -673,7 +687,9 @@ export function QuestionControlPanel({
                         animate={isCurrent ? { scale: 1.08 } : { scale: 1 }}
                         transition={{ type: 'spring', stiffness: 180, damping: 18 }}
                       >
-                        {isAnswered ? (
+                        {mode === 'revision' ? (
+                          <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                        ) : isAnswered ? (
                           isCorrect === true ? (
                             <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
                           ) : isCorrect === 'partial' ? (
@@ -778,7 +794,9 @@ export function QuestionControlPanel({
                         {anyPinned && <Pin className="h-4 w-4 text-pink-600 dark:text-pink-400" />}
                         {allHidden && <EyeOff className="h-4 w-4 text-red-500" />}
                         <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-700">
-                        {isAnswered ? (
+                        {mode === 'revision' ? (
+                          <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                        ) : isAnswered ? (
                           isCorrect === true ? (
                             <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
                           ) : isCorrect === 'partial' ? (

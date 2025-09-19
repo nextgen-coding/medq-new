@@ -35,6 +35,8 @@ export default function LecturePageRoute() {
   const { user } = useAuth()
   const [openQuestionsDialog, setOpenQuestionsDialog] = useState(false)
   const [openOrganizer, setOpenOrganizer] = useState(false)
+  // Notes visibility state
+  const [showAllNotes, setShowAllNotes] = useState(false)
   
   const lectureId = params?.lectureId as string
   const specialtyId = params?.specialtyId as string

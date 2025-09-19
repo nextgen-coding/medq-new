@@ -313,8 +313,8 @@ export function useLecture(lectureId: string | undefined, mode?: string | null) 
         } catch {}
         console.error('Failed lecture fetch', { lectureId, status: response.status, serverMsg });
         toast({
-          title: 'Lecture load failed',
-          description: serverMsg || `Request failed with status ${response.status}`,
+          title: 'Échec du chargement du cours',
+          description: serverMsg || `La requête a échoué avec le statut ${response.status}`,
           variant: 'destructive'
         });
         // Redirect only on 404 (not found / access) or 401
@@ -353,8 +353,8 @@ export function useLecture(lectureId: string | undefined, mode?: string | null) 
     } catch (error) {
       console.error('Error fetching lecture data:', error);
       toast({
-        title: "Error",
-        description: "Failed to load lecture information. Please try again.",
+  title: "Erreur",
+  description: "Impossible de charger les informations du cours. Veuillez réessayer.",
         variant: "destructive",
       });
       router.push('/dashboard');

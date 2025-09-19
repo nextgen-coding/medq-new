@@ -273,9 +273,9 @@ export default function SpecialtyPageRoute() {
       <ProtectedRoute>
         <AppSidebarProvider>
           <AppSidebar />
-          <SidebarInset className="flex-1 flex flex-col">
+          <SidebarInset className="flex flex-col min-h-0">
             <UniversalHeader title="Chargement..." hideSeparator />
-            <div className="flex-1 bg-gray-50 dark:bg-gray-900 p-4 lg:p-6 overflow-hidden">
+            <div className="bg-gray-50 dark:bg-gray-900 p-4 lg:p-6 overflow-hidden">
               <div className="max-w-7xl mx-auto h-full flex flex-col gap-6">
                 {/* HEADER CARD */}
                 <div className="rounded-2xl border border-gray-200/60 dark:border-gray-800 bg-white/70 dark:bg-gray-800/60 backdrop-blur-sm p-5 lg:p-6 flex flex-col gap-6 animate-fade-in">
@@ -383,9 +383,9 @@ export default function SpecialtyPageRoute() {
       <ProtectedRoute>
         <AppSidebarProvider>
           <AppSidebar />
-          <SidebarInset className="flex-1 flex flex-col">
+          <SidebarInset className="flex flex-col min-h-0">
             <UniversalHeader title="Matière introuvable" />
-            <div className="flex-1 bg-gray-50 dark:bg-gray-900 p-8">
+            <div className="bg-gray-50 dark:bg-gray-900 p-8">
               <p>Matière introuvable</p>
             </div>
           </SidebarInset>
@@ -486,32 +486,32 @@ export default function SpecialtyPageRoute() {
     <ProtectedRoute>
       <AppSidebarProvider>
         <AppSidebar />
-        <SidebarInset className="flex-1 flex flex-col">
+        <SidebarInset className="flex flex-col min-h-0 overflow-x-hidden">
           <UniversalHeader title={specialty.name} />
 
-          <div className="flex-1 bg-gray-50 dark:bg-gray-900 p-4 sm:p-6 lg:p-8">
-            <div className="max-w-7xl mx-auto space-y-6">
+          <div className="bg-gray-50 dark:bg-gray-900 p-4 sm:p-6 lg:p-8 min-w-0 overflow-x-hidden">
+            <div className="max-w-7xl mx-auto space-y-6 min-w-0">
               {/* Breadcrumb */}
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+              <div className="flex items-center gap-4 min-w-0">
+                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 min-w-0 flex-1">
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => router.push('/matieres')}
-                    className="flex items-center gap-1 px-2 py-1 h-auto hover:bg-gray-100 dark:hover:bg-gray-700"
+                    className="flex items-center gap-1 px-2 py-1 h-auto hover:bg-gray-100 dark:hover:bg-gray-700 flex-shrink-0"
                   >
                     <ArrowLeft className="h-3 w-3" />
                     Matières
                   </Button>
-                  <span>/</span>
-                  <span className="text-gray-900 dark:text-gray-100 font-medium">{specialty.name}</span>
+                  <span className="flex-shrink-0">/</span>
+                  <span className="text-gray-900 dark:text-gray-100 font-medium truncate">{specialty.name}</span>
                 </div>
                 {isAdmin && (
                   <Button 
                     variant="outline" 
                     size="sm" 
                     onClick={handleEdit} 
-                    className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-100 transition-colors"
+                    className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-100 transition-colors flex-shrink-0"
                   >
                     <Edit className="w-4 h-4" />
                     Modifier
@@ -520,24 +520,24 @@ export default function SpecialtyPageRoute() {
               </div>
 
               {/* Overview */}
-              <Card className="bg-white dark:bg-gray-800 shadow-sm">
-                <CardContent className="p-6">
-                  <div className="mb-4">
-                    <div className="flex-1">
+              <Card className="bg-white dark:bg-gray-800 shadow-sm min-w-0">
+                <CardContent className="p-6 min-w-0">
+                  <div className="mb-4 min-w-0">
+                    <div className="flex-1 min-w-0">
                       {specialty.description && (
-                        <p className="text-gray-600 dark:text-gray-400 mb-4">{specialty.description}</p>
+                        <p className="text-gray-600 dark:text-gray-400 mb-4 min-w-0">{specialty.description}</p>
                       )}
 
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 min-w-0">
+                        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 min-w-0">
                           <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{specialty.progress?.totalLectures || 0}</div>
                           <div className="text-sm text-blue-600 dark:text-blue-400">Cours totaux</div>
                         </div>
-                        <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4">
+                        <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 min-w-0">
                           <div className="text-2xl font-bold text-green-700 dark:text-green-300">{specialty.progress?.completedLectures || 0}</div>
                           <div className="text-sm text-green-600 dark:text-green-400">Terminés</div>
                         </div>
-                        <div className="bg-medblue-50 dark:bg-medblue-900/20 rounded-lg p-4">
+                        <div className="bg-medblue-50 dark:bg-medblue-900/20 rounded-lg p-4 min-w-0">
                           <div className="text-2xl font-bold text-medblue-700 dark:text-medblue-300">{Math.round(specialty.progress?.questionProgress || 0)}%</div>
                           <div className="text-sm text-medblue-600 dark:text-medblue-400">Progression</div>
                         </div>
@@ -560,11 +560,11 @@ export default function SpecialtyPageRoute() {
 
               {/* Group Management */}
               {isAdmin && (
-                <Card className="bg-white dark:bg-gray-800 shadow-sm">
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Gestion des groupes de cours</h3>
-                      <Button onClick={() => setIsGroupManagementOpen(!isGroupManagementOpen)} variant="outline" size="sm" className="bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-100 transition-colors">
+                <Card className="bg-white dark:bg-gray-800 shadow-sm min-w-0">
+                  <CardContent className="p-4 min-w-0">
+                    <div className="flex items-center justify-between mb-4 min-w-0">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 truncate">Gestion des groupes de cours</h3>
+                      <Button onClick={() => setIsGroupManagementOpen(!isGroupManagementOpen)} variant="outline" size="sm" className="bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-100 transition-colors flex-shrink-0">
                         <Settings className="w-4 h-4 mr-2" />
                         {isGroupManagementOpen ? 'Masquer' : 'Gérer les groupes'}
                       </Button>
@@ -572,22 +572,22 @@ export default function SpecialtyPageRoute() {
 
                     {isGroupManagementOpen && (
                       <div className="space-y-4">
-                        <div className="flex gap-2">
-                          <Input placeholder="Nom du nouveau groupe..." value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} className="flex-1" />
-                          <Button onClick={createGroup} disabled={!newGroupName.trim()} className="bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                        <div className="flex gap-2 min-w-0">
+                          <Input placeholder="Nom du nouveau groupe..." value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} className="flex-1 min-w-0" />
+                          <Button onClick={createGroup} disabled={!newGroupName.trim()} className="bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0">
                             <Plus className="w-4 h-4 mr-2" />
                             Créer un groupe
                           </Button>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 min-w-0">
                           {Object.keys(courseGroups).map((groupName) => (
-                            <div key={groupName} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                              <div className="flex items-center gap-2">
-                                <Folder className="w-4 h-4 text-blue-600" />
-                                <span className="font-medium">{groupName}</span>
-                                <Badge variant="secondary" className="text-xs">{courseGroups[groupName].length}</Badge>
+                            <div key={groupName} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg min-w-0">
+                              <div className="flex items-center gap-2 min-w-0 flex-1">
+                                <Folder className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                                <span className="font-medium truncate">{groupName}</span>
+                                <Badge variant="secondary" className="text-xs flex-shrink-0">{courseGroups[groupName].length}</Badge>
                               </div>
-                              <Button variant="ghost" size="sm" onClick={() => deleteGroup(groupName)} className="h-8 w-8 p-0 text-red-600 hover:bg-red-50">
+                              <Button variant="ghost" size="sm" onClick={() => deleteGroup(groupName)} className="h-8 w-8 p-0 text-red-600 hover:bg-red-50 flex-shrink-0">
                                 <Trash className="w-3 h-3" />
                               </Button>
                             </div>
@@ -600,93 +600,98 @@ export default function SpecialtyPageRoute() {
               )}
 
               {/* Search and Filter */}
-              <div className="flex gap-4 items-center">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
-                  <Input placeholder="Rechercher des cours..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 bg-white dark:bg-gray-800" />
+              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center min-w-0">
+                <div className="relative flex-1 w-full min-w-0">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4 flex-shrink-0" />
+                  <Input placeholder="Rechercher des cours..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 bg-white dark:bg-gray-800 min-w-0" />
                 </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-100 transition-colors">
-                      <Filter className="w-4 h-4" />
-                      Filtrer
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => setSelectedFilter('all')}>Tous les cours</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setSelectedFilter('completed')}>Terminés</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setSelectedFilter('in-progress')}>En cours</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setSelectedFilter('not-started')}>Non commencés</DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-100 transition-colors">
-                      <ArrowUpDown className="w-4 h-4" />
-                      {(() => {
-                        if (sortOption === 'default') return 'Trier';
-                        const dirArrow = sortDirection === 'asc' ? '↑' : '↓';
-                        if (sortOption === 'name') return `Nom ${dirArrow}`;
-                        if (sortOption === 'note') return `Note ${dirArrow}`;
-                        if (sortOption === 'lastAccessed') return `Accès ${dirArrow}`;
-                        return 'Trier';
-                      })()}
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-48">
-                    <DropdownMenuItem onClick={() => { setSortOption('default'); setSortDirection('asc'); }}>Par défaut</DropdownMenuItem>
-                    <div className="px-2 py-1 text-xs text-gray-500">Nom</div>
-                    <DropdownMenuItem onClick={() => { setSortOption('name'); setSortDirection('asc'); }}>Nom A→Z</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => { setSortOption('name'); setSortDirection('desc'); }}>Nom Z→A</DropdownMenuItem>
-                    <div className="px-2 pt-2 pb-1 text-xs text-gray-500">Note /20</div>
-                    <DropdownMenuItem onClick={() => { setSortOption('note'); setSortDirection('desc'); }}>Note haute→basse</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => { setSortOption('note'); setSortDirection('asc'); }}>Note basse→haute</DropdownMenuItem>
-                    <div className="px-2 pt-2 pb-1 text-xs text-gray-500">Dernier accès</div>
-                    <DropdownMenuItem onClick={() => { setSortOption('lastAccessed'); setSortDirection('desc'); }}>Plus récent</DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => { setSortOption('lastAccessed'); setSortDirection('asc'); }}>Plus ancien</DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <div className="flex gap-2 w-full sm:w-auto min-w-0">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-100 transition-colors flex-1 sm:flex-none min-w-0">
+                        <Filter className="w-4 h-4 flex-shrink-0" />
+                        <span className="truncate">Filtrer</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => setSelectedFilter('all')}>Tous les cours</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setSelectedFilter('completed')}>Terminés</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setSelectedFilter('in-progress')}>En cours</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setSelectedFilter('not-started')}>Non commencés</DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-100 transition-colors flex-1 sm:flex-none min-w-0">
+                        <ArrowUpDown className="w-4 h-4 flex-shrink-0" />
+                        <span className="truncate">
+                          {(() => {
+                            if (sortOption === 'default') return 'Trier';
+                            const dirArrow = sortDirection === 'asc' ? '↑' : '↓';
+                            if (sortOption === 'name') return `Nom ${dirArrow}`;
+                            if (sortOption === 'note') return `Note ${dirArrow}`;
+                            if (sortOption === 'lastAccessed') return `Accès ${dirArrow}`;
+                            return 'Trier';
+                          })()}
+                        </span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuItem onClick={() => { setSortOption('default'); setSortDirection('asc'); }}>Par défaut</DropdownMenuItem>
+                      <div className="px-2 py-1 text-xs text-gray-500">Nom</div>
+                      <DropdownMenuItem onClick={() => { setSortOption('name'); setSortDirection('asc'); }}>Nom A→Z</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => { setSortOption('name'); setSortDirection('desc'); }}>Nom Z→A</DropdownMenuItem>
+                      <div className="px-2 pt-2 pb-1 text-xs text-gray-500">Note /20</div>
+                      <DropdownMenuItem onClick={() => { setSortOption('note'); setSortDirection('desc'); }}>Note haute→basse</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => { setSortOption('note'); setSortDirection('asc'); }}>Note basse→haute</DropdownMenuItem>
+                      <div className="px-2 pt-2 pb-1 text-xs text-gray-500">Dernier accès</div>
+                      <DropdownMenuItem onClick={() => { setSortOption('lastAccessed'); setSortDirection('desc'); }}>Plus récent</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => { setSortOption('lastAccessed'); setSortDirection('asc'); }}>Plus ancien</DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
 
               {/* Lectures table */}
-              <Card className="bg-white dark:bg-gray-800 shadow-sm">
-                <CardContent className="p-0">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        {isAdmin && (
-                          <TableHead className="w-8">
-                            <Checkbox
-                              aria-label="Tout sélectionner"
-                              checked={(() => {
-                                const ids = [...ungroupedLectures, ...Object.values(groupedLectures).flat()].map(l => l.id)
-                                return ids.length > 0 && ids.every(id => selectedCourseIds[id])
-                              })()}
-                              onCheckedChange={(checked) => {
-                                const allIds = [...ungroupedLectures, ...Object.values(groupedLectures).flat()].map(l => l.id)
-                                const next: Record<string, boolean> = { ...selectedCourseIds }
-                                allIds.forEach(id => { next[id] = !!checked })
-                                setSelectedCourseIds(next)
-                              }}
-                            />
-                          </TableHead>
-                        )}
-                        <TableHead>Cours</TableHead>
-                        {isAdmin && <TableHead>Rapports</TableHead>}
-                        <TableHead>Note /20</TableHead>
-                        <TableHead className="w-64">Progression</TableHead>
-                        <TableHead>Commentaires</TableHead>
-                        <TableHead>Action</TableHead>
-                      </TableRow>
-                    </TableHeader>
+              <Card className="bg-white dark:bg-gray-800 shadow-sm min-w-0">
+                <CardContent className="p-0 min-w-0">
+                  <div className="overflow-x-auto w-full min-w-0 -mx-2 px-2 sm:mx-0 sm:px-0">
+                    <Table className="min-w-full w-full">
+                      <TableHeader>
+                        <TableRow>
+                          {isAdmin && (
+                            <TableHead className="w-8">
+                              <Checkbox
+                                aria-label="Tout sélectionner"
+                                checked={(() => {
+                                  const ids = [...ungroupedLectures, ...Object.values(groupedLectures).flat()].map(l => l.id)
+                                  return ids.length > 0 && ids.every(id => selectedCourseIds[id])
+                                })()}
+                                onCheckedChange={(checked) => {
+                                  const allIds = [...ungroupedLectures, ...Object.values(groupedLectures).flat()].map(l => l.id)
+                                  const next: Record<string, boolean> = { ...selectedCourseIds }
+                                  allIds.forEach(id => { next[id] = !!checked })
+                                  setSelectedCourseIds(next)
+                                }}
+                              />
+                            </TableHead>
+                          )}
+                          <TableHead className="min-w-0">Cours</TableHead>
+                          {isAdmin && <TableHead className="hidden lg:table-cell min-w-0">Rapports</TableHead>}
+                          <TableHead className="hidden md:table-cell min-w-0">Note /20</TableHead>
+                          <TableHead className="min-w-0 w-20 sm:w-24 md:w-32 lg:w-40">Progression</TableHead>
+                          <TableHead className="hidden xl:table-cell min-w-0">Commentaires</TableHead>
+                          <TableHead className="min-w-0 w-16 sm:w-20 md:w-24">Action</TableHead>
+                        </TableRow>
+                      </TableHeader>
                     <TableBody>
                       {isAdmin && Object.values(selectedCourseIds).some(v => v) && (
                         <TableRow className="bg-blue-50/40 dark:bg-blue-900/10">
-                          <TableCell colSpan={isAdmin ? 7 : 5}>
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm text-gray-700 dark:text-gray-300 mr-2">Affecter en masse au groupe :</span>
+                          <TableCell colSpan={isAdmin ? 6 : 5} className="p-4 min-w-0">
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 min-w-0">
+                              <span className="text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap flex-shrink-0">Affecter en masse au groupe :</span>
                               <Select onValueChange={(v) => v && bulkAssignToGroup(v)}>
-                                <SelectTrigger className="w-56">
+                                <SelectTrigger className="w-full sm:w-56 min-w-0">
                                   <SelectValue placeholder="Choisir un groupe" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -695,7 +700,7 @@ export default function SpecialtyPageRoute() {
                                   ))}
                                 </SelectContent>
                               </Select>
-                              <Button variant="ghost" size="sm" onClick={() => setSelectedCourseIds({})} className="bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-100 transition-colors">Effacer la sélection</Button>
+                              <Button variant="ghost" size="sm" onClick={() => setSelectedCourseIds({})} className="bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-100 transition-colors whitespace-nowrap flex-shrink-0">Effacer la sélection</Button>
                             </div>
                           </TableCell>
                         </TableRow>
@@ -715,15 +720,15 @@ export default function SpecialtyPageRoute() {
                           )}
                           <TableCell>
                             <div className="flex items-center gap-2">
-                              <File className="w-4 h-4 text-gray-500" />
-                              <div>
-                                <div className="font-medium">{lecture.title}</div>
-                                <div className="text-sm text-gray-500">{lecture.description}</div>
+                              <File className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                              <div className="min-w-0 flex-1">
+                                <div className="font-medium truncate">{lecture.title}</div>
+                                <div className="text-sm text-gray-500 truncate">{lecture.description}</div>
                               </div>
                             </div>
                           </TableCell>
                           {isAdmin && (
-                            <TableCell>
+                            <TableCell className="hidden lg:table-cell">
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -736,7 +741,7 @@ export default function SpecialtyPageRoute() {
                               </Button>
                             </TableCell>
                           )}
-                          <TableCell>
+                          <TableCell className="hidden md:table-cell">
                             {(() => {
                               const note = lecture.culmonNote;
                               if (note == null || isNaN(note)) return <span className="text-xs text-gray-400">-</span>;
@@ -748,13 +753,13 @@ export default function SpecialtyPageRoute() {
                               );
                             })()}
                           </TableCell>
-                          <TableCell className="w-64">
+                          <TableCell className="min-w-0 w-20 sm:w-24 md:w-32 lg:w-40">
                             <div className="space-y-1">
                               <div className="flex justify-between text-sm">
                                 <span>{Math.round(lecture.progress?.percentage || 0)}%</span>
-                                <span className="text-xs text-gray-500">{lecture.progress?.completedQuestions || 0}/{lecture.progress?.totalQuestions || 0}</span>
+                                <span className="text-xs text-gray-500 hidden md:inline">{lecture.progress?.completedQuestions || 0}/{lecture.progress?.totalQuestions || 0}</span>
                               </div>
-                              <div className="relative h-2 w-56 overflow-hidden rounded-full bg-gray-200">
+                              <div className="relative h-2 w-full overflow-hidden rounded-full bg-gray-200">
                                 {(() => {
                                   const total = lecture.progress?.totalQuestions || 1
                                   const correct = lecture.progress?.correctAnswers || 0
@@ -774,7 +779,7 @@ export default function SpecialtyPageRoute() {
                               </div>
                             </div>
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="hidden xl:table-cell">
                             <Button
                               variant="ghost"
                               size="sm"
@@ -790,15 +795,15 @@ export default function SpecialtyPageRoute() {
                               </span>
                             </Button>
                           </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
+                          <TableCell className="min-w-0 w-16 sm:w-20 md:w-24">
+                            <div className="flex items-center gap-1 sm:gap-2">
                               <Button
                                 size="sm"
                                 onClick={() => goToLectureMode(lecture.id)}
-                                className="h-8 bg-sky-500 hover:bg-sky-600 text-white"
+                                className="h-8 bg-sky-500 hover:bg-sky-600 text-white text-xs px-1 sm:px-2 md:px-3"
                               >
-                                <Play className="w-4 h-4 mr-1" />
-                                {getModeLabel(getLectureMode(lecture.id))}
+                                <Play className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                                <span className="hidden sm:inline md:inline">{getModeLabel(getLectureMode(lecture.id))}</span>
                               </Button>
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
@@ -808,7 +813,7 @@ export default function SpecialtyPageRoute() {
                                     size="icon"
                                     className="h-8 w-8 rounded-md bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-100 transition-colors"
                                   >
-                                    <ChevronDown className="w-4 h-4" />
+                                    <ChevronDown className="w-3 h-3 sm:w-4 sm:h-4" />
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
@@ -825,12 +830,12 @@ export default function SpecialtyPageRoute() {
                       {/* Grouped rows */}
                       {Object.entries(groupedLectures).map(([groupName, glist]) => [
                         <TableRow key={`group-${groupName}`} className="bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-700/50">
-                          <TableCell colSpan={isAdmin ? 7 : 5}>
-                            <Button variant="ghost" onClick={() => setExpandedGroups(prev => ({ ...prev, [groupName]: !prev[groupName] }))} className="flex items-center gap-2 p-0 h-auto font-medium text-gray-900 dark:text-gray-100">
-                              <Folder className="w-4 h-4 text-blue-600" />
+                          <TableCell colSpan={isAdmin ? 6 : 5} className="p-4 min-w-0">
+                            <Button variant="ghost" onClick={() => setExpandedGroups(prev => ({ ...prev, [groupName]: !prev[groupName] }))} className="flex items-center gap-2 p-0 h-auto font-medium text-gray-900 dark:text-gray-100 min-w-0 w-full">
+                              <Folder className="w-4 h-4 text-blue-600 flex-shrink-0" />
                               {expandedGroups[groupName] ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                              {groupName}
-                              <Badge variant="secondary" className="ml-2">{glist.length} cours</Badge>
+                              <span className="truncate flex-1 min-w-0">{groupName}</span>
+                              <Badge variant="secondary" className="ml-2 flex-shrink-0">{glist.length} cours</Badge>
                             </Button>
                           </TableCell>
                         </TableRow>,
@@ -846,16 +851,16 @@ export default function SpecialtyPageRoute() {
                                </TableCell>
                             )}
                             <TableCell>
-                              <div className="flex items-center gap-2 pl-6">
-                                <File className="w-4 h-4 text-gray-500" />
-                                <div>
-                                  <div className="font-medium">{lecture.title}</div>
-                                  <div className="text-sm text-gray-500">{lecture.description}</div>
+                              <div className="flex items-center gap-2 pl-4 sm:pl-6">
+                                <File className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                                <div className="min-w-0 flex-1">
+                                  <div className="font-medium truncate">{lecture.title}</div>
+                                  <div className="text-sm text-gray-500 truncate">{lecture.description}</div>
                                 </div>
                               </div>
                             </TableCell>
                             {isAdmin && (
-                              <TableCell>
+                              <TableCell className="hidden lg:table-cell">
                                 <Button variant="ghost" size="sm" onClick={() => router.push(`/admin/reports?lectureId=${lecture.id}`)} className="flex items-center gap-2 hover:bg-orange-50 dark:hover:bg-orange-900/20">
                                   <AlertTriangle className="w-4 h-4 text-orange-600" />
                                   <span className="font-medium">{lecture.reportsCount || 0}</span>
@@ -863,7 +868,7 @@ export default function SpecialtyPageRoute() {
                                 </Button>
                               </TableCell>
                             )}
-                            <TableCell>
+                            <TableCell className="hidden md:table-cell">
                               {(() => {
                                 const note = (lecture as any).culmonNote;
                                 if (note == null || isNaN(note)) return <span className="text-xs text-gray-400">-</span>;
@@ -875,14 +880,14 @@ export default function SpecialtyPageRoute() {
                                 );
                               })()}
                             </TableCell>
-                            <TableCell className="w-64">
+                            <TableCell className="min-w-0 w-20 sm:w-24 md:w-32 lg:w-40">
                               <div className="space-y-1">
                                 <div className="flex justify-between text-sm">
                                   <span>{Math.round(lecture.progress?.percentage || 0)}%</span>
-                                  <span className="text-xs text-gray-500">{lecture.progress?.completedQuestions || 0}/{lecture.progress?.totalQuestions || 0}</span>
+                                  <span className="text-xs text-gray-500 hidden md:inline">{lecture.progress?.completedQuestions || 0}/{lecture.progress?.totalQuestions || 0}</span>
                                 </div>
                                 {/* Three-color progress bar with real data */}
-                                <div className="relative h-2 w-56 overflow-hidden rounded-full bg-gray-200">
+                                <div className="relative h-2 w-full overflow-hidden rounded-full bg-gray-200">
                                   {(() => {
                                     const total = lecture.progress?.totalQuestions || 1;
                                     const correct = lecture.progress?.correctAnswers || 0;
@@ -922,7 +927,7 @@ export default function SpecialtyPageRoute() {
                                 </div>
                             </div>
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="hidden xl:table-cell">
                             <Button
                               variant="ghost"
                               size="sm"
@@ -938,15 +943,15 @@ export default function SpecialtyPageRoute() {
                               </span>
                             </Button>
                           </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
+                          <TableCell className="min-w-0 w-16 sm:w-20 md:w-24">
+                            <div className="flex items-center gap-1 sm:gap-2">
                               <Button
                                 size="sm"
                                 onClick={() => goToLectureMode(lecture.id)}
-                                className="h-8 bg-sky-500 hover:bg-sky-600 text-white"
+                                className="h-8 bg-sky-500 hover:bg-sky-600 text-white text-xs px-1 sm:px-2 md:px-3"
                               >
-                                <Play className="w-4 h-4 mr-1" />
-                                {getModeLabel(getLectureMode(lecture.id))}
+                                <Play className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                                <span className="hidden sm:inline md:inline">{getModeLabel(getLectureMode(lecture.id))}</span>
                               </Button>
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
@@ -956,7 +961,7 @@ export default function SpecialtyPageRoute() {
                                     size="icon"
                                     className="h-8 w-8 rounded-md bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-100 transition-colors"
                                   >
-                                    <ChevronDown className="w-4 h-4" />
+                                    <ChevronDown className="w-3 h-3 sm:w-4 sm:h-4" />
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
@@ -972,10 +977,13 @@ export default function SpecialtyPageRoute() {
                       ].flat())}
                     </TableBody>
                   </Table>
+                  </div>
                 </CardContent>
               </Card>
             </div>
           </div>
+
+         </SidebarInset>
 
           {/* Lecture Comments Modal */}
           <Dialog open={!!commentsLectureId} onOpenChange={(open) => { if (!open) setCommentsLectureId(null) }}>
@@ -990,7 +998,6 @@ export default function SpecialtyPageRoute() {
           </Dialog>
 
            <EditSpecialtyDialog specialty={specialty} isOpen={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} onSpecialtyUpdated={handleSpecialtyUpdated} />
-         </SidebarInset>
        </AppSidebarProvider>
      </ProtectedRoute>
    )

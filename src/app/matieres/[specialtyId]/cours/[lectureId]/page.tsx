@@ -52,6 +52,8 @@ export default function CoursPageRoute() {
   const [openClinicalCaseEdit, setOpenClinicalCaseEdit] = useState(false)
   const [openGroupedQrocEdit, setOpenGroupedQrocEdit] = useState(false)
   const [openGroupedMcqEdit, setOpenGroupedMcqEdit] = useState(false)
+  // Notes visibility state
+  const [showAllNotes, setShowAllNotes] = useState(false)
   
   const lectureId = params?.lectureId as string
   const specialtyId = params?.specialtyId as string
@@ -115,19 +117,11 @@ export default function CoursPageRoute() {
     }
   }
 
-  if (isLoading) {
-    return (
-      <ProtectedRoute>
-        <div className="min-h-screen bg-gradient-to-br from-blue-50/50 via-white to-blue-50/50 dark:from-blue-950/20 dark:via-gray-900 dark:to-blue-950/20">
-          <div className="container mx-auto px-4 py-6">
-             <LectureLoadingState />
-          </div>
-        </div>
-      </ProtectedRoute>
-    );
-  }
 
-  if (!lecture) {
+  // Always render the page layout, but show skeletons for question area and icons while loading
+
+
+  if (!isLoading && !lecture) {
     return (
       <ProtectedRoute>
         <div className="min-h-screen bg-gradient-to-br from-blue-50/50 via-white to-blue-50/50 dark:from-blue-950/20 dark:via-gray-900 dark:to-blue-950/20">
@@ -168,7 +162,7 @@ export default function CoursPageRoute() {
               questions={questions}
               answers={answers}
               answerResults={answerResults}
-              lectureTitle={lecture.title}
+              lectureTitle={lecture ? lecture.title : ''}
               lectureId={lectureId}
             />
           </div>
@@ -185,6 +179,10 @@ export default function CoursPageRoute() {
     if (currentQuestionIndex > 0) {
       setCurrentQuestionIndex(currentQuestionIndex - 1);
     }
+  };
+
+  const handleNotesVisibilityChange = (showAll: boolean) => {
+    setShowAllNotes(showAll);
   };
 
   const handleMCQSubmit = (selectedOptionIds: string[], isCorrect: boolean) => {
@@ -518,6 +516,7 @@ export default function CoursPageRoute() {
       }
       return (
         <ClinicalCaseQuestion
+          key={`case-${clinicalCase.caseNumber}`}
           clinicalCase={clinicalCase}
           onSubmit={handleClinicalCaseComplete}
           onNext={handleNext}
@@ -555,6 +554,7 @@ export default function CoursPageRoute() {
   if (currentQuestion.type === 'mcq') {
       return (
         <MCQQuestion
+          key={currentQuestion.id}
           question={currentQuestion}
           onSubmit={handleMCQSubmit}
           onNext={handleNext}
@@ -569,11 +569,13 @@ export default function CoursPageRoute() {
           hideMeta
           enableOptionHighlighting={true}
           hideActions={revisionMode}
+          showNotesAfterSubmit={isAnswered}
         />
       );
     } else {
       return (
         <OpenQuestion
+          key={currentQuestion.id}
           question={currentQuestion}
           onSubmit={handleOpenSubmit}
           onNext={handleNext}
@@ -588,6 +590,7 @@ export default function CoursPageRoute() {
           hideMeta={(currentQuestion as any).type === 'qroc'}
           enableAnswerHighlighting={true}
           hideActions={revisionMode}
+          showNotesAfterSubmit={isAnswered}
         />
       );
     }
@@ -707,7 +710,7 @@ export default function CoursPageRoute() {
                           ) : (
                             <Pin className="h-4 w-4 mr-2" />
                           )}
-                          <span className="hidden sm:inline">{isPinned ? 'Unpin' : 'Pin'}</span>
+                          <span className="hidden sm:inline">{isPinned ? 'Détacher' : 'Épingler'}</span>
                         </Button>
                       )}
                       
@@ -880,6 +883,8 @@ export default function CoursPageRoute() {
                 isComplete={isComplete}
                 pinnedIds={pinnedQuestionIds}
                 onQuit={handleBackToSpecialtyNested}
+                mode={mode}
+                // onNotesVisibilityChange and showAllNotes removed
               />
             </div>
           </div>
@@ -897,6 +902,8 @@ export default function CoursPageRoute() {
               isComplete={isComplete}
               pinnedIds={pinnedQuestionIds}
               onQuit={handleBackToSpecialtyNested}
+              mode={mode}
+              // onNotesVisibilityChange and showAllNotes removed
             />
           </div>
             

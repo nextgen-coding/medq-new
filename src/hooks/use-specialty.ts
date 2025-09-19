@@ -38,8 +38,8 @@ export function useSpecialty(specialtyId: string | undefined) {
         setSpecialty(null);
         setLectures([]);
         toast({
-          title: "Specialty not found",
-          description: "The requested specialty could not be found.",
+          title: "Spécialité introuvable",
+          description: "La spécialité demandée est introuvable.",
           variant: "destructive",
         });
       } else {
@@ -67,8 +67,8 @@ export function useSpecialty(specialtyId: string | undefined) {
     } catch (error: any) {
       console.error('Error fetching data:', error);
       toast({
-        title: "Error",
-        description: "Failed to load specialty information. Please try again.",
+  title: "Erreur",
+  description: "Impossible de charger les informations de la spécialité. Veuillez réessayer.",
         variant: "destructive",
       });
       // Only navigate away if we're on the specialty page

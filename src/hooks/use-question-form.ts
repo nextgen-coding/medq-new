@@ -68,8 +68,8 @@ export function useQuestionForm({ lectureId, editQuestionId, onComplete }: UseQu
     } catch (error) {
       console.error('Error fetching question:', error);
       toast({
-        title: "Error loading question",
-        description: "Failed to load question data. Please try again.",
+  title: "Erreur lors du chargement de la question",
+  description: "Impossible de charger les données de la question. Veuillez réessayer.",
         variant: "destructive",
       });
     }

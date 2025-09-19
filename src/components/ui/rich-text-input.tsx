@@ -61,17 +61,17 @@ export function RichTextInput({
       if (res && res[0]) {
         insertImageAtCursor(res[0].url, res[0].name);
         toast({
-          title: 'Image ajoutée',
-          description: 'L\'image a été téléchargée et insérée dans le texte.',
+    title: 'Image ajoutée',
+    description: "L'image a été téléchargée et insérée dans le texte.",
         });
       }
     },
     onUploadError: (error: Error) => {
       console.error("Upload error:", error);
       toast({
-        title: 'Erreur d\'upload',
-        description: error.message || 'Impossible d\'ajouter l\'image.',
-        variant: 'destructive',
+  title: 'Erreur lors du téléversement',
+  description: error.message || "Impossible d'ajouter l'image.",
+  variant: 'destructive',
       });
     },
   });
@@ -152,52 +152,37 @@ export function RichTextInput({
     const editor = editorRef.current;
     if (!editor) return value;
     
-    let result = '';
+    let content = '';
     
-    const processNode = (node: Node): string => {
+    const processNode = (node: Node): void => {
       if (node.nodeType === Node.TEXT_NODE) {
-        return node.textContent || '';
+        // Remove zero-width spaces that we use for cursor positioning
+        const text = (node.textContent || '').replace(/\u200B/g, '');
+        content += text;
       } else if (node.nodeType === Node.ELEMENT_NODE) {
         const el = node as HTMLElement;
-        const tagName = el.tagName.toLowerCase();
-        
-        // Handle line breaks
-        if (tagName === 'br') {
-          return '\n';
-        }
-        
-        // Handle div elements (usually created by Enter key)
-        if (tagName === 'div') {
-          let content = '';
-          el.childNodes.forEach(child => {
-            content += processNode(child);
-          });
-          // Add newline after div content (except for the first div if it's at the start)
-          return content + '\n';
-        }
         
         // Handle image elements
         if (el.dataset.imageId) {
-          return `[IMAGE:${el.dataset.imageId}]`;
+          content += `[IMAGE:${el.dataset.imageId}]`;
+          return;
         }
         
-        // Handle other elements - process their children
-        let content = '';
-        el.childNodes.forEach(child => {
-          content += processNode(child);
-        });
-        return content;
+        // Handle line breaks
+        if (el.tagName.toLowerCase() === 'br') {
+          content += '\n';
+          return;
+        }
+        
+        // For other elements, just process their children
+        el.childNodes.forEach(child => processNode(child));
       }
-      return '';
     };
     
-    editor.childNodes.forEach((node, index) => {
-      const content = processNode(node);
-      result += content;
-    });
+    editor.childNodes.forEach(node => processNode(node));
     
-    // Clean up: remove trailing newline and normalize multiple newlines
-    return result.replace(/\n+$/, '').replace(/\n{3,}/g, '\n\n');
+    // Clean up: normalize multiple newlines but preserve intended line breaks
+    return content.replace(/\n{3,}/g, '\n\n');
   }, [value]);
 
   // Hoisted: update image width so both renderer & cursor insertion can use it
@@ -316,28 +301,7 @@ export function RichTextInput({
     const editor = editorRef.current;
     if (!editor) return;
     if (lastRenderedValueRef.current === value) return; // no-op if unchanged
-    // Preserve selection to avoid caret jump
-    let selStart: number | null = null;
-    let selEnd: number | null = null;
-    const selection = window.getSelection();
-    if (selection && selection.rangeCount > 0 && editor.contains(selection.anchorNode)) {
-      const range = selection.getRangeAt(0);
-      // Helper to compute offset within editor
-      const getOffset = (container: Node, offset: number) => {
-        const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT, null);
-        let pos = 0;
-        while (walker.nextNode()) {
-          const node = walker.currentNode as Text;
-            if (node === container) {
-              return pos + offset;
-            }
-            pos += node.nodeValue?.length || 0;
-        }
-        return pos;
-      };
-      selStart = getOffset(range.startContainer, range.startOffset);
-      selEnd = getOffset(range.endContainer, range.endOffset);
-    }
+    
     editor.innerHTML = '';
     if (!value) { lastRenderedValueRef.current = ''; return; }
     const regex = /\[IMAGE:([^\]]+)\]/g;
@@ -362,32 +326,8 @@ export function RichTextInput({
       }
     }
     lastRenderedValueRef.current = value;
-    // Restore selection if we had it
-    if (selStart !== null && selEnd !== null && document.activeElement === editor) {
-      const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT, null);
-      let pos = 0; let startNode: Text | null = null; let startOffset = 0; let endNode: Text | null = null; let endOffset = 0;
-      while (walker.nextNode()) {
-        const node = walker.currentNode as Text;
-        const len = node.nodeValue?.length || 0;
-        if (!startNode && selStart <= pos + len) {
-          startNode = node;
-          startOffset = Math.max(0, selStart - pos);
-        }
-        if (!endNode && selEnd <= pos + len) {
-          endNode = node;
-          endOffset = Math.max(0, selEnd - pos);
-          break;
-        }
-        pos += len;
-      }
-      if (startNode && endNode) {
-        const newRange = document.createRange();
-        newRange.setStart(startNode, startOffset);
-        newRange.setEnd(endNode, endOffset);
-        selection?.removeAllRanges();
-        selection?.addRange(newRange);
-      }
-    }
+    // Don't restore selection to avoid cursor jumping issues
+    // Let natural typing behavior handle cursor positioning
   }, [value, createImageElement]);
 
   // Editing existing image metadata (placed early so dependent callbacks can use it)
@@ -486,18 +426,18 @@ export function RichTextInput({
   const handleImageUpload = useCallback(async (file: File) => {
     if (!file.type.startsWith('image/')) {
       toast({
-        title: 'Type de fichier non supporté',
-        description: 'Veuillez sélectionner une image.',
-        variant: 'destructive',
+  title: 'Type de fichier non supporté',
+  description: 'Veuillez sélectionner une image.',
+  variant: 'destructive',
       });
       return;
     }
 
     if (file.size > maxImageSize) {
       toast({
-        title: 'Image trop volumineuse',
-        description: `La taille maximum est de ${Math.round(maxImageSize / (1024 * 1024))}MB.`,
-        variant: 'destructive',
+  title: 'Image trop volumineuse',
+  description: `La taille maximale est de ${Math.round(maxImageSize / (1024 * 1024))}MB.`,
+  variant: 'destructive',
       });
       return;
     }
@@ -505,7 +445,7 @@ export function RichTextInput({
     try {
       // Show loading state
       toast({
-        title: 'Upload en cours',
+        title: 'Téléversement en cours',
         description: 'Veuillez patienter...',
       });
 
@@ -516,7 +456,7 @@ export function RichTextInput({
       console.error('Error uploading image:', error);
       toast({
         title: 'Erreur',
-        description: error instanceof Error ? error.message : 'Impossible d\'ajouter l\'image.',
+        description: error instanceof Error ? error.message : "Impossible d'ajouter l'image.",
         variant: 'destructive',
       });
     }
@@ -563,7 +503,11 @@ export function RichTextInput({
   useEffect(() => {
     if (!useInlineImages) return;
     if (internalUpdateRef.current) return; // skip internal programmatic updates
-    renderEditorFromValue();
+    // Only render if this is truly an external value change, not from user typing
+    const editor = editorRef.current;
+    if (editor && document.activeElement !== editor) {
+      renderEditorFromValue();
+    }
   }, [useInlineImages, value, images, renderEditorFromValue]);
 
   // Selection preservation helpers (treat each image span as a single token)
@@ -635,6 +579,16 @@ export function RichTextInput({
   const pendingUpdateRef = useRef<number | null>(null);
   const savedSelectionRef = useRef<{ start: number; end: number } | null>(null);
 
+  const handleEditorKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    
+    if (e.key === 'Enter') {
+      // Let the default behavior handle the newline naturally
+      // Don't prevent default - let browser handle it
+      return;
+    }
+  }, []);
+
   const handleEditorInput = useCallback((e: React.FormEvent<HTMLDivElement> | React.FocusEvent<HTMLDivElement>) => {
     if (!useInlineImages) return;
     e.stopPropagation();
@@ -652,17 +606,13 @@ export function RichTextInput({
       const newVal = reconstructValueFromEditor();
       if (newVal !== value) {
         onChange(newVal);
-      } else {
-        // No external change; restore selection immediately
-        restoreSelectionOffsets(savedSelectionRef.current);
       }
+      // Don't aggressively restore selection - let natural typing flow
       setTimeout(() => {
         internalUpdateRef.current = false;
-        // After potential parent re-render, try restoration again
-        restoreSelectionOffsets(savedSelectionRef.current);
       }, 0);
     });
-  }, [useInlineImages, getSelectionOffsets, reconstructValueFromEditor, value, onChange, restoreSelectionOffsets]);
+  }, [useInlineImages, getSelectionOffsets, reconstructValueFromEditor, value, onChange]);
 
   const renderPreview = () => {
     if (!value && !images.length) return null;
@@ -787,9 +737,7 @@ export function RichTextInput({
               e.target.style.unicodeBidi = 'plaintext'; 
             }}
             onClick={(e) => { e.stopPropagation(); }}
-            onKeyDown={(e) => {
-              e.stopPropagation();
-            }}
+            onKeyDown={handleEditorKeyDown}
             role="textbox"
             aria-multiline="true"
             data-placeholder={placeholder}

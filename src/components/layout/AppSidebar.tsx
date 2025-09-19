@@ -19,7 +19,7 @@ import {
   useSidebar
 } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
-import { LayoutDashboard, UserCircle, Settings, Users, LogOut, BookOpen, Moon, Sun, FileText, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, UserCircle, Users, LogOut, BookOpen, Moon, Sun, FileText, AlertTriangle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
@@ -38,7 +38,6 @@ export function AppSidebar() {
     { label: t('sidebar.exercices', { defaultValue: 'Exercices' }), icon: BookOpen, href: '/matieres' },
     { label: t('sidebar.sessions', { defaultValue: 'Sessions' }), icon: FileText, href: '/session' },
     { label: t('sidebar.profile', { defaultValue: 'Profil' }), icon: UserCircle, href: '/profile' },
-    { label: t('sidebar.settings', { defaultValue: 'Paramètres' }), icon: Settings, href: '/settings' },
   ];
 
   const adminItem = isAdmin ? { label: t('sidebar.admin', { defaultValue: 'Administration' }), icon: Users, href: '/admin' } : null;
@@ -269,8 +268,8 @@ export function AppSidebar() {
 
 export function AppSidebarProvider({ children }: { children: React.ReactNode }) {
   return (
-    <SidebarProvider className="w-full">
-      <div className="flex min-h-screen w-full">
+    <SidebarProvider className="w-full min-h-0">
+      <div className="flex w-full min-h-0">
         {children}
       </div>
     </SidebarProvider>

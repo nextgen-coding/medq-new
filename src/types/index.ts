@@ -1,18 +1,15 @@
 
-export type Niveau = {
-  id: string;
-  name: string;
-  order: number;
-};
-
 export type User = {
   id: string;
   email: string;
   role: 'student' | 'maintainer' | 'admin';
   name?: string;
   image?: string;
+  faculty?: string | null;
   password?: string;
   passwordUpdatedAt?: string;
+  // Social login fields
+  google_id?: string;
   // Profile fields
   sexe?: 'M' | 'F';
   niveauId?: string;
@@ -32,6 +29,8 @@ export type User = {
     order: number;
     niveauId: string;
   };
+  // Highlight color for souligner
+  highlightColor?: string | null;
 };
 
 export type Specialty = {
