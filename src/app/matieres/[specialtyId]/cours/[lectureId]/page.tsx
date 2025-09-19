@@ -52,6 +52,8 @@ export default function CoursPageRoute() {
   const [openClinicalCaseEdit, setOpenClinicalCaseEdit] = useState(false)
   const [openGroupedQrocEdit, setOpenGroupedQrocEdit] = useState(false)
   const [openGroupedMcqEdit, setOpenGroupedMcqEdit] = useState(false)
+  // Notes visibility state
+  const [showAllNotes, setShowAllNotes] = useState(false)
   
   const lectureId = params?.lectureId as string
   const specialtyId = params?.specialtyId as string
@@ -185,6 +187,10 @@ export default function CoursPageRoute() {
     if (currentQuestionIndex > 0) {
       setCurrentQuestionIndex(currentQuestionIndex - 1);
     }
+  };
+
+  const handleNotesVisibilityChange = (showAll: boolean) => {
+    setShowAllNotes(showAll);
   };
 
   const handleMCQSubmit = (selectedOptionIds: string[], isCorrect: boolean) => {
@@ -886,6 +892,8 @@ export default function CoursPageRoute() {
                 pinnedIds={pinnedQuestionIds}
                 onQuit={handleBackToSpecialtyNested}
                 mode={mode}
+                onNotesVisibilityChange={handleNotesVisibilityChange}
+                showAllNotes={showAllNotes}
               />
             </div>
           </div>
@@ -904,6 +912,8 @@ export default function CoursPageRoute() {
               pinnedIds={pinnedQuestionIds}
               onQuit={handleBackToSpecialtyNested}
               mode={mode}
+              onNotesVisibilityChange={handleNotesVisibilityChange}
+              showAllNotes={showAllNotes}
             />
           </div>
             
