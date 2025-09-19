@@ -12,6 +12,7 @@
     "db:update-specialties": "dotenv -e .env.local -- tsx scripts/update-specialties-niveau.ts"
   },
   "dependencies": {
+    "@ai-sdk/azure": "^2.0.0",
     "@hookform/resolvers": "^3.9.0",
     "@prisma/client": "^6.14.0",
     "@radix-ui/react-accordion": "^1.2.0",
@@ -46,6 +47,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/uuid": "^10.0.0",
     "@uploadthing/react": "^7.3.2",
+    "ai": "^5.0.47",
     "aos": "^2.3.4",
     "bcryptjs": "^3.0.2",
     "chart.js": "^4.5.0",

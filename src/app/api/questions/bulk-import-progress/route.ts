@@ -126,6 +126,17 @@ const canonicalizeHeader = (h: string): string => {
   return headerAliases[n] ?? n;
 };
 
+// Strict specialty (matiere) sanitizer: keep letters/digits/spaces, drop symbols, collapse spaces
+function sanitizeSpecialtyName(input: string): string {
+  const s = String(input || '')
+    .normalize('NFC')
+    // Keep latin letters with accents + digits + spaces
+    .replace(/[^A-Za-zÀ-ÖØ-öø-ÿ0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return s;
+}
+
 // Deprecated: we no longer extract/remove image URLs from text.
 // Images embedded as URLs remain in the question text and will be rendered on the frontend.
 
@@ -342,10 +353,21 @@ async function processFile(file: File, importId: string) {
             rowData[h] = String((row as unknown[])[idx] ?? '').trim();
           });
 
+          // Skip fully empty rows (do not count as failures)
+          const isCompletelyEmpty = (row as unknown[]).every(cell => String(cell ?? '').trim() === '');
+          if (isCompletelyEmpty) {
+            importStats.total--; // adjust total to exclude this blank row
+            updateProgress(importId, progress, `Skipping empty row ${i + 1} in ${sheetName}...`);
+            continue;
+          }
+
           // Build basic fields with forward-fill: use last seen values if cells are empty
           let specialtyName = rowData['matiere'] || lastSpecialtyName;
+          if (specialtyName) {
+            specialtyName = sanitizeSpecialtyName(specialtyName);
+          }
           let lectureTitle = rowData['cours'] || lastLectureTitle;
-          if (rowData['matiere']) lastSpecialtyName = rowData['matiere'];
+          if (rowData['matiere']) lastSpecialtyName = sanitizeSpecialtyName(rowData['matiere']);
           if (rowData['cours']) lastLectureTitle = rowData['cours'];
 
           // Determine question text (keep any image URLs inline inside the text)
@@ -401,7 +423,7 @@ async function processFile(file: File, importId: string) {
                 semestersCache.set(`${niveauId}:${created.name.toLowerCase()}`, sem);
                 updateProgress(importId, 25, `Created semester: ${name}`, `✅ Created semester: ${name}`);
               }
-              semesterId = sem.id;
+              // (no per-sheet branching here)
             }
           }
 
@@ -511,7 +533,7 @@ async function processFile(file: File, importId: string) {
             mediaUrl?: string | null;
             mediaType?: string | null;
             type?: string;
-            options?: string[] | null;
+            options?: any[] | null;
             correctAnswers?: string[];
             caseNumber?: number | null;
             caseText?: string | null;
@@ -555,7 +577,20 @@ async function processFile(file: File, importId: string) {
             case 'qcm': {
               const { options, correctAnswers } = parseMCQOptions(rowData);
               questionData.type = 'mcq';
-              questionData.options = options;
+              // Build options as objects with per-option explanations if available
+              {
+                const letters = ['a','b','c','d','e'];
+                const opts = options.map((text, idx) => {
+                  const expKey = `explication ${letters[idx]}`;
+                  const exp = rowData[expKey] ? String(rowData[expKey]).trim() : '';
+                  return {
+                    id: String(idx),
+                    text,
+                    ...(exp ? { explanation: exp } : {})
+                  };
+                });
+                questionData.options = opts;
+              }
               questionData.correctAnswers = correctAnswers;
               if (!options || options.length === 0) throw new Error('MCQ missing options');
               if (!correctAnswers || correctAnswers.length === 0) throw new Error('MCQ missing correct answers');
@@ -563,12 +598,15 @@ async function processFile(file: File, importId: string) {
             }
 
             case 'qroc': {
+              // Open question (QROC): text + single correct answer string; rappel handled via courseReminder
               questionData.type = 'qroc';
               {
                 const ans = String(rowData['reponse'] || '').trim();
                 if (!ans) throw new Error('QROC missing answer');
                 questionData.correctAnswers = [ans];
               }
+              // No options for QROC
+              questionData.options = null;
               break;
             }
 
@@ -581,7 +619,20 @@ async function processFile(file: File, importId: string) {
                 return /^PCEM\s*1$/i.test(norm) || /^PCEM\s*2$/i.test(norm) || /^PCEM[12]$/i.test(norm);
               })();
               questionData.type = isPreclinical ? 'mcq' : 'clinic_mcq';
-              questionData.options = casQcmOptions.options;
+              // Build options as objects with per-option explanations if available
+              {
+                const letters = ['a','b','c','d','e'];
+                const opts = casQcmOptions.options.map((text: string, idx: number) => {
+                  const expKey = `explication ${letters[idx]}`;
+                  const exp = rowData[expKey] ? String(rowData[expKey]).trim() : '';
+                  return {
+                    id: String(idx),
+                    text,
+                    ...(exp ? { explanation: exp } : {})
+                  };
+                });
+                questionData.options = opts;
+              }
               questionData.correctAnswers = casQcmOptions.correctAnswers;
               questionData.caseNumber = caseNumber;
               questionData.caseText = caseText;
@@ -621,7 +672,8 @@ async function processFile(file: File, importId: string) {
             type: questionData.type,
             options: questionData.options ?? undefined,
             correctAnswers: questionData.correctAnswers,
-            explanation: buildCombinedExplanation(rowData),
+            // Do not persist global explanation: per-option explanations are embedded in options[]; for QROC, only rappel is used
+            explanation: undefined,
             courseReminder: questionData.courseReminder,
             number: questionData.number,
             session: questionData.session ?? undefined,
