@@ -787,7 +787,7 @@ export function ClinicalCaseQuestion({
                     <Keyboard className="h-3.5 w-3.5 mr-1" />
                     <span>Entrée: Suivant</span>
                   </div>
-                  <div className="w-full sm:w-auto sm:ml-auto flex flex-col sm:flex-row sm:items-center gap-2">
+                  <div className="flex flex-row gap-2 justify-end items-center sm:ml-auto w-full sm:w-auto">
                     <div className="flex items-center sm:mr-4">
                       {(() => {
                         // All MCQs must be correct for "Correcte!", any partial for "Partiellement correcte", else "Incorrecte"
@@ -811,25 +811,25 @@ export function ClinicalCaseQuestion({
                         );
                       })()}
                     </div>
-                    {/* Mes notes button between result and next */}
-
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setShowNotesArea(p => !p);
-                        setNotesManuallyControlled(true);
-                        setTimeout(() => { document.getElementById(`clinical-case-notes-${clinicalCase.caseNumber}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 30);
-                      }}
-                      className={`flex items-center gap-1 ${showNotesArea ? 'bg-blue-100' : ''}`}
-                    >
-                      <StickyNote className={`h-4 w-4 ${notesHasContent ? 'text-yellow-500' : ''}`} />
-                      <span className="hidden sm:inline">{showNotesArea ? 'Fermer les notes' : 'Mes notes'}</span>
-                    </Button>
-                    <Button onClick={onNext} className="group">
-                      <span className="hidden sm:inline">Question suivante</span>
-                      <ChevronRight className="sm:ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
-                    </Button>
+                    <div className="flex flex-row gap-2 items-center">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setShowNotesArea(p => !p);
+                          setNotesManuallyControlled(true);
+                          setTimeout(() => { document.getElementById(`clinical-case-notes-${clinicalCase.caseNumber}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 30);
+                        }}
+                        className={`flex items-center gap-1 ${showNotesArea ? 'bg-blue-100 dark:bg-blue-900/30' : ''}`}
+                      >
+                        <StickyNote className={`h-4 w-4 ${notesHasContent ? 'text-yellow-500' : ''}`} />
+                        <span className="hidden sm:inline">{showNotesArea ? 'Fermer les notes' : 'Mes notes'}</span>
+                      </Button>
+                      <Button onClick={onNext} className="group">
+                        <span className="hidden sm:inline">Question suivante</span>
+                        <ChevronRight className="sm:ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ) : (
