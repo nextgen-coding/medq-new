@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
 // POST /api/course-groups - Create a new course group
 export async function POST(request: NextRequest) {
   try {
-    const { name, specialtyId, userId } = await request.json()
+  const { name, specialtyId, userId, coefficient } = await request.json()
 
     if (!name || !specialtyId || !userId) {
       return NextResponse.json({ error: 'Name, specialty ID, and user ID are required' }, { status: 400 })
@@ -67,6 +67,7 @@ export async function POST(request: NextRequest) {
         name,
         specialtyId,
         createdBy: userId,
+        ...(typeof coefficient === 'number' && !isNaN(coefficient) ? { coefficient } : {})
       },
       include: {
         lectureGroups: {

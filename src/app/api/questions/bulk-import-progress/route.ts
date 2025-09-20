@@ -126,6 +126,20 @@ const canonicalizeHeader = (h: string): string => {
   return headerAliases[n] ?? n;
 };
 
+// All-or-nothing toggle (default ON). Set ALL_OR_NOTHING_IMPORT=0 to revert to row-by-row inserts.
+const ALL_OR_NOTHING = process.env.ALL_OR_NOTHING_IMPORT !== '0';
+
+// Strict specialty (matiere) sanitizer: keep letters/digits/spaces, drop symbols, collapse spaces
+function sanitizeSpecialtyName(input: string): string {
+  const s = String(input || '')
+    .normalize('NFC')
+    // Keep latin letters with accents + digits + spaces
+    .replace(/[^A-Za-zÀ-ÖØ-öø-ÿ0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return s;
+}
+
 // Deprecated: we no longer extract/remove image URLs from text.
 // Images embedded as URLs remain in the question text and will be rendered on the frontend.
 
@@ -217,17 +231,15 @@ async function processFile(file: File, importId: string) {
       errors: [] as string[]
     };
 
-    const createdSpecialties = new Map<string, any>();
-    const createdLectures = new Map<string, any>();
-    const createdCases = new Map<string, any>(); // Track cases by lectureId + caseNumber
-
-    // Preload and cache niveaux and semesters
+    // Preload caches (read-only) for validation phase; creations happen later inside a transaction
     const niveauxCache = new Map<string, { id: string; name: string }>();
     const semestersCache = new Map<string, { id: string; name: string; order: number; niveauId: string }>();
     const allNiveaux = await prisma.niveau.findMany();
     for (const n of allNiveaux) {
       niveauxCache.set(n.name.toLowerCase(), { id: n.id, name: n.name });
       niveauxCache.set(n.name.replace(/\s+/g, '').toLowerCase(), { id: n.id, name: n.name });
+      // Also map compact uppercase
+      niveauxCache.set(n.name.replace(/\s+/g, '').toUpperCase(), { id: n.id, name: n.name });
     }
     const allSemesters = await prisma.semester.findMany();
     for (const s of allSemesters) {
@@ -255,6 +267,40 @@ async function processFile(file: File, importId: string) {
       const n = parseInt(s, 10);
       return Number.isFinite(n) ? n : null;
     };
+
+    // Types for planned insertions (validation-first, then one-shot transaction)
+    type PlannedQuestion = {
+      sheetName: 'qcm' | 'qroc' | 'cas_qcm' | 'cas_qroc';
+      specialtyName: string; // sanitized
+      lectureTitle: string;
+      niveauName?: string | null; // normalized (e.g., PCEM1, DCEM2)
+      semesterOrder?: number | null;
+      questionText: string;
+      hasInlineImage: boolean;
+      questionData: {
+        type: string;
+        text: string;
+        options?: any[] | null;
+        correctAnswers: string[];
+        courseReminder?: string | null;
+        number?: number | null;
+        session?: string | null;
+        mediaUrl?: string | null;
+        mediaType?: string | null;
+        caseNumber?: number | null;
+        caseText?: string | null;
+        caseQuestionNumber?: number | null;
+      }
+    };
+
+    // Accumulators for validation and planning
+    const plannedRows: PlannedQuestion[] = [];
+    const plannedCases = new Set<string>(); // key: specialty|lecture|caseNumber
+    const specialtyNamesSet = new Set<string>();
+    const lectureTitlesBySpecialty = new Map<string, Set<string>>(); // specialty -> titles
+    const niveauxToEnsure = new Set<string>(); // PCEM1, DCEM2...
+    const semestersToEnsure = new Set<string>(); // key: niveauName|order
+    let inlineImageCount = 0;
 
     // Process each sheet
     const sheets = ['qcm', 'qroc', 'cas_qcm', 'cas_qroc'] as const;
@@ -342,10 +388,21 @@ async function processFile(file: File, importId: string) {
             rowData[h] = String((row as unknown[])[idx] ?? '').trim();
           });
 
+          // Skip fully empty rows (do not count as failures)
+          const isCompletelyEmpty = (row as unknown[]).every(cell => String(cell ?? '').trim() === '');
+          if (isCompletelyEmpty) {
+            importStats.total--; // adjust total to exclude this blank row
+            updateProgress(importId, progress, `Skipping empty row ${i + 1} in ${sheetName}...`);
+            continue;
+          }
+
           // Build basic fields with forward-fill: use last seen values if cells are empty
           let specialtyName = rowData['matiere'] || lastSpecialtyName;
+          if (specialtyName) {
+            specialtyName = sanitizeSpecialtyName(specialtyName);
+          }
           let lectureTitle = rowData['cours'] || lastLectureTitle;
-          if (rowData['matiere']) lastSpecialtyName = rowData['matiere'];
+          if (rowData['matiere']) lastSpecialtyName = sanitizeSpecialtyName(rowData['matiere']);
           if (rowData['cours']) lastLectureTitle = rowData['cours'];
 
           // Determine question text (keep any image URLs inline inside the text)
@@ -379,11 +436,8 @@ async function processFile(file: File, importId: string) {
             if (found) {
               niveauId = found.id;
             } else {
-              const created = await prisma.niveau.create({ data: { name: normalized, order: Math.max(1, allNiveaux.length + 1) } });
-              niveauxCache.set(created.name.toLowerCase(), { id: created.id, name: created.name });
-              niveauxCache.set(created.name.replace(/\s+/g, '').toLowerCase(), { id: created.id, name: created.name });
-              niveauId = created.id;
-              updateProgress(importId, 25, `Created niveau: ${created.name}`, `✅ Created niveau: ${created.name}`);
+              // Plan to create niveau later inside transaction
+              niveauxToEnsure.add(normalized);
             }
           }
 
@@ -393,76 +447,20 @@ async function processFile(file: File, importId: string) {
               const keyByOrder = `${niveauId}:order:${order}`;
               let sem = semestersCache.get(keyByOrder);
               if (!sem) {
-                const niveauName = Array.from(niveauxCache.values()).find(n => n.id === niveauId)?.name || 'NIVEAU';
-                const name = `${niveauName} - S${order}`;
-                const created = await prisma.semester.create({ data: { name, order, niveauId } });
-                sem = { id: created.id, name: created.name, order: created.order, niveauId };
-                semestersCache.set(`${niveauId}:order:${order}`, sem);
-                semestersCache.set(`${niveauId}:${created.name.toLowerCase()}`, sem);
-                updateProgress(importId, 25, `Created semester: ${name}`, `✅ Created semester: ${name}`);
+                // Plan to create semester later inside transaction (will need niveau name too)
+                const nvName = Array.from(niveauxCache.values()).find(n => n.id === niveauId)?.name || null;
+                if (nvName) {
+                  semestersToEnsure.add(`${nvName}|${order}`);
+                }
               }
-              semesterId = sem.id;
+              // (no per-sheet branching here)
             }
           }
 
-          // Find or create specialty
-          let specialty = createdSpecialties.get(specialtyName);
-          if (!specialty) {
-            specialty = await prisma.specialty.findFirst({
-              where: { name: specialtyName }
-            });
-            
-            if (!specialty) {
-              specialty = await prisma.specialty.create({
-                data: { 
-                  name: specialtyName,
-                  ...(niveauId ? { niveauId } : {}),
-                  ...(semesterId ? { semesterId } : {})
-                }
-              });
-              importStats.createdSpecialties++;
-              updateProgress(importId, progress, `Created specialty: ${specialtyName}`, `✅ Created specialty: ${specialtyName}`);
-            }
-            // Update existing specialty if it lacks niveau/semester
-            else {
-              const updates: Prisma.SpecialtyUpdateInput = {};
-              if (niveauId && !specialty.niveauId) {
-                (updates as any).niveau = { connect: { id: niveauId } };
-              }
-              if (semesterId && !specialty.semesterId) {
-                (updates as any).semester = { connect: { id: semesterId } };
-              }
-              if (Object.keys(updates).length > 0) {
-                specialty = await prisma.specialty.update({ where: { id: specialty.id }, data: updates });
-                updateProgress(importId, progress, `Updated specialty`, `ℹ️ Linked specialty to niveau/semester`);
-              }
-            }
-            createdSpecialties.set(specialtyName, specialty);
-          }
-
-          // Find or create lecture
-          const lectureKey = `${specialty.id}_${lectureTitle}`;
-          let lecture = createdLectures.get(lectureKey);
-          if (!lecture) {
-            lecture = await prisma.lecture.findFirst({
-              where: { 
-                specialtyId: specialty.id,
-                title: lectureTitle
-              }
-            });
-            
-            if (!lecture) {
-              lecture = await prisma.lecture.create({
-                data: {
-                  specialtyId: specialty.id,
-                  title: lectureTitle
-                }
-              });
-              importStats.createdLectures++;
-              updateProgress(importId, progress, `Created lecture: ${lectureTitle}`, `✅ Created lecture: ${lectureTitle}`);
-            }
-            createdLectures.set(lectureKey, lecture);
-          }
+          // Collect names/titles to lookup/create later
+          specialtyNamesSet.add(specialtyName);
+          if (!lectureTitlesBySpecialty.has(specialtyName)) lectureTitlesBySpecialty.set(specialtyName, new Set());
+          lectureTitlesBySpecialty.get(specialtyName)!.add(lectureTitle);
 
           // Handle clinical cases
           let caseNumber = null;
@@ -482,12 +480,10 @@ async function processFile(file: File, importId: string) {
             })();
 
             if (!isPreclinical && caseNumber && caseText) {
-              // Check if this case already exists in our tracking
-              const caseKey = `${lecture.id}_${caseNumber}`;
-              if (!createdCases.has(caseKey)) {
-                createdCases.set(caseKey, { caseNumber, caseText });
-                importStats.createdCases++;
-                updateProgress(importId, progress, `Created case ${caseNumber}`, `✅ Created clinical case ${caseNumber}: ${caseText.substring(0, 50)}...`);
+              // Track unique planned cases for stats only (creation occurs implicitly with question insert)
+              const caseKey = `${specialtyName}|${lectureTitle}|${caseNumber}`;
+              if (!plannedCases.has(caseKey)) {
+                plannedCases.add(caseKey);
               }
             }
           }
@@ -497,7 +493,7 @@ async function processFile(file: File, importId: string) {
           let hostedUrl: string | null = null;
           let hostedType: string | null = null;
           if (hasInlineImage) {
-            importStats.questionsWithImages++;
+            inlineImageCount++;
             updateProgress(importId, progress, `Found inline image link in text`, `🖼️ Inline image URL detected in question text`);
           }
 
@@ -511,7 +507,7 @@ async function processFile(file: File, importId: string) {
             mediaUrl?: string | null;
             mediaType?: string | null;
             type?: string;
-            options?: string[] | null;
+            options?: any[] | null;
             correctAnswers?: string[];
             caseNumber?: number | null;
             caseText?: string | null;
@@ -519,7 +515,7 @@ async function processFile(file: File, importId: string) {
           };
 
           let questionData: MutableQuestionData = {
-            lectureId: lecture.id,
+            lectureId: 'PENDING', // resolved later
             text: questionText,
             courseReminder: null,
             number: Number.isFinite(parseInt(rowData['question n'])) ? parseInt(rowData['question n']) : null,
@@ -555,7 +551,20 @@ async function processFile(file: File, importId: string) {
             case 'qcm': {
               const { options, correctAnswers } = parseMCQOptions(rowData);
               questionData.type = 'mcq';
-              questionData.options = options;
+              // Build options as objects with per-option explanations if available
+              {
+                const letters = ['a','b','c','d','e'];
+                const opts = options.map((text, idx) => {
+                  const expKey = `explication ${letters[idx]}`;
+                  const exp = rowData[expKey] ? String(rowData[expKey]).trim() : '';
+                  return {
+                    id: String(idx),
+                    text,
+                    ...(exp ? { explanation: exp } : {})
+                  };
+                });
+                questionData.options = opts;
+              }
               questionData.correctAnswers = correctAnswers;
               if (!options || options.length === 0) throw new Error('MCQ missing options');
               if (!correctAnswers || correctAnswers.length === 0) throw new Error('MCQ missing correct answers');
@@ -563,12 +572,15 @@ async function processFile(file: File, importId: string) {
             }
 
             case 'qroc': {
+              // Open question (QROC): text + single correct answer string; rappel handled via courseReminder
               questionData.type = 'qroc';
               {
                 const ans = String(rowData['reponse'] || '').trim();
                 if (!ans) throw new Error('QROC missing answer');
                 questionData.correctAnswers = [ans];
               }
+              // No options for QROC
+              questionData.options = null;
               break;
             }
 
@@ -581,7 +593,20 @@ async function processFile(file: File, importId: string) {
                 return /^PCEM\s*1$/i.test(norm) || /^PCEM\s*2$/i.test(norm) || /^PCEM[12]$/i.test(norm);
               })();
               questionData.type = isPreclinical ? 'mcq' : 'clinic_mcq';
-              questionData.options = casQcmOptions.options;
+              // Build options as objects with per-option explanations if available
+              {
+                const letters = ['a','b','c','d','e'];
+                const opts = casQcmOptions.options.map((text: string, idx: number) => {
+                  const expKey = `explication ${letters[idx]}`;
+                  const exp = rowData[expKey] ? String(rowData[expKey]).trim() : '';
+                  return {
+                    id: String(idx),
+                    text,
+                    ...(exp ? { explanation: exp } : {})
+                  };
+                });
+                questionData.options = opts;
+              }
               questionData.correctAnswers = casQcmOptions.correctAnswers;
               questionData.caseNumber = caseNumber;
               questionData.caseText = caseText;
@@ -614,31 +639,31 @@ async function processFile(file: File, importId: string) {
           if (!questionData.type || !questionData.correctAnswers || questionData.correctAnswers.length === 0) {
             throw new Error('Invalid question data: missing type or correct answers');
           }
-
-          const data: Prisma.QuestionUncheckedCreateInput = {
-            lectureId: questionData.lectureId,
-            text: questionData.text,
-            type: questionData.type,
-            options: questionData.options ?? undefined,
-            correctAnswers: questionData.correctAnswers,
-            explanation: buildCombinedExplanation(rowData),
-            courseReminder: questionData.courseReminder,
-            number: questionData.number,
-            session: questionData.session ?? undefined,
-            mediaUrl: questionData.mediaUrl ?? undefined,
-            mediaType: questionData.mediaType ?? undefined,
-            caseNumber: questionData.caseNumber ?? undefined,
-            caseText: questionData.caseText ?? undefined,
-            caseQuestionNumber: questionData.caseQuestionNumber ?? undefined
-          };
-
-          // Create the question
-          await prisma.question.create({
-            data
+          // Plan the question for transactional insert
+          plannedRows.push({
+            sheetName,
+            specialtyName,
+            lectureTitle,
+            niveauName: (rowData['niveau'] ? normalizeNiveauName(rowData['niveau']) : null) || null,
+            semesterOrder: parseSemesterOrder(rowData['semestre'] || ''),
+            questionText,
+            hasInlineImage,
+            questionData: {
+              type: questionData.type!,
+              text: questionData.text,
+              options: questionData.options ?? null,
+              correctAnswers: questionData.correctAnswers,
+              courseReminder: questionData.courseReminder ?? null,
+              number: questionData.number ?? null,
+              session: questionData.session ?? null,
+              mediaUrl: questionData.mediaUrl ?? null,
+              mediaType: questionData.mediaType ?? null,
+              caseNumber: questionData.caseNumber ?? null,
+              caseText: questionData.caseText ?? null,
+              caseQuestionNumber: questionData.caseQuestionNumber ?? null
+            }
           });
-
-          importStats.imported++;
-          updateProgress(importId, progress, `Imported question ${i + 1}`, `✅ Imported ${sheetName} question: ${questionText.substring(0, 50)}...`);
+          updateProgress(importId, progress, `Validated row ${i + 1}`, `✅ Valid row: ${questionText.substring(0, 50)}...`);
 
         } catch (error) {
           importStats.failed++;
@@ -655,8 +680,238 @@ async function processFile(file: File, importId: string) {
       }
     }
 
-    // Update final stats (preserve latest progress/message/logs)
-  const currentSession = activeImports.get(importId) || { progress: 0, phase: 'importing', message: '', logs: [], lastUpdated: Date.now(), createdAt: Date.now() } as ImportSession;
+    // Early exit if any row-level validation errors
+    if (importStats.errors.length > 0) {
+      updateProgress(importId, 60, 'Validation failed. No data was imported.', `❌ Validation failed with ${importStats.errors.length} error(s). Aborting import.`, 'complete');
+      const sess = activeImports.get(importId);
+      if (sess) {
+        activeImports.set(importId, { ...sess, stats: { ...importStats }, progress: 100, phase: 'complete', message: 'Validation failed' });
+      }
+      return;
+    }
+
+    // File-level duplicate detection (within uploaded file)
+    updateProgress(importId, 62, 'Checking duplicates within the file...');
+    const fileDupKey = (p: PlannedQuestion) => {
+      const ca = (p.questionData.correctAnswers || []).join('|');
+      return [p.specialtyName, p.lectureTitle, p.questionData.type, p.questionData.text.trim(), ca, p.questionData.number ?? '', p.questionData.session ?? '', p.questionData.courseReminder ?? ''].join('||');
+    };
+    const seenFile = new Map<string, number>();
+    plannedRows.forEach((p, idx) => {
+      const key = fileDupKey(p);
+      if (seenFile.has(key)) {
+        importStats.errors!.push(`Duplicate in file — row ${idx + 1} identical to row ${seenFile.get(key)! + 1}`);
+      } else {
+        seenFile.set(key, idx);
+      }
+    });
+
+    if (importStats.errors!.length > 0) {
+      updateProgress(importId, 65, 'Duplicate check failed in file', `❌ Found ${importStats.errors.length} duplicate(s) in file`, 'complete');
+      const sess = activeImports.get(importId);
+      if (sess) {
+        activeImports.set(importId, { ...sess, stats: { ...importStats, failed: importStats.errors.length }, progress: 100, phase: 'complete', message: 'Duplicate check failed' });
+      }
+      return;
+    }
+
+    // DB duplicate detection for existing lectures
+    updateProgress(importId, 70, 'Checking duplicates in database...');
+    // 1) Resolve existing specialties/lectures
+    const specialtyList = Array.from(specialtyNamesSet);
+    const titlesBySpec: Record<string, string[]> = {};
+    for (const [spec, titlesSet] of lectureTitlesBySpecialty.entries()) {
+      titlesBySpec[spec] = Array.from(titlesSet);
+    }
+    const existingLectures = await prisma.lecture.findMany({
+      where: {
+        title: { in: Array.from(new Set(Object.values(titlesBySpec).flat())) },
+        specialty: { name: { in: specialtyList } }
+      },
+      include: { specialty: true }
+    });
+    const lectureIdBySpecTitle = new Map<string, string>(); // key: spec|title -> id
+    for (const lec of existingLectures) {
+      lectureIdBySpecTitle.set(`${lec.specialty.name}|${lec.title}`, lec.id);
+    }
+
+    // 2) For lectures that already exist, batch fetch candidate questions to compare
+    const byLectureIdTexts = new Map<string, Set<string>>();
+    plannedRows.forEach(p => {
+      const k = `${p.specialtyName}|${p.lectureTitle}`;
+      const lecId = lectureIdBySpecTitle.get(k);
+      if (lecId) {
+        if (!byLectureIdTexts.has(lecId)) byLectureIdTexts.set(lecId, new Set());
+        byLectureIdTexts.get(lecId)!.add(p.questionData.text);
+      }
+    });
+    const lectureIds = Array.from(byLectureIdTexts.keys());
+    let existingCandidates: Array<{
+      id: string; lectureId: string; type: string; text: string; correctAnswers: any; courseReminder: string | null; number: number | null; session: string | null; caseNumber: number | null; caseText: string | null; caseQuestionNumber: number | null;
+    }> = [];
+    if (lectureIds.length > 0) {
+      existingCandidates = await prisma.question.findMany({
+        where: {
+          lectureId: { in: lectureIds },
+          text: { in: Array.from(new Set(lectureIds.flatMap(id => Array.from(byLectureIdTexts.get(id) || [])))) }
+        },
+        select: { id: true, lectureId: true, type: true, text: true, correctAnswers: true, courseReminder: true, number: true, session: true, caseNumber: true, caseText: true, caseQuestionNumber: true }
+      });
+    }
+    const eqArr = (a?: any[] | null, b?: any[] | null) => {
+      const aa = Array.isArray(a) ? a.map(x => String(x)) : [];
+      const bb = Array.isArray(b) ? b.map(x => String(x)) : [];
+      if (aa.length !== bb.length) return false;
+      for (let i = 0; i < aa.length; i++) if (aa[i] !== bb[i]) return false;
+      return true;
+    };
+    const s = (x?: string | null) => String(x ?? '').trim();
+    for (let i = 0; i < plannedRows.length; i++) {
+      const p = plannedRows[i];
+      const lecId = lectureIdBySpecTitle.get(`${p.specialtyName}|${p.lectureTitle}`);
+      if (!lecId) continue; // lecture will be created => cannot be duplicate in DB yet
+      const candidates = existingCandidates.filter(c => c.lectureId === lecId && s(c.text) === s(p.questionData.text));
+      const dup = candidates.find(c => c.type === p.questionData.type && eqArr(c.correctAnswers as any, p.questionData.correctAnswers) && ((c.number ?? null) === (p.questionData.number ?? null)) && s(c.session) === s(p.questionData.session) && s(c.courseReminder) === s(p.questionData.courseReminder) && (c.caseNumber ?? null) === (p.questionData.caseNumber ?? null) && s(c.caseText) === s(p.questionData.caseText) && (c.caseQuestionNumber ?? null) === (p.questionData.caseQuestionNumber ?? null));
+      if (dup) {
+        importStats.errors!.push(`Row ${i + 1} in ${p.sheetName}: Duplicate in database — identical question already exists`);
+      }
+    }
+
+    if (importStats.errors!.length > 0) {
+      updateProgress(importId, 75, 'Duplicate check failed against database', `❌ Found ${importStats.errors.length} duplicate(s)`, 'complete');
+      const sess = activeImports.get(importId);
+      if (sess) {
+        activeImports.set(importId, { ...sess, stats: { ...importStats, failed: importStats.errors.length }, progress: 100, phase: 'complete', message: 'Duplicate check failed' });
+      }
+      return;
+    }
+
+    // If not all-or-nothing, we could fall back to row-wise inserts, but default is all-or-nothing
+    updateProgress(importId, 80, ALL_OR_NOTHING ? 'Starting transactional import...' : 'Starting import...');
+
+    // Transactional import: create missing entities and then all questions
+    let createdSpecCount = 0;
+    let createdLectureCount = 0;
+    await prisma.$transaction(async (tx) => {
+      // Ensure niveaux
+      const niveauNameToId = new Map<string, string>();
+      // Start with existing
+      for (const n of allNiveaux) niveauNameToId.set(n.name.toUpperCase(), n.id);
+      // Create planned niveaux
+      for (const nvName of niveauxToEnsure) {
+        const key = nvName.toUpperCase();
+        if (!niveauNameToId.has(key)) {
+          const created = await tx.niveau.create({ data: { name: nvName, order: Math.max(1, allNiveaux.length + 1) } });
+          niveauNameToId.set(key, created.id);
+        }
+      }
+
+      // Ensure semesters
+      const semesterKeyToId = new Map<string, string>(); // key: NV|order
+      for (const sRow of allSemesters) {
+        const nvName = Array.from(niveauNameToId.entries()).find(([k, v]) => v === sRow.niveauId)?.[0] || '';
+        semesterKeyToId.set(`${nvName}|${sRow.order}`, sRow.id);
+      }
+      // Also add semesters observed in planned rows (covers newly created niveaux)
+      for (const p of plannedRows) {
+        if (p.niveauName && p.semesterOrder) {
+          semestersToEnsure.add(`${p.niveauName}|${p.semesterOrder}`);
+        }
+      }
+      for (const token of semestersToEnsure) {
+        const [nvName, ordStr] = token.split('|');
+        const order = parseInt(ordStr, 10);
+        const nvId = niveauNameToId.get(nvName.toUpperCase());
+        if (nvId && !semesterKeyToId.has(`${nvName}|${order}`)) {
+          const name = `${nvName} - S${order}`;
+          const created = await tx.semester.create({ data: { name, order, niveauId: nvId } });
+          semesterKeyToId.set(`${nvName}|${order}`, created.id);
+        }
+      }
+
+      // Ensure specialties
+      const specialtyNameToId = new Map<string, string>();
+      const existingSpecialties = await tx.specialty.findMany({ where: { name: { in: specialtyList } }, select: { id: true, name: true } });
+      for (const s of existingSpecialties) specialtyNameToId.set(s.name, s.id);
+      for (const specName of specialtyList) {
+        if (!specialtyNameToId.has(specName)) {
+          // Try to infer niveau/semester from first occurrence in planned rows for this specialty
+          const first = plannedRows.find(p => p.specialtyName === specName);
+          const nvId = first?.niveauName ? (niveauNameToId.get(first.niveauName.toUpperCase()) ?? null) : null;
+          const semId = first?.niveauName && first?.semesterOrder ? (semesterKeyToId.get(`${first.niveauName}|${first.semesterOrder}`) ?? null) : null;
+          const created = await tx.specialty.create({ data: { name: specName, ...(nvId ? { niveauId: nvId } : {}), ...(semId ? { semesterId: semId } : {}) } });
+          specialtyNameToId.set(specName, created.id);
+          createdSpecCount++;
+        }
+      }
+
+      // Ensure lectures
+      const specTitleToLectureId = new Map<string, string>();
+      // Prefill existing
+      const existingLecs = await tx.lecture.findMany({
+        where: { title: { in: Array.from(new Set(Object.values(titlesBySpec).flat())) }, specialtyId: { in: Array.from(specialtyNameToId.values()) } },
+        include: { specialty: { select: { name: true } } }
+      });
+      for (const lec of existingLecs) specTitleToLectureId.set(`${lec.specialty.name}|${lec.title}`, lec.id);
+      // Create missing
+      for (const specName of Object.keys(titlesBySpec)) {
+        for (const title of titlesBySpec[specName] || []) {
+          const key = `${specName}|${title}`;
+          if (!specTitleToLectureId.has(key)) {
+            const specId = specialtyNameToId.get(specName);
+            if (!specId) continue; // should not happen
+            const created = await tx.lecture.create({ data: { specialtyId: specId, title } });
+            specTitleToLectureId.set(key, created.id);
+            createdLectureCount++;
+          }
+        }
+      }
+
+      // Prepare batch per lectureId for faster insertion
+      const byLectureRecords = new Map<string, Prisma.QuestionUncheckedCreateInput[]>();
+      for (const p of plannedRows) {
+        const lecId = specTitleToLectureId.get(`${p.specialtyName}|${p.lectureTitle}`) || lectureIdBySpecTitle.get(`${p.specialtyName}|${p.lectureTitle}`);
+        if (!lecId) throw new Error(`Internal error: Lecture not resolved for ${p.specialtyName} / ${p.lectureTitle}`);
+        const rec: Prisma.QuestionUncheckedCreateInput = {
+          lectureId: lecId,
+          text: p.questionData.text,
+          type: p.questionData.type,
+          options: p.questionData.options ?? undefined,
+          correctAnswers: p.questionData.correctAnswers,
+          explanation: undefined,
+          courseReminder: p.questionData.courseReminder ?? undefined,
+          number: p.questionData.number ?? undefined,
+          session: p.questionData.session ?? undefined,
+          mediaUrl: p.questionData.mediaUrl ?? undefined,
+          mediaType: p.questionData.mediaType ?? undefined,
+          caseNumber: p.questionData.caseNumber ?? undefined,
+          caseText: p.questionData.caseText ?? undefined,
+          caseQuestionNumber: p.questionData.caseQuestionNumber ?? undefined
+        };
+        if (!byLectureRecords.has(lecId)) byLectureRecords.set(lecId, []);
+        byLectureRecords.get(lecId)!.push(rec);
+      }
+
+      // Insert per lecture with createMany
+      let processed = 0;
+      const total = plannedRows.length;
+      for (const [lecId, rows] of byLectureRecords.entries()) {
+        await tx.question.createMany({ data: rows });
+        processed += rows.length;
+        const base = 80;
+        const pct = base + Math.floor((processed / total) * 19);
+        updateProgress(importId, pct, `Imported ${processed}/${total}...`);
+      }
+    });
+
+    // Update final stats and session
+    importStats.imported = plannedRows.length;
+    importStats.failed = 0;
+    importStats.createdLectures = createdLectureCount;
+    importStats.createdSpecialties = createdSpecCount;
+    importStats.createdCases = plannedCases.size;
+    importStats.questionsWithImages = inlineImageCount;
+
     const finalSession = activeImports.get(importId);
     if (finalSession && !finalSession.cancelled) {
       activeImports.set(importId, {
@@ -668,7 +923,6 @@ async function processFile(file: File, importId: string) {
         lastUpdated: Date.now()
       });
     }
-
     updateProgress(importId, 100, 'Import completed!', `🎉 Import completed! Total: ${importStats.total}, Imported: ${importStats.imported}, Failed: ${importStats.failed}, Created: ${importStats.createdSpecialties} specialties, ${importStats.createdLectures} lectures, ${importStats.createdCases} cases, ${importStats.questionsWithImages} questions with images`, 'complete');
 
   } catch (error) {

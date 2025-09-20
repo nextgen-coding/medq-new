@@ -80,9 +80,10 @@ export function ClinicalCaseQuestion({
   const [evaluationOrder, setEvaluationOrder] = useState<string[]>([]); // ordered list of open question ids needing evaluation
   const [evaluationIndex, setEvaluationIndex] = useState<number>(0); // current evaluation pointer
   const [evaluationComplete, setEvaluationComplete] = useState<boolean>(false);
-  // Progressive reveal: -1 = only header/case text; 0..n index of last revealed question
-  // For multi QROC, show all questions from start
-  const [revealIndex, setRevealIndex] = useState<number>(displayMode === 'multi_qroc' ? clinicalCase.questions.length - 1 : -1);
+  // Answering phase active question pointer (for keyboard shortcuts and blue frame)
+  const [activeIndex, setActiveIndex] = useState<number>(0);
+  // All questions are visible from the start; Enter navigates to next unanswered (like QROC)
+  const [revealIndex, setRevealIndex] = useState<number>(clinicalCase.questions.length - 1);
   // Removed per-question submission; single global submit after all questions answered
 
   const [openCaseEdit, setOpenCaseEdit] = useState(false);
@@ -107,7 +108,11 @@ export function ClinicalCaseQuestion({
       setQuestionResults({});
       setIsCaseComplete(false);
       setShowResults(false);
-      setRevealIndex(displayMode === 'multi_qroc' ? clinicalCase.questions.length - 1 : -1);
+      // Always show all questions (no progressive reveal)
+      setRevealIndex(clinicalCase.questions.length - 1);
+      // Reset active question to the first unanswered (or 0)
+      const firstUnanswered = clinicalCase.questions.findIndex(q => userAnswers[q.id] === undefined);
+      setActiveIndex(firstUnanswered !== -1 ? firstUnanswered : 0);
     }
   }, [clinicalCase.caseNumber, isAnswered, displayMode, clinicalCase.questions.length]);
 
@@ -123,21 +128,7 @@ export function ClinicalCaseQuestion({
     }
   }, [clinicalCase.caseNumber]);
 
-  // Initial focus on first question when it's revealed
-  useEffect(() => {
-    if (revealIndex === 0 && !showResults) {
-      setTimeout(() => {
-        const firstQuestion = clinicalCase.questions[0];
-        if (firstQuestion) {
-          const element = questionRefs.current[firstQuestion.id];
-          if (element) {
-            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            setTimeout(() => focusFirstInput(firstQuestion.id), 500);
-          }
-        }
-      }, 300);
-    }
-  }, [revealIndex, showResults, clinicalCase.questions]);
+  // Removed progressive reveal focus effect; we focus first unanswered on mount instead
 
   useEffect(() => {
     const fetchPinned = async () => {
@@ -239,12 +230,14 @@ export function ClinicalCaseQuestion({
     }
   };
 
-  // On mount (or case change) focus first question
+  // On mount (or case change) focus first unanswered question and set active index
   useEffect(() => {
     if (clinicalCase.questions.length > 0 && !showResults) {
       // Find first unanswered question
       const firstUnanswered = clinicalCase.questions.find(q => answers[q.id] === undefined);
       const targetId = firstUnanswered?.id || clinicalCase.questions[0].id;
+      const targetIndex = firstUnanswered ? clinicalCase.questions.findIndex(q => q.id === firstUnanswered.id) : 0;
+      setActiveIndex(targetIndex);
       
       // Scroll to first unanswered question and focus it
       setTimeout(() => {
@@ -370,11 +363,14 @@ export function ClinicalCaseQuestion({
         if (evaluationComplete || evaluationOrder.length === 0) {
           onNext();
         }
+
         return;
       }
 
       // Answering phase - controlled progression through questions
       if (!showResults && e.key === 'Enter' && !e.shiftKey) {
+        // Don't hijack Enter from text inputs
+        if (isTextInput || isEditable) return;
         e.preventDefault();
         // For multi QROC mode, all questions are visible, so just scroll between them
         if (displayMode === 'multi_qroc') {
@@ -439,6 +435,7 @@ export function ClinicalCaseQuestion({
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [answers, answeredQuestions, isCaseComplete, showResults, evaluationOrder, evaluationIndex, evaluationComplete, clinicalCase.questions, clinicalCase.totalQuestions, revealIndex, onNext]);
+
   const getQuestionStatus = (question: Question) => {
     if (answers[question.id] !== undefined) {
       if (showResults) {
@@ -456,11 +453,11 @@ export function ClinicalCaseQuestion({
     const isAnsweredQ = answers[question.id] !== undefined;
     const answerResultQ = questionResults[question.id];
     const userAnswerQ = answers[question.id];
-    const isCurrentEvaluationTarget = showResults && !evaluationComplete && evaluationOrder[evaluationIndex] === question.id;
+  const isCurrentEvaluationTarget = showResults && !evaluationComplete && evaluationOrder[evaluationIndex] === question.id;
+  const isActiveAnswerTarget = !showResults && index === activeIndex;
     const hasEvaluation = showResults && (question.type as any) === 'clinic_croq' && questionResults[question.id] !== undefined;
     
-    // Next to answer is the currently revealed question when not submitted
-    const isNextToAnswer = !showResults && revealIndex === index;
+  // Progressive reveal removed; all questions visible from start
     
     const evaluationLabel = hasEvaluation
       ? questionResults[question.id] === true
@@ -484,11 +481,20 @@ export function ClinicalCaseQuestion({
       <div
         key={question.id}
         ref={el => { questionRefs.current[question.id] = el; }}
-        className={`border rounded-xl p-3 bg-card shadow-sm transition-all duration-200 ${
-          isCurrentEvaluationTarget ? 'ring-2 ring-blue-500 shadow-md' : 
-          isNextToAnswer ? 'ring-2 ring-orange-500 shadow-md' : ''
-        }`}
+        className={`${
+          // Remove white container around open questions during results to avoid extra box
+          (showResults && (question.type as any) === 'clinic_croq')
+            ? 'transition-all duration-200 rounded-none border-0 p-0 bg-transparent shadow-none'
+            : 'border rounded-xl p-3 bg-card shadow-sm transition-all duration-200'
+        } ${(isCurrentEvaluationTarget || isActiveAnswerTarget) ? 'ring-2 ring-blue-500 shadow-md' : ''}`}
         data-question-id={question.id}
+        tabIndex={0}
+        onClick={() => {
+          if (!showResults) {
+            setActiveIndex(index);
+            setTimeout(() => focusFirstInput(question.id), 50);
+          }
+        }}
       >
         {isInlineLayout ? (
           // Inline layout for compact questions: question number and question content on same line
@@ -498,7 +504,6 @@ export function ClinicalCaseQuestion({
                 'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold tracking-wide flex-shrink-0 ' +
                 (!showResults
                   ? (isAnsweredQ ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : 
-                     isNextToAnswer ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300' :
                      'bg-muted text-muted-foreground')
                   : isAnsweredQ
                     ? answerResultQ === true
@@ -526,14 +531,7 @@ export function ClinicalCaseQuestion({
                     </div>
                   )}
                 </div>
-                {/* Evaluation indicator positioned directly next to question text content */}
-                {showResults && ((question.type as any) === 'clinic_croq' || (displayMode === 'multi_qroc' && (question.type as any) === 'clinic_croq')) && hasEvaluation && (
-                  <div className="flex-shrink-0">
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded font-medium text-xs ${evaluationColor}`}>
-                      {evaluationLabel}
-                    </span>
-                  </div>
-                )}
+                {/* Removed inline textual evaluation label for QROC after evaluation per request */}
                 {showResults && ((question.type as any) === 'clinic_croq' || (displayMode === 'multi_qroc' && (question.type as any) === 'clinic_croq')) && isCurrentEvaluationTarget && !hasEvaluation && (
                   <div className="flex-shrink-0">
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-200 font-medium text-xs">
@@ -565,6 +563,9 @@ export function ClinicalCaseQuestion({
                     hideMeta
                     suppressReminder={true}
                     enableOptionHighlighting={true}
+                    disableKeyboardHandlers={false}
+                    allowEnterSubmit={false}
+                    isActive={index === activeIndex}
                   />
                 ) : (
                   <OpenQuestion
@@ -581,7 +582,12 @@ export function ClinicalCaseQuestion({
                     answerResult={showResults ? answerResultQ : undefined}
                     userAnswer={userAnswerQ as any}
                     hideImmediateResults={!showResults}
-                    showDeferredSelfAssessment={showResults && (question.type as any) === 'clinic_croq'}
+                    showDeferredSelfAssessment={
+                      showResults &&
+                      (question.type as any) === 'clinic_croq' &&
+                      !evaluationComplete &&
+                      evaluationOrder[evaluationIndex] === question.id
+                    }
                     disableIndividualSubmit={!showResults} 
                     onSelfAssessmentUpdate={handleSelfAssessmentUpdate}
                     hideNotes={true}
@@ -618,7 +624,6 @@ export function ClinicalCaseQuestion({
                   'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold tracking-wide ' +
                   (!showResults
                     ? (isAnsweredQ ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : 
-                       isNextToAnswer ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300' :
                        'bg-muted text-muted-foreground')
                     : isAnsweredQ
                       ? answerResultQ === true
@@ -675,6 +680,9 @@ export function ClinicalCaseQuestion({
                 hideMeta
                 suppressReminder={true}
                 enableOptionHighlighting={true}
+                disableKeyboardHandlers={false}
+                allowEnterSubmit={false}
+                isActive={index === activeIndex}
               />
             ) : (
               <OpenQuestion
@@ -692,7 +700,12 @@ export function ClinicalCaseQuestion({
                 answerResult={showResults ? answerResultQ : undefined}
                 userAnswer={userAnswerQ as any}
                 hideImmediateResults={!showResults}
-                showDeferredSelfAssessment={showResults && (question.type as any) === 'clinic_croq'}
+                showDeferredSelfAssessment={
+                  showResults &&
+                  (question.type as any) === 'clinic_croq' &&
+                  !evaluationComplete &&
+                  evaluationOrder[evaluationIndex] === question.id
+                }
                 disableIndividualSubmit={!showResults} 
                 onSelfAssessmentUpdate={handleSelfAssessmentUpdate}
                 hideNotes={!showResults}
@@ -739,11 +752,7 @@ export function ClinicalCaseQuestion({
               );
             })}
           </div>
-          {!showResults && revealIndex === -1 && (
-            <div className="mt-4 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 text-sm text-blue-700 dark:text-blue-200 font-medium">
-              Appuyez sur <span className="font-semibold">Entrée</span> pour afficher la première question.
-            </div>
-          )}
+          {/* Progressive reveal hint removed */}
         </CardContent>
       </Card>
 
@@ -757,6 +766,7 @@ export function ClinicalCaseQuestion({
               ? clinicalCase.questions
               : clinicalCase.questions.slice(0, revealIndex === -1 ? 0 : revealIndex + 1)
             ).map((question, index) => {
+
               const isCurrentEval = showResults && !evaluationComplete && (question.type as any) === 'clinic_croq' && evaluationOrder[evaluationIndex] === question.id;
               return (
                 <div key={question.id} className={cn(
@@ -764,11 +774,7 @@ export function ClinicalCaseQuestion({
                   isCurrentEval ? 'ring-2 ring-blue-500 rounded-lg transition-shadow' : ''
                 )}>
                   {renderQuestion(question, index)}
-                  {showResults && (question.type as any) === 'clinic_croq' && questionResults[question.id] !== undefined && (
-                    <div className="mt-2 text-xs font-medium text-muted-foreground">
-                      Votre évaluation: {questionResults[question.id] === true ? 'Correct' : questionResults[question.id] === 'partial' ? 'Partiel' : 'Incorrect'}
-                    </div>
-                  )}
+                  {/* Removed post-evaluation textual status (Correct/Partiel/Incorrect) for QROC */}
                 </div>
               );
             })}
@@ -806,6 +812,7 @@ export function ClinicalCaseQuestion({
                       })()}
                     </div>
                     {/* Mes notes button between result and next */}
+
                     <Button
                       variant="outline"
                       size="sm"

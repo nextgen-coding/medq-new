@@ -99,8 +99,36 @@ export function requireMaintainerOrAdmin<T extends any[]>(
   return async (request: NextRequest, ...args: T) => {
     const authenticatedRequest = await authenticateRequest(request);
     if (!authenticatedRequest) {
-      if ((request as any)._dbUnavailable) {
+      // Graceful fallback: if DB is unavailable and local fallback is enabled, allow specific AI progress GET endpoints
+      if ((request as any)._dbUnavailable && process.env.ALLOW_LOCAL_AI_WHEN_DB_DOWN === '1') {
+        try {
+          const url = new URL(request.url);
+          const isAiProgress = url.pathname.endsWith('/api/validation/ai-progress');
+          const action = url.searchParams.get('action');
+          const method = request.method?.toUpperCase?.() || 'GET';
+          const allow = isAiProgress && method === 'GET' && (action === 'list' || action === 'details' || action === 'download' || action === null);
+          if (allow) {
+            const fake = request as AuthenticatedRequest;
+            fake.user = { userId: 'local-fallback', email: 'fallback@local', role: 'admin' } as any;
+            return handler(fake, ...args);
+          }
+        } catch {}
         return NextResponse.json({ error: 'Service Unavailable: database unreachable' }, { status: 503 });
+      }
+      // Development bypass: optionally allow read-only ai-progress endpoints without auth
+      if (process.env.ALLOW_DEV_PUBLIC_AI === '1') {
+        try {
+          const url = new URL(request.url);
+          const isAiProgress = url.pathname.endsWith('/api/validation/ai-progress');
+          const action = url.searchParams.get('action');
+          const method = request.method?.toUpperCase?.() || 'GET';
+          const allow = isAiProgress && method === 'GET' && (action === 'list' || action === 'details' || action === 'download' || action === null);
+          if (allow) {
+            const fake = request as AuthenticatedRequest;
+            fake.user = { userId: 'dev-bypass', email: 'dev@local', role: 'admin' } as any;
+            return handler(fake, ...args);
+          }
+        } catch {}
       }
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }

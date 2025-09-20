@@ -22,7 +22,10 @@ export type MCQAiResult = {
   error?: string;
 };
 
-// PERFECT SYSTEM PROMPT - NO AMBIGUITY, COMPLETE DETAILS, EXACT FORMATTING
+// Professor-level prompt: always produce detailed, multi‑sentence per‑option explanations with style variety,
+// and ALWAYS return correctAnswers (choose the most plausible if uncertain). Also include
+// a RAPPEL DU COURS (small course example/synthesis) mapped to globalExplanation.
+// Formatting requirement: Use newline-separated segments so we can render nicely (no markdown bullets, just line breaks).
 const DEFAULT_SYSTEM_PROMPT = `Tu es PROFESSEUR de médecine de TRÈS HAUT NIVEAU: tu corriges des QCM pour des étudiants avancés avec une EXIGENCE ABSOLUE de QUALITÉ et COMPLÉTUDE.
 
 NIVEAU ET DÉTAIL OBLIGATOIRE:
@@ -70,8 +73,8 @@ SORTIE JSON STRICT (aucun markdown, aucune prose hors JSON):
       "status": "ok" | "error", 
       "correctAnswers": [0,2],
       "noAnswer": false,
-      "globalExplanation": "RAPPEL DU COURS COMPLET 3-5 phrases détaillées avec retours ligne",
-      "optionExplanations": ["Connecteur_varié: explication_complète_4-6_phrases", "Autre_connecteur: autre_explication_complète_4-6_phrases"],
+  "globalExplanation": "RAPPEL DU COURS COMPLET 3-5 phrases détaillées avec retours ligne",
+  "optionExplanations": ["Connecteur_varié: explication_complète_4-6_phrases", "Autre_connecteur: autre_explication_complète_4-6_phrases"],
       "error": "(si status=error)"
     }
   ]
@@ -187,7 +190,6 @@ ${systemPrompt}
   const maxAttempts = Math.max(1, Number(process.env.AI_RETRY_ATTEMPTS || 2));
   let lastErr: any = null;
   let content: string = '';
-
   // Try AI SDK structured approach first for better reliability if enabled
   const useStructuredSDK = process.env.USE_STRUCTURED_AI_SDK === 'true';
   
@@ -213,7 +215,7 @@ ${systemPrompt}
     // Use the same working approach as QROC with fixed token limit
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       try {
-        // Use chatCompletion like QROC does, with token limit for PERFECT responses
+        // Use chatCompletion like QROC does, with hardcoded 1600 token limit that works
         const result = await chatCompletion([
           { role: 'system', content: sys },
           { role: 'user', content: user }
@@ -236,8 +238,7 @@ ${systemPrompt}
       }
     }
   }
-  
-  if (!content && lastErr) {
+  if (lastErr) {
     // Propagate a clearer error so caller can fallback per-item
     throw new Error(`Azure request failed after ${maxAttempts} attempt(s): ${String(lastErr?.message || lastErr)}`);
   }
@@ -252,7 +253,7 @@ ${systemPrompt}
         const single = await chatCompletion([
           { role: 'system', content: sys },
           { role: 'user', content: singlePayload }
-  ], { maxTokens: 800 }); // Fast single salvage
+        ], { maxTokens: 800 }); // Fast single salvage
         const singleJson = safeParseJson(single.content);
         const rec = Array.isArray(singleJson?.results) ? singleJson.results.find((r: any) => String(r?.id || '') === it.id) : null;
         if (rec && typeof rec === 'object') {
@@ -286,7 +287,7 @@ ${systemPrompt}
         const single = await chatCompletion([
           { role: 'system', content: sys },
           { role: 'user', content: singlePayload }
-  ], { maxTokens: 800 }); // Fast single salvage
+        ], { maxTokens: 800 }); // Fast single salvage
         const singleJson = safeParseJson(single.content);
         const rec = Array.isArray(singleJson?.results) ? singleJson.results.find((r: any) => String(r?.id || '') === it.id) : null;
         if (rec && typeof rec === 'object') {
@@ -300,84 +301,113 @@ ${systemPrompt}
             error: typeof rec.error === 'string' ? rec.error : undefined
           });
         } else {
-          salvaged.push({ id: it.id, status: 'error', error: 'No AI response (single-item salvage)' });
+          salvaged.push({ id: it.id, status: 'error', error: 'No AI response (single-item)' });
         }
       } catch (ie: any) {
-        salvaged.push({ id: it.id, status: 'error', error: `Single-item salvage fail: ${String(ie?.message || ie)}` });
+        salvaged.push({ id: it.id, status: 'error', error: `Single-item fail: ${String(ie?.message || ie)}` });
       }
     }
     return salvaged;
   }
-  // Process successful batch results
-  for (const raw of arr) {
-    if (!raw || typeof raw !== 'object') continue;
-    const id = String(raw.id || '');
-    const match = items.find(i => i.id === id);
-    if (!match) continue;
-    results.push({
-      id,
-      status: raw.status === 'ok' ? 'ok' : 'error',
-      correctAnswers: Array.isArray(raw.correctAnswers) ? raw.correctAnswers.map((n: any) => Number(n)).filter((n: number) => Number.isInteger(n) && n >= 0) : undefined,
-      noAnswer: !!raw.noAnswer,
-      optionExplanations: Array.isArray(raw.optionExplanations) ? raw.optionExplanations.map((s: any) => String(s || '')) : undefined,
-      globalExplanation: typeof raw.globalExplanation === 'string' ? raw.globalExplanation : undefined,
-      error: typeof raw.error === 'string' ? raw.error : undefined
-    });
-  }
-  // Add errors for any missing items
-  for (const it of items) {
-    if (!results.find(r => r.id === it.id)) {
-      results.push({ id: it.id, status: 'error', error: 'Missing from AI response' });
+  // Map responses back to input items
+  for (const item of items) {
+    const found = arr.find((r: any) => String(r?.id || '') === item.id);
+    if (found && typeof found === 'object') {
+      results.push({
+        id: item.id,
+        status: found.status === 'ok' ? 'ok' : 'error',
+        correctAnswers: Array.isArray(found.correctAnswers) ? found.correctAnswers.map((n: any) => Number(n)).filter((n: number) => Number.isInteger(n) && n >= 0) : undefined,
+        noAnswer: !!found.noAnswer,
+        optionExplanations: Array.isArray(found.optionExplanations) ? found.optionExplanations.map((s: any) => String(s || '')) : undefined,
+        globalExplanation: typeof found.globalExplanation === 'string' ? found.globalExplanation : undefined,
+        error: typeof found.error === 'string' ? found.error : undefined
+      });
+    } else {
+      results.push({ id: item.id, status: 'error', error: 'No AI response for this item' });
     }
   }
   return results;
 }
 
-export async function analyzeMcqInChunks(
-  items: MCQAiItem[],
-  options: {
-    batchSize?: number;
-    concurrency?: number;
-    onProgress?: (completed: number, total: number, stage: string) => void;
-    systemPrompt?: string;
-  } = {}
-): Promise<MCQAiResult[]> {
-  const { batchSize = 8, concurrency = 12, onProgress, systemPrompt } = options;
-  
-  const allResults: MCQAiResult[] = [];
-  const chunks: MCQAiItem[][] = [];
-  
-  // Create chunks
-  for (let i = 0; i < items.length; i += batchSize) {
-    chunks.push(items.slice(i, i + batchSize));
+export async function analyzeMcqInChunks(items: MCQAiItem[], options?: {
+  batchSize?: number;
+  concurrency?: number;
+  systemPrompt?: string;
+  // Deprecated: onBatch (kept for compatibility)
+  onBatch?: (info: { index: number; total: number }) => void;
+  // New detailed hooks
+  onBatchStart?: (info: { index: number; total: number; size: number }) => void;
+  onBatchEnd?: (info: { index: number; total: number; size: number; ms: number; ok: boolean; error?: string }) => void;
+}): Promise<Map<string, MCQAiResult>> {
+  const { batchSize: callerBatch = 50, concurrency: callerConc = 4, systemPrompt, onBatch, onBatchStart, onBatchEnd } = options || {};
+  // Effective sizes with conservative defaults and env overrides
+  const singleMode = String(process.env.AI_QCM_SINGLE || '').trim() === '1' || String(process.env.AI_QCM_MODE || '').trim().toLowerCase() === 'single' || String(process.env.AI_IMPORT_SINGLE || '').trim() === '1';
+  const effBatch = singleMode ? 1 : Math.max(1, Number(process.env.AI_IMPORT_BATCH_SIZE || process.env.AI_BATCH_SIZE || callerBatch || 8));
+  const effConc = singleMode ? 1 : Math.max(1, Number(process.env.AI_IMPORT_CONCURRENCY || process.env.AI_CONCURRENCY || callerConc || 1));
+  const batches: MCQAiItem[][] = [];
+  if (singleMode) {
+    console.info('[AI] QCM single-item mode enabled — sending one by one');
+    for (let i = 0; i < items.length; i++) batches.push([items[i]]);
+  } else {
+    for (let i = 0; i < items.length; i += effBatch) {
+      batches.push(items.slice(i, i + effBatch));
+    }
   }
-  
-  const processChunk = async (chunk: MCQAiItem[], index: number) => {
+  const results = new Map<string, MCQAiResult>();
+  let idx = 0;
+  async function runBatch(bIndex: number) {
+    const batch = batches[bIndex];
+    if (!batch) return;
+    const t0 = Date.now();
+    // Back-compat 'onBatch' and new 'onBatchStart'
+    try { options?.onBatch?.({ index: bIndex + 1, total: batches.length }); } catch {}
+    try { onBatchStart?.({ index: bIndex + 1, total: batches.length, size: batch.length }); } catch {}
     try {
-      onProgress?.(index, chunks.length, `Processing batch ${index + 1}/${chunks.length}`);
-      const results = await analyzeMcqBatch(chunk, systemPrompt);
-      return results;
-    } catch (err: any) {
-      console.error(`[AI] Chunk ${index} failed:`, err?.message);
-      return chunk.map(item => ({ 
-        id: item.id, 
-        status: 'error' as const, 
-        error: `Batch failed: ${String(err?.message || err)}` 
-      }));
-    }
-  };
-  
-  // Process chunks with concurrency control
-  for (let i = 0; i < chunks.length; i += concurrency) {
-    const batch = chunks.slice(i, i + concurrency);
-    const promises = batch.map((chunk, localIndex) => processChunk(chunk, i + localIndex));
-    const batchResults = await Promise.all(promises);
-    
-    for (const results of batchResults) {
-      allResults.push(...results);
+      let res: MCQAiResult[] | null = null;
+      let shrink = 0;
+      while (res === null) {
+        try {
+          res = await analyzeMcqBatch(batch.slice(0, batch.length - shrink), systemPrompt);
+        } catch (e: any) {
+          const msg = String(e?.message || e);
+          // If fetch/timeout or payload too large, shrink batch and retry a couple times
+          const shouldShrinkForNoContent = /No content from Azure OpenAI/i.test(msg);
+          if ((/fetch failed|ETIMEDOUT|EAI_AGAIN|ECONNRESET/i.test(msg) || /413|request too large|payload too large/i.test(msg) || shouldShrinkForNoContent) && (batch.length - shrink) > 1) {
+            // If "no content" reported, shrink aggressively to 1 to isolate problematic item
+            const target = shouldShrinkForNoContent ? (batch.length - shrink - 1) : Math.max(1, (batch.length - shrink) - Math.ceil((batch.length - shrink) * 0.4));
+            shrink = Math.max(0, batch.length - target);
+            console.warn(`[AI] Shrinking batch ${bIndex + 1}: trying size=${batch.length - shrink} due to ${shouldShrinkForNoContent ? 'no-content' : 'network/size'} error`);
+            continue;
+          }
+          throw e;
+        }
+      }
+      for (const r of res) results.set(r.id, r);
+      const ms = Date.now() - t0;
+      console.info(`[AI] Batch ${bIndex + 1}/${batches.length} done in ${ms}ms, size=${batch.length}`);
+      try { onBatchEnd?.({ index: bIndex + 1, total: batches.length, size: batch.length, ms, ok: true }); } catch {}
+    } catch (e: any) {
+      for (const it of batch) {
+        results.set(it.id, { id: it.id, status: 'error', error: e?.message || 'Batch processing error' });
+      }
+      const msg = String(e?.message || e);
+      console.error(`[AI] Batch ${bIndex + 1}/${batches.length} failed:`, msg);
+      try { onBatchEnd?.({ index: bIndex + 1, total: batches.length, size: batch.length, ms: Date.now() - t0, ok: false, error: msg }); } catch {}
     }
   }
-  
-  onProgress?.(chunks.length, chunks.length, 'Complete');
-  return allResults;
+  const runners: Promise<void>[] = [];
+  for (let c = 0; c < Math.min(effConc, batches.length); c++) {
+    console.info(`[AI] Starting worker ${c + 1}/${Math.min(effConc, batches.length)}`);
+    runners.push((async function loop() {
+      while (true) {
+        const myIndex = idx++;
+        if (myIndex >= batches.length) break;
+        await runBatch(myIndex);
+      }
+    })());
+  }
+  const started = Date.now();
+  await Promise.all(runners);
+  console.info(`[AI] analyzeMcqInChunks completed in ${Date.now() - started}ms`);
+  return results;
 }

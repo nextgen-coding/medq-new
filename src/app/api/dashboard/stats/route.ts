@@ -55,6 +55,9 @@ async function getHandler(request: AuthenticatedRequest) {
                 id: true,
                 name: true
               }
+            },
+            lectureGroups: {
+              include: { courseGroup: true }
             }
           }
         }
@@ -62,17 +65,25 @@ async function getHandler(request: AuthenticatedRequest) {
       orderBy: {
         lastAccessed: 'desc'
       }
-    });
+    }) as any[];
 
     // Filter out rows without a questionId for question-based stats
     const questionProgress = progressData.filter(p => p.questionId);
 
     // Calculate statistics (question-level)
     const totalQuestions = questionProgress.length;
-    const completedQuestions = questionProgress.filter(p => p.completed).length;
-    const averageScore = questionProgress.length > 0 
-      ? questionProgress.reduce((sum, p) => sum + (p.score || 0), 0) / questionProgress.length
-      : 0;
+    const completedItems = questionProgress.filter(p => p.completed && typeof p.score === 'number') as Array<typeof questionProgress[number]>;
+    const completedQuestions = completedItems.length;
+    // Weighted average by course group coefficient; default coeff=1 when no group
+    let weightedSum = 0;
+    let weightTotal = 0;
+    for (const p of completedItems as any[]) {
+      const groups = p?.lecture?.lectureGroups as any[] | undefined;
+      const coeff = groups && groups.length ? (groups[0]?.courseGroup?.coefficient ?? 1) : 1;
+      weightedSum += ((p.score as number) || 0) * coeff;
+      weightTotal += coeff;
+    }
+    const averageScore = weightTotal > 0 ? (weightedSum / weightTotal) * 100 : null;
 
     // Calculate learning streak (consecutive days with activity)
     const today = new Date();
@@ -96,7 +107,7 @@ async function getHandler(request: AuthenticatedRequest) {
     const uniqueLectures = new Set(progressData.map(p => p.lectureId)).size;
 
     // Get last accessed lecture progress (group per lecture)
-    const lastLecture = progressData.length > 0 ? progressData[0] : null;
+  const lastLecture = progressData.length > 0 ? (progressData[0] as any) : null;
     let lastLecturePayload: any = null;
     if (lastLecture) {
       const lectureEntries = questionProgress.filter(p => p.lectureId === lastLecture.lectureId);
@@ -116,7 +127,7 @@ async function getHandler(request: AuthenticatedRequest) {
     }
 
     return NextResponse.json({
-      averageScore: Math.round(averageScore * 10) / 10, // Round to 1 decimal
+      averageScore: averageScore === null ? null : Math.round(averageScore * 10) / 10, // Round to 1 decimal
       totalQuestions,
       completedQuestions,
       learningStreak,
