@@ -403,39 +403,13 @@ export const HighlightableQuestionText: React.FC<HighlightableQuestionTextProps>
       {highlightedContent}
       {confirmMode && bubble && pending && (
         <div
-          className="absolute z-50 bg-white border border-gray-300 rounded-md p-3 shadow-lg"
-          style={{
-            left: `${bubble.x}px`,
-            top: `${bubble.y}px`,
-            transform: 'translate(-50%, -100%)',
-          }}
+          className="absolute z-50 -translate-x-1/2 -translate-y-full bg-white dark:bg-neutral-900 border rounded shadow px-2 py-1 flex items-center gap-2 text-xs"
+          style={{ left: bubble.x, top: Math.max(0, bubble.y - 6) }}
         >
-          <div className="text-sm text-gray-700 mb-2 whitespace-nowrap">
-            Surligner cette partie ?
-          </div>
-          <div className="flex gap-2 justify-center">
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setHighlights(curr => mergeRanges([...curr, pending!]));
-                setPending(null);
-                setBubble(null);
-              }}
-              className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md shadow hover:bg-blue-500 transition-colors"
-            >
-              Oui
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setPending(null);
-                setBubble(null);
-              }}
-              className="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded-md shadow hover:bg-gray-100 transition-colors"
-            >
-              Non
-            </button>
-          </div>
+          <button
+            className="px-2 py-0.5 rounded bg-lime-300 text-black hover:bg-lime-200 ring-1 ring-lime-400 shadow-[0_0_4px_rgba(163,230,53,0.8)]"
+            onClick={(e)=>{ e.stopPropagation(); setHighlights(curr=>mergeRanges([...curr, pending!])); setBubble(null); setPending(null); const sel=window.getSelection(); sel?.removeAllRanges(); }}
+          >Souligner</button>
         </div>
       )}
     </div>
