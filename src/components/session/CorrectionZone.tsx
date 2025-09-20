@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger, DrawerClose } from '@/components/ui/drawer';
-import { Plus, Save, UploadCloud, Table as TableIcon, PenLine, CheckCircle, Loader2, Eye, EyeOff, ClipboardList, Trash2, X, FileText, MinusCircle, XCircle, Link, GripVertical, ChevronUp, ChevronDown, Edit2, RefreshCw } from 'lucide-react';
+import { Plus, Save, UploadCloud, PenLine, CheckCircle, Loader2, Eye, EyeOff, ClipboardList, Trash2, X, FileText, MinusCircle, XCircle, Link, GripVertical, ChevronUp, ChevronDown, Edit2, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { saveCorrection, saveSubmission, getCorrection } from '@/app/actions/correction';
@@ -1057,6 +1057,38 @@ export function CorrectionZone({ sessionId, mode, onQuestionLink, pdfLinks = [],
     markDirty();
   };
 
+  // Creation helpers (restored)
+  const addTable = () => {
+    setData(d => ({
+      ...d,
+      tables: [
+        ...d.tables,
+        {
+          id: crypto.randomUUID(),
+          title: '',
+          headers: ['Question', 'Référence', 'Réponse'],
+          rows: [['', '', '']],
+        },
+      ],
+    }));
+    markDirty();
+  };
+
+  const addText = () => {
+    setData(d => ({
+      ...d,
+      texts: [
+        ...d.texts,
+        {
+          id: crypto.randomUUID(),
+          title: '',
+          reference: '',
+        },
+      ],
+    }));
+    markDirty();
+  };
+
   const saveCorrectionData = async () => {
     try {
       setSaving(true);
@@ -1408,7 +1440,69 @@ export function CorrectionZone({ sessionId, mode, onQuestionLink, pdfLinks = [],
   }
 
   return (
-    <div className="space-y-3 sm:space-y-4 w-full max-w-none sm:max-w-4xl mx-auto h-full px-2 sm:px-0">
+    <div className="correction-zone-scroll space-y-3 sm:space-y-4 w-full max-w-none sm:max-w-4xl mx-auto h-full px-2 sm:px-0">
+      {/* Editor preview banner when in user mode: always visible for admins */}
+      {isEditor && editorTestMode && (
+        <Card className="border border-yellow-300 dark:border-yellow-700 bg-yellow-50/70 dark:bg-yellow-900/20">
+          <CardContent className="py-2 px-4 flex items-center justify-between gap-2">
+            <div className="text-sm text-yellow-900 dark:text-yellow-200">
+              Mode étudiant (aperçu admin)
+            </div>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" onClick={toggleEditorTestMode} className="gap-2">
+                Retour mode éditeur
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      {/* Desktop Admin Controls */}
+      {canEdit && (
+        <Card className="hidden sm:block border border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-800/60">
+          <CardContent className="py-3 px-4">
+            <div className="flex flex-wrap gap-2 items-center">
+              <Button size="sm" variant="outline" onClick={addMedicalQCMQuestion} className="gap-2">
+                <ClipboardList className="h-4 w-4" /> QCM Médical
+              </Button>
+              <Button size="sm" variant="outline" onClick={addMedicalQROCQuestion} className="gap-2">
+                <PenLine className="h-4 w-4" /> QROC Médical
+              </Button>
+              <Button size="sm" variant="outline" onClick={addClinicalCase} className="gap-2">
+                <FileText className="h-4 w-4" /> Cas Clinique
+              </Button>
+              {/* Removed Tableau QCM and Bloc de Texte buttons as requested */}
+              <Button size="sm" variant="outline" onClick={() => setShowPasteDialog(true)} className="gap-2">
+                <Plus className="h-4 w-4" /> Coller Contenu
+              </Button>
+              <div className="ml-auto flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant={editorTestMode ? 'outline' : 'default'}
+                  onClick={() => { if (editorTestMode) toggleEditorTestMode(); }}
+                  className="gap-2"
+                  title="Mode éditeur"
+                >
+                  Éditeur
+                </Button>
+                <Button
+                  size="sm"
+                  variant={editorTestMode ? 'default' : 'outline'}
+                  onClick={() => { if (!editorTestMode) toggleEditorTestMode(); }}
+                  className="gap-2"
+                  title="Voir comme étudiant"
+                >
+                  Étudiant
+                </Button>
+                {dirty && (
+                  <Button size="sm" onClick={saveCorrectionData} className="gap-2 bg-green-600 hover:bg-green-700 text-white">
+                    <Save className="h-4 w-4" /> Enregistrer
+                  </Button>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
       {/* Mobile Floating Action Button for Zone de Correction */}
       <div className="block sm:hidden">
         <Drawer open={mobileDrawerOpen} onOpenChange={setMobileDrawerOpen}>
@@ -1444,6 +1538,55 @@ export function CorrectionZone({ sessionId, mode, onQuestionLink, pdfLinks = [],
             </DrawerHeader>
             
             {/* Mobile Content in Drawer - All content shown like desktop */}
+            {canEdit && (
+              <div className="p-4 pt-2">
+                <Card className="border border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-800/60">
+                  <CardHeader className="pb-2 px-4">
+                    <CardTitle className="text-sm font-semibold">Outils d'édition</CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-0 pb-3 px-4">
+                    <div className="flex flex-wrap gap-2">
+                      <Button size="sm" variant="outline" onClick={addMedicalQCMQuestion} className="gap-2">
+                        <ClipboardList className="h-4 w-4" /> QCM Médical
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={addMedicalQROCQuestion} className="gap-2">
+                        <PenLine className="h-4 w-4" /> QROC Médical
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={addClinicalCase} className="gap-2">
+                        <FileText className="h-4 w-4" /> Cas Clinique
+                      </Button>
+                      {/* Removed Tableau QCM and Bloc de Texte on mobile as requested */}
+                      <Button size="sm" variant="outline" onClick={() => setShowPasteDialog(true)} className="gap-2">
+                        <Plus className="h-4 w-4" /> Coller Contenu
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={editorTestMode ? 'outline' : 'default'}
+                        onClick={() => { if (editorTestMode) toggleEditorTestMode(); }}
+                        className="gap-2"
+                        title="Mode éditeur"
+                      >
+                        Éditeur
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={editorTestMode ? 'default' : 'outline'}
+                        onClick={() => { if (!editorTestMode) toggleEditorTestMode(); }}
+                        className="gap-2"
+                        title="Voir comme étudiant"
+                      >
+                        Étudiant
+                      </Button>
+                      {dirty && (
+                        <Button size="sm" onClick={saveCorrectionData} className="gap-2 bg-green-600 hover:bg-green-700 text-white">
+                          <Save className="h-4 w-4" /> Enregistrer
+                        </Button>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
             <div className="flex-1 overflow-auto p-4 space-y-4">
               {/* Tables Section */}
               {data.tables.map(table => {
@@ -1723,8 +1866,8 @@ export function CorrectionZone({ sessionId, mode, onQuestionLink, pdfLinks = [],
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto max-w-full">
+            <CardContent className="py-3 px-4">
+              <div className="flex flex-wrap gap-2 items-center">
                 <div className="p-4 min-w-max">
                   <table className="table-auto text-sm border-collapse">
                     <thead>
@@ -1736,9 +1879,9 @@ export function CorrectionZone({ sessionId, mode, onQuestionLink, pdfLinks = [],
                               <div className="space-y-1">
                                 <div className="flex items-center gap-1">
                                   <Input 
-                                    value={h} 
+                                    value={h}
                                     onChange={e => updateTableHeader(table.id, i, e.target.value)}
-                                    className="h-7 text-xs bg-white/80 dark:bg-gray-800/50 border-gray-300 dark:border-gray-600 focus:ring-blue-500 min-w-0 flex-1" 
+                                    className="h-7 text-xs bg-white/80 dark:bg-gray-800/50 border-gray-300 dark:border-gray-600 focus:ring-blue-500 min-w-0 flex-1"
                                     placeholder="En-tête"
                                   />
                                   <Button
@@ -3400,6 +3543,12 @@ export function CorrectionZone({ sessionId, mode, onQuestionLink, pdfLinks = [],
         <div className="fixed top-2 sm:top-4 right-2 sm:right-4 z-50 bg-blue-600 text-white px-3 sm:px-4 py-2 sm:py-3 rounded-lg shadow-lg border border-blue-500 max-w-[calc(100vw-1rem)] sm:max-w-none">
           <div className="text-xs sm:text-sm font-medium mb-1 sm:mb-2">
             Auto-évaluation QROC {reviewIndex + 1}/{pendingSelfEvalIds.length}
+          </div>
+          <div className="text-[10px] sm:text-xs space-y-0.5 sm:space-y-1">
+            <div>1 = Correcte</div>
+            <div>2 = Partielle</div>
+            <div>3 = Incorrecte</div>
+            <div className="border-t border-blue-400 pt-1 mt-1 sm:mt-2 text-[9px] sm:text-xs">Entrée = Suivant</div>
           </div>
         </div>
       )}

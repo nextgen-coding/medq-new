@@ -59,8 +59,8 @@ export function AppSidebar() {
     }
   };
 
-  // Icon size based on sidebar state
-  const iconSize = state === 'expanded' ? 'h-5 w-5' : 'h-6 w-6';
+  // Icon size based on sidebar state (treat mobile as expanded for spacing/labels)
+  const iconSize = (state === 'expanded' || sidebarIsMobile) ? 'h-5 w-5' : 'h-6 w-6';
 
   return (
     <>
@@ -79,7 +79,7 @@ export function AppSidebar() {
                   className="w-7 h-7 object-contain"
                 />
               </div>
-              {state === 'expanded' && (
+              {(state === 'expanded' || sidebarIsMobile) && (
                 <div className="flex flex-col">
                   <span className="font-bold text-lg bg-gradient-to-r from-blue-600 to-blue-800 dark:from-blue-400 dark:to-blue-600 bg-clip-text text-transparent">
                     MedQ
@@ -118,7 +118,7 @@ export function AppSidebar() {
             </div>
             <SidebarGroup className="px-0">
               <SidebarGroupContent>
-                <SidebarMenu className={`space-y-2 ${state === 'expanded' ? 'px-3' : 'px-2'}`}>
+                <SidebarMenu className={`space-y-2 ${(state === 'expanded' || sidebarIsMobile) ? 'px-3' : 'px-2'}`}>
                   {regularMenuItems.map((item) => {
                     const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
                     return (
@@ -127,7 +127,7 @@ export function AppSidebar() {
                           asChild 
                           className={
                             `group transition-all duration-200 font-medium rounded-xl ${
-                              state === 'expanded' 
+                              (state === 'expanded' || sidebarIsMobile)
                                 ? 'px-4 py-3 min-h-[44px] flex items-center' 
                                 : 'p-0 min-h-[44px] w-full flex items-center justify-center'
                             } ${
@@ -137,9 +137,9 @@ export function AppSidebar() {
                             }`
                           }
                         >
-                          <Link href={item.href} className={`${state === 'expanded' ? 'flex items-center gap-3 w-full' : 'flex items-center justify-center w-full h-full'}`}>
+                          <Link href={item.href} className={`${(state === 'expanded' || sidebarIsMobile) ? 'flex items-center gap-3 w-full' : 'flex items-center justify-center w-full h-full'}`}>
                             <item.icon className={`${iconSize} ${isActive ? 'text-white' : 'text-blue-500 group-hover:text-blue-600'} transition-all flex-shrink-0`} />
-                            <span className={`${state === 'expanded' ? 'block' : 'sr-only'} font-medium`}>
+                            <span className={`${(state === 'expanded' || sidebarIsMobile) ? 'block' : 'sr-only'} font-medium`}>
                               {item.label}
                             </span>
                           </Link>
@@ -162,7 +162,7 @@ export function AppSidebar() {
                               asChild 
                               className={
                                 `group transition-all duration-200 font-medium rounded-xl ${
-                                  state === 'expanded' 
+                                  (state === 'expanded' || sidebarIsMobile)
                                     ? 'px-4 py-3 min-h-[44px] flex items-center' 
                                     : 'p-0 min-h-[44px] w-full flex items-center justify-center'
                                 } ${
@@ -172,9 +172,9 @@ export function AppSidebar() {
                                 }`
                               }
                             >
-                              <Link href={item.href} className={`${state === 'expanded' ? 'flex items-center gap-3 w-full' : 'flex items-center justify-center w-full h-full'}`}>
+                              <Link href={item.href} className={`${(state === 'expanded' || sidebarIsMobile) ? 'flex items-center gap-3 w-full' : 'flex items-center justify-center w-full h-full'}`}>
                                 <item.icon className={`${iconSize} ${isActive ? 'text-white' : 'text-indigo-500 group-hover:text-indigo-600'} transition-all flex-shrink-0`} />
-                                <span className={`${state === 'expanded' ? 'block' : 'sr-only'} font-medium`}>
+                                <span className={`${(state === 'expanded' || sidebarIsMobile) ? 'block' : 'sr-only'} font-medium`}>
                                   {item.label}
                                 </span>
                               </Link>
@@ -198,7 +198,7 @@ export function AppSidebar() {
                           asChild 
                           className={
                             `group transition-all duration-200 font-medium rounded-xl ${
-                              state === 'expanded' 
+                              (state === 'expanded' || sidebarIsMobile)
                                 ? 'px-4 py-3 min-h-[44px] flex items-center' 
                                 : 'p-0 min-h-[44px] w-full flex items-center justify-center'
                             } ${
@@ -208,9 +208,9 @@ export function AppSidebar() {
                             }`
                           }
                         >
-                          <Link href={adminItem.href} className={`${state === 'expanded' ? 'flex items-center gap-3 w-full' : 'flex items-center justify-center w-full h-full'}`}>
+                          <Link href={adminItem.href} className={`${(state === 'expanded' || sidebarIsMobile) ? 'flex items-center gap-3 w-full' : 'flex items-center justify-center w-full h-full'}`}>
                             <adminItem.icon className={`${iconSize} ${pathname.startsWith('/admin') ? 'text-white' : 'text-green-500 group-hover:text-green-600'} transition-all flex-shrink-0`} />
-                            <span className={`${state === 'expanded' ? 'block' : 'sr-only'} font-medium`}>
+                            <span className={`${(state === 'expanded' || sidebarIsMobile) ? 'block' : 'sr-only'} font-medium`}>
                               {adminItem.label}
                             </span>
                           </Link>

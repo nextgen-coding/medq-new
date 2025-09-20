@@ -34,10 +34,19 @@ import { UniversalHeader } from '@/components/layout/UniversalHeader';
 import { AppSidebar, AppSidebarProvider } from '@/components/layout/AppSidebar';
 import { SidebarInset, useSidebar } from '@/components/ui/sidebar';
 import { CorrectionZone } from '@/components/session/CorrectionZone';
+import { getCorrection } from '@/app/actions/correction';
 
 // Import CSS for react-pdf
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
+
+// Configure PDF.js worker
+import { pdfjs } from 'react-pdf';
+
+// Set up the worker
+if (typeof window !== 'undefined') {
+  pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
+}
 
 type Session = {
   id: string;
@@ -140,9 +149,9 @@ export default function SessionViewerPage() {
   }, []);
 
   const viewType = searchParams.get('type') || 'exam';
-  // Allow all authenticated roles (including students) to view correction PDF
-  const canViewCorrection = !!user; // previously restricted to admin/maintainer
   const mode: 'admin' | 'maintainer' | 'student' = user?.role === 'admin' ? 'admin' : user?.role === 'maintainer' ? 'maintainer' : 'student';
+  const isAdminOrMaintainer = mode === 'admin' || mode === 'maintainer';
+  const [hasDbCorrection, setHasDbCorrection] = useState<boolean | null>(null);
 
   // Normalize params
   const sessionId = Array.isArray(params.sessionId) ? params.sessionId[0] : params.sessionId;
@@ -154,9 +163,31 @@ export default function SessionViewerPage() {
   const examUrl = examUrlRaw ? (/drive\.google\.com/.test(examUrlRaw) ? `/api/proxy-pdf?url=${encodeURIComponent(examUrlRaw)}` : examUrlRaw) : undefined;
   const correctionUrl = correctionUrlRaw ? (/drive\.google\.com/.test(correctionUrlRaw) ? `/api/proxy-pdf?url=${encodeURIComponent(correctionUrlRaw)}` : correctionUrlRaw) : undefined;
   const currentPdfUrl = examUrl; // always exam in main view
-  const canShowCorrection = !!(session && canViewCorrection && correctionUrlRaw);
+  // Capabilities: Zone is available to admins at all times, and to students only if a DB correction exists. PDF depends on URL.
+  const canShowCorrectionPdf = !!(session && correctionUrlRaw);
+  const canShowCorrectionZone = !!session && (isAdminOrMaintainer || hasDbCorrection === true);
+  const canShowCorrectionButton = canShowCorrectionPdf || canShowCorrectionZone;
   // auto open PDF view (in-panel) if ?type=correction
-  useEffect(() => { if (viewType === 'correction' && canShowCorrection) { setPanelCollapsed(false); setShowCorrectionPdf(true); } }, [viewType, canShowCorrection]);
+  useEffect(() => { if (viewType === 'correction' && canShowCorrectionPdf) { setPanelCollapsed(false); setShowCorrectionPdf(true); } }, [viewType, canShowCorrectionPdf]);
+
+  // Fetch whether a DB correction exists for this session (for student visibility gating)
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        if (!sessionId) return;
+        // Server action call – will respect current user's auth
+        const res = await getCorrection(String(sessionId));
+        if (!cancelled) {
+          setHasDbCorrection(!!(res && (res as any).success && (res as any).correction));
+        }
+      } catch (e) {
+        if (!cancelled) setHasDbCorrection(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [sessionId]);
 
   // Fetch session data
   useEffect(() => {
@@ -431,6 +462,46 @@ export default function SessionViewerPage() {
     };
   }, []);
 
+  // Keyboard shortcut: C toggles Correction PDF panel (open to PDF, press again closes)
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      // Only plain 'c' (case-insensitive), no Ctrl/Meta; Shift allowed
+      const key = e.key?.toLowerCase();
+      if (key !== 'c' || e.ctrlKey || e.metaKey || e.altKey) return;
+
+      // Avoid when typing in inputs/textareas/contenteditable
+      const target = e.target as HTMLElement | null;
+      if (target) {
+        const tag = target.tagName;
+        const isEditable = (target as any).isContentEditable;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || isEditable) return;
+      }
+
+      // Must have a correction PDF available
+      if (!canShowCorrectionPdf || !correctionUrl) return;
+
+  e.preventDefault();
+
+      // If panel collapsed, open directly to PDF
+      if (panelCollapsed) {
+        setPanelCollapsed(false);
+        // If correction mode is enabled (zone/pdf toggle), force PDF view
+        if (correctionModeEnabled) setShowCorrectionPdf(true);
+        return;
+      }
+
+      // Panel is open: if currently showing PDF, close; otherwise switch to PDF
+      const currentlyShowingPdf = (!correctionModeEnabled) || (correctionModeEnabled && showCorrectionPdf);
+      if (currentlyShowingPdf) {
+        setPanelCollapsed(true);
+      } else {
+        setShowCorrectionPdf(true);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [panelCollapsed, correctionModeEnabled, showCorrectionPdf, canShowCorrectionPdf, correctionUrl]);
+
   return (
     <ProtectedRoute>
       <AppSidebarProvider>
@@ -454,7 +525,7 @@ export default function SessionViewerPage() {
                     <span className="font-medium">Retour</span>
                   </Button>
                 )}
-                rightActions={canShowCorrection && (
+                rightActions={canShowCorrectionButton && (
                   <Button
                     variant={correctionModeEnabled ? "default" : "outline"}
                     size="sm"
@@ -465,7 +536,8 @@ export default function SessionViewerPage() {
                       if (newCorrectionMode) {
                         // When enabling correction mode, show the panel and zone (not PDF)
                         setPanelCollapsed(false);
-                        setShowCorrectionPdf(false); 
+                        // Default to Zone if available, otherwise PDF
+                        setShowCorrectionPdf(!canShowCorrectionZone && canShowCorrectionPdf);
                       } else {
                         // When disabling correction mode, also disable linking mode
                         setIsLinkingMode(false);
@@ -542,35 +614,16 @@ export default function SessionViewerPage() {
                       <Card className="border-border/50 bg-white/50 dark:bg-muted/30 backdrop-blur-sm shadow-lg">
                         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-blue-400/40 via-blue-600/10 to-blue-400/40" />
                         <CardContent className="p-3 sm:p-4">
-                          <div className="flex flex-col gap-3 text-xs sm:text-sm">
-                            <div className="flex flex-wrap items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap text-xs sm:text-sm">
+                            {/* Left group: label + pages */}
+                            <div className="flex items-center gap-2">
                               <Badge variant="default" className="bg-blue-600 text-white text-xs">Examen</Badge>
-                              {numPages && <span className="text-sm text-blue-800 dark:text-blue-200 font-medium whitespace-nowrap">{numPages} pages</span>}
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    setPanelCollapsed(c => !c);
-                                    // When opening panel, ensure appropriate content is shown
-                                    if (panelCollapsed) {
-                                      // If correction mode is enabled, show zone; otherwise always show PDF
-                                      if (correctionModeEnabled) {
-                                        setShowCorrectionPdf(false);
-                                      } else {
-                                        setShowCorrectionPdf(true);
-                                      }
-                                    }
-                                  }}
-                                  disabled={!canShowCorrection}
-                                  className="ml-auto bg-white/70 dark:bg-muted/40 hover:bg-blue-50 dark:hover:bg-blue-900/30 border-blue-200 dark:border-blue-800 gap-1"
-                                >
-                                  {panelCollapsed ? <PanelRightOpen className="h-4 w-4" /> : <PanelRightClose className="h-4 w-4" />}
-                                  <span className="hidden sm:inline">
-                                    {panelCollapsed ? 'Afficher correction' : 'Masquer correction'}
-                                  </span>
-                                </Button>
+                              {numPages && (
+                                <span className="text-sm text-blue-800 dark:text-blue-200 font-medium whitespace-nowrap">{numPages} pages</span>
+                              )}
                             </div>
-                            <div className="flex items-center gap-2 flex-wrap">
+                            {/* Center group: zoom/adjust/rotate/fullscreen/link */}
+                            <div className="flex-1 flex items-center justify-center gap-2 min-w-[200px]">
                               <Button variant="outline" size="sm" onClick={() => changeScale(-0.2)} disabled={scale <= 0.5}
                                 className="bg-white/70 dark:bg-muted/40 hover:bg-blue-50 dark:hover:bg-blue-900/30 border-blue-200 dark:border-blue-800 p-2">
                                 <ZoomOut className="h-4 w-4" />
@@ -606,6 +659,36 @@ export default function SessionViewerPage() {
                                 </Button>
                               )}
                             </div>
+                            {/* Right group: show/hide correction panel */}
+                            <div className="ml-auto">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setPanelCollapsed(c => !c);
+                                  // When opening panel, ensure appropriate content is shown
+                                  if (panelCollapsed) {
+                                    // If correction mode is enabled, show zone; otherwise always show PDF
+                                    if (correctionModeEnabled) {
+                                      setShowCorrectionPdf(false);
+                                    } else {
+                                      setShowCorrectionPdf(true);
+                                    }
+                                  }
+                                }}
+                                disabled={!canShowCorrectionButton}
+                                className="bg-white/70 dark:bg-muted/40 hover:bg-blue-50 dark:hover:bg-blue-900/30 border-blue-200 dark:border-blue-800 gap-1"
+                                title={canShowCorrectionPdf ? "Afficher/Masquer la correction (C)" : "Afficher/Masquer la correction"}
+                              >
+                                {panelCollapsed ? <PanelRightOpen className="h-4 w-4" /> : <PanelRightClose className="h-4 w-4" />}
+                                <span className="hidden sm:inline">
+                                  {panelCollapsed ? 'Afficher correction' : 'Masquer correction'}
+                                </span>
+                                {canShowCorrectionPdf && (
+                                  <span className="hidden lg:inline text-[10px] text-muted-foreground ml-1">C</span>
+                                )}
+                              </Button>
+                            </div>
                             {/* Linking Mode Helper Text - only show when correction mode is enabled */}
                             {isLinkingMode && correctionModeEnabled && (
                               <div className="mt-2 p-2 bg-blue-50/80 dark:bg-blue-900/30 rounded-lg border border-blue-200 dark:border-blue-700">
@@ -631,7 +714,7 @@ export default function SessionViewerPage() {
                               <span className="text-sm font-medium text-blue-800 dark:text-blue-200">Liens créés ({pdfLinks.length})</span>
                             </div>
                             <div className="space-y-2 max-h-32 overflow-y-auto">
-                              {pdfLinks.map((link, index) => (
+                              {pdfLinks.map((link) => (
                                 <div key={link.id} className="flex items-center justify-between p-2 bg-blue-50/50 dark:bg-blue-900/20 rounded-lg">
                                   <div className="flex items-center gap-2 flex-1 min-w-0">
                                     <span className="text-xs text-blue-700 dark:text-blue-300 font-medium">Page {link.page}</span>
@@ -659,7 +742,6 @@ export default function SessionViewerPage() {
                                     >
                                       <Copy className="h-3 w-3" />
                                     </Button>
-                                    {/* Hide delete button in user mode */}
                                     {!isUserMode && (
                                       <Button
                                         variant="ghost"
@@ -675,11 +757,12 @@ export default function SessionViewerPage() {
                                 </div>
                               ))}
                             </div>
-                          </CardContent>
-                        </Card>
+                        </CardContent>
+                      </Card>
                       )}
-                      
-            <Card className="border-border/50 bg-white/50 dark:bg-muted/30 backdrop-blur-sm shadow-lg overflow-hidden" style={{ height: '70vh', maxHeight: '70vh' }}>
+
+                      {/* Exam PDF content */}
+                      <Card className="border-border/50 bg-white/50 dark:bg-muted/30 backdrop-blur-sm shadow-lg overflow-hidden" style={{ height: '70vh', maxHeight: '70vh' }}>
                         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-blue-400/40 via-blue-600/10 to-blue-400/40" />
                         <CardContent className="p-0 h-full flex flex-col">
                           <div className="flex justify-center bg-gradient-to-br from-blue-50/80 via-white to-indigo-50/40 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 relative rounded-md overflow-hidden flex-1" style={{ height: '100%' }}>
@@ -694,7 +777,7 @@ export default function SessionViewerPage() {
                                     className="bg-white/70 dark:bg-muted/40 hover:bg-blue-50 dark:hover:bg-blue-900/30 border-blue-200 dark:border-blue-800">
                                     Tourner
                                   </Button>
-                                  <Button size="sm" variant="outline" onClick={() => window.open(currentPdfUrl, '_blank')}
+                                  <Button size="sm" variant="outline" onClick={() => window.open(currentPdfUrl!, '_blank')}
                                     className="bg-white/70 dark:bg-muted/40 hover:bg-blue-50 dark:hover:bg-blue-900/30 border-blue-200 dark:border-blue-800">
                                     Ouvrir dans un onglet
                                   </Button>
@@ -839,7 +922,7 @@ export default function SessionViewerPage() {
                                 {correctionModeEnabled ? "Zone de Correction" : "PDF de Correction"}
                               </span>
                               {/* Toggle between PDF and Zone when correction mode is enabled */}
-                              {canShowCorrection && correctionModeEnabled && (
+                              {canShowCorrectionPdf && canShowCorrectionZone && correctionModeEnabled && (
                                 <Button 
                                   size="sm" 
                                   variant="outline" 
@@ -857,7 +940,7 @@ export default function SessionViewerPage() {
                               )}
                             </div>
                             {/* Mobile-only: Always show PDF in the panel, Zone opens via floating button */}
-                            {canShowCorrection && correctionUrl && (
+                            {canShowCorrectionPdf && correctionUrl && (
                               <div className="flex sm:hidden flex-col border border-blue-100 dark:border-blue-800 rounded-lg overflow-hidden bg-gradient-to-br from-blue-50/60 via-white to-indigo-50/40 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex-1 min-h-0">
                                 {/* Mobile PDF Header */}
                                 <div className="flex items-center justify-between px-3 py-2 border-b border-blue-200 dark:border-blue-800 bg-white/80 dark:bg-muted/40 flex-shrink-0">
@@ -932,7 +1015,7 @@ export default function SessionViewerPage() {
                               </div>
                             )}
                             {/* Show Correction Zone only when correction mode is enabled and not showing PDF */}
-                            {correctionModeEnabled && !showCorrectionPdf && (
+                            {correctionModeEnabled && !showCorrectionPdf && canShowCorrectionZone && (
                               <div className="hidden sm:flex flex-1 flex-col h-full min-h-0">
                                 <div className="flex-1 overflow-y-auto overflow-x-hidden correction-zone-scroll pr-1">
                                   <CorrectionZone 
@@ -947,7 +1030,7 @@ export default function SessionViewerPage() {
                               </div>
                             )}
                             {/* Show Correction PDF when enabled OR when correction mode is disabled */}
-                            {(showCorrectionPdf || !correctionModeEnabled) && canShowCorrection && correctionUrl && (
+                            {(showCorrectionPdf || !correctionModeEnabled) && canShowCorrectionPdf && correctionUrl && (
                               <div className="hidden sm:flex flex-col border border-blue-100 dark:border-blue-800 rounded-lg overflow-hidden bg-gradient-to-br from-blue-50/60 via-white to-indigo-50/40 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex-1 min-h-0">
                                 <div className="flex items-center gap-2 px-3 py-2 border-b border-blue-200 dark:border-blue-800 bg-white/70 dark:bg-muted/40 text-xs flex-wrap flex-shrink-0">
                                   {correctionNumPages && <span className="text-blue-800 dark:text-blue-200 font-medium text-[11px]">{correctionNumPages} pages</span>}
@@ -1012,7 +1095,7 @@ export default function SessionViewerPage() {
                   </div>
                 )}
                 {/* Render CorrectionZone on mobile for floating button only when correction mode is ON */}
-                {session && correctionModeEnabled && canShowCorrection && (
+                {session && correctionModeEnabled && canShowCorrectionZone && (
                   <div className="block sm:hidden">
                     <CorrectionZone 
                       sessionId={session.id} 
@@ -1024,7 +1107,7 @@ export default function SessionViewerPage() {
                     />
                   </div>
                 )}
-                {canShowCorrection && correctionUrl && panelCollapsed && <FloatingCorrectionButton onClick={() => { setPanelCollapsed(false); setShowCorrectionPdf(true); }} />}
+                {canShowCorrectionPdf && correctionUrl && panelCollapsed && <FloatingCorrectionButton onClick={() => { setPanelCollapsed(false); setShowCorrectionPdf(true); }} />}
                 </div>
               </div>
             </SidebarInset>
