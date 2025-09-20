@@ -1,8 +1,9 @@
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Activity } from 'lucide-react';
-import { Bar, BarChart, XAxis, YAxis, Tooltip, ResponsiveContainer, LabelList, Cell, ReferenceLine } from 'recharts';
+import { Bar, BarChart, XAxis, YAxis, Tooltip, LabelList, Cell, ReferenceLine } from 'recharts';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -20,9 +21,28 @@ export function DailyLearningChart({ data, isLoading: extLoading=false, streak }
   // debug mode removed (was toggled via 'bug' button)
   const [meta, setMeta] = useState<any>(null);
   const [mounted, setMounted] = useState(false);
+  const [windowWidth, setWindowWidth] = useState<number>(1024); // Default to desktop size
+
+  const toggleView = () => {
+    setDays(prev => prev === 7 ? 30 : 7);
+  };
+
+  const viewMode = days === 7 ? '7days' : '30days';
 
   useEffect(() => {
     setMounted(true);
+    // Set initial window width
+    if (typeof window !== 'undefined') {
+      setWindowWidth(window.innerWidth);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const handleResize = () => setWindowWidth(window.innerWidth);
+      window.addEventListener('resize', handleResize);
+      return () => window.removeEventListener('resize', handleResize);
+    }
   }, []);
 
   useEffect(()=>{ if(typeof window!=='undefined') localStorage.setItem('daily_activity_days', String(days)); },[days]);
@@ -96,13 +116,51 @@ export function DailyLearningChart({ data, isLoading: extLoading=false, streak }
     if(days>=14) return d.toLocaleDateString('fr-FR',{ weekday:'short', day:'numeric' }).replace(/\.$/,'');
     return d.toLocaleDateString('fr-FR',{ weekday:'short', day:'numeric' });
   };
+  // Responsive chart dimensions
+  const getChartDimensions = () => {
+    if (typeof window === 'undefined') return { height: 280, minWidth: 300 };
+
+    const width = windowWidth;
+    if (width < 640) { // Mobile
+      return { height: 240, minWidth: Math.max(280, width - 16) }; // Use more conservative minWidth to prevent overflow
+    } else if (width < 1024) { // Tablet
+      return { height: 260, minWidth: 400 };
+    } else { // Desktop
+      return { height: 280, minWidth: Math.min(800, width - 100) }; // Increased from 500 to 800, with max width constraint
+    }
+  };
+
+  const chartDimensions = getChartDimensions();
+
+  // Responsive bar sizes
+  const getBarSize = () => {
+    if (typeof window === 'undefined') return days === 7 ? 70 : days === 14 ? 20 : 12;
+
+    const width = windowWidth;
+    const availableWidth = Math.max(width - 32, 280); // Reduced padding from 64 to 32 for mobile
+    const totalBars = days;
+    const minBarSize = 8;
+    const maxBarSize = width >= 1024 ? (days === 7 ? 80 : days === 14 ? 35 : 20) : (days === 7 ? 70 : days === 14 ? 20 : 12); // Increased max bar sizes for desktop
+    const calculatedSize = Math.max(minBarSize, Math.min(maxBarSize, (availableWidth - 40) / totalBars));
+
+    return calculatedSize;
+  };
+
+  const barSize = getBarSize();
 
   // Custom tick to hide some labels to prevent overlap (especially 30j window)
   const CustomTick = (props:any) => {
     const { x, y, payload, index } = props;
-    if(days===30 && index % 2 === 1) return null; // show every other day
+    const width = windowWidth;
+
+    // On very small screens, show fewer labels
+    if (width < 480 && days >= 14 && index % 2 === 1) return null;
+    if (width < 640 && days >= 30 && index % 3 !== 0) return null;
+    if (width >= 640 && days === 30 && index % 2 === 1) return null;
+
+    const fontSize = width < 640 ? 8 : width < 1024 ? 10 : 11;
     return (
-      <text x={x} y={y+10} textAnchor="middle" fontSize={11} fill="currentColor" className="select-none">
+      <text x={x} y={y+10} textAnchor="middle" fontSize={fontSize} fill="currentColor" className="select-none">
         {formatDate(payload.value)}
       </text>
     );
@@ -120,77 +178,163 @@ export function DailyLearningChart({ data, isLoading: extLoading=false, streak }
     return null;
   };
 
+  // Mobile-optimized chart for very small screens
+  const MobileChart = () => {
+    const mobileData = chartData.slice(-4); // Show only last 4 days on mobile
+    // Account for card padding (px-1 = 4px on each side = 8px total) + maximum buffer
+    const availableWidth = windowWidth - 32; // Subtract card padding + 24px buffer for absolute safe fit
+    const mobileBarSize = Math.max(14, (availableWidth) / 4); // Minimum bars for guaranteed fit
+
+    return (
+      <BarChart 
+        data={mobileData} 
+        width={availableWidth} // Fit within card padding
+        height={chartDimensions.height} 
+        margin={{ top: 8, right: 3, left: 3, bottom: 8 }} 
+        barCategoryGap="3%" 
+        barGap={0}
+      >
+        <XAxis
+          dataKey="date"
+          tick={{ fontSize: 8, fill: 'currentColor' }}
+          axisLine={false}
+          tickLine={false}
+          interval={0}
+          tickFormatter={(value) => new Date(value).toLocaleDateString('fr-FR', { weekday: 'short' })}
+        />
+        <YAxis
+          tick={{ fontSize: 8, fill: 'currentColor' }}
+          axisLine={false}
+          tickLine={false}
+          allowDecimals={false}
+          domain={[0, maxVal === 0 ? 4 : Math.max(maxVal + 1, Math.ceil(maxVal * 1.05))]}
+        />
+        <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(148,163,184,0.12)' }} wrapperStyle={{ pointerEvents: 'none' }} />
+        {avg > 0 && <ReferenceLine y={avg} stroke="#64748b" strokeDasharray="4 4" label={{ value: t('dashboard.chart.avgLabel', { defaultValue: 'Moy.' }), position: 'right', fill: 'currentColor', fontSize: 8 }} />}
+        <Bar dataKey="displayTotal" fill="#3b82f6" radius={[4, 4, 0, 0]} minPointSize={8} barSize={mobileBarSize}>
+          {mobileData.map((e, i) => (
+            <Cell key={i} fill={e.total === 0 ? 'rgba(59,130,246,0.25)' : '#3b82f6'} stroke={e.date === todayKey ? '#1d4ed8' : undefined} strokeWidth={e.date === todayKey ? 2 : 0} />
+          ))}
+          <LabelList dataKey="total" position="top" fontSize={8} className="fill-current" formatter={(v: number) => v > 0 ? v : ''} />
+        </Bar>
+      </BarChart>
+    );
+  };
+
   if(isLoading){
     return (
-      <Card className="border-border/50 bg-white/50 dark:bg-muted/30 backdrop-blur-sm shadow-lg">
-        <CardHeader className="pb-3">
+      <Card className="border-border/50 bg-white/50 dark:bg-muted/30 backdrop-blur-sm shadow-lg mx-0 sm:mx-auto max-w-none">
+        <CardHeader className="pb-3 px-3 sm:px-6">
           <div className="h-6 w-40 bg-muted/60 rounded animate-pulse"/>
         </CardHeader>
-        <CardContent className="pb-[2px]">
+        <CardContent className="pb-[2px] px-1 sm:px-6">
           {/* Match loaded chart container height exactly */}
-          <div className="w-full h-[280px] bg-muted/60 rounded animate-pulse" style={{ minWidth: '300px', minHeight: '280px' }} />
+          <div 
+            className="w-full relative overflow-x-auto scrollbar-hide flex justify-center" 
+            style={{ 
+              height: chartDimensions.height, 
+              minWidth: chartDimensions.minWidth
+            }}
+          >
+            <div className="bg-muted/60 rounded animate-pulse" style={{ width: chartDimensions.minWidth, height: chartDimensions.height }} />
+          </div>
         </CardContent>
       </Card>
     );
   }
 
   return (
-  <Card className="border-border/50 bg-white/50 dark:bg-muted/30 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all">
-      <CardHeader className="pb-3">
-    <CardTitle className="flex items-center gap-3 flex-wrap text-lg font-semibold tracking-tight">
-          <span className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-800 dark:from-blue-400 dark:to-blue-600 bg-clip-text text-transparent">
-            <Activity className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-            {t('dashboard.chart.dailyActivity', { defaultValue: 'Activité quotidienne' })}
-          </span>
-          {showStreak>0 && (
-            <div className={`relative inline-flex items-center justify-center ${streakIsCurrent? 'animate-pulse':'opacity-75'}`}
-              title={streakIsCurrent? (maxStreak && maxStreak!==showStreak? t('dashboard.chart.currentStreakWithMax', { defaultValue: 'Série actuelle: {{current}} jours (max: {{max}})', current: showStreak, max: maxStreak }):t('dashboard.chart.currentStreak', { defaultValue: 'Série actuelle: {{streak}} jours', streak: showStreak })):t('dashboard.chart.bestStreak', { defaultValue: 'Meilleure série: {{streak}} jours', streak: showStreak })}>
-              {/* Fire emoji background */}
-              <span className="text-4xl select-none filter drop-shadow-lg">🔥</span>
-              {/* Streak number overlay */}
-              <span className="absolute inset-0 flex items-center justify-center text-sm font-bold text-black drop-shadow-md">
-                {showStreak}
-              </span>
+  <Card className="border-border/50 bg-white/50 dark:bg-muted/30 backdrop-blur-sm shadow-lg hover:shadow-xl transition-all mx-0 sm:mx-auto max-w-none">
+              <CardHeader className="pb-2 sm:pb-4 px-3 sm:px-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
+            <CardTitle className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white">
+              {t('dashboard.chart.title', { defaultValue: 'Activité quotidienne' })}
+            </CardTitle>
+            <div className="flex items-center gap-2 sm:gap-3">
+              {showStreak>0 && (
+                <div className={`relative inline-flex items-center justify-center ${streakIsCurrent? 'animate-pulse':'opacity-75'}`}
+                  title={streakIsCurrent? (maxStreak && maxStreak!==showStreak? t('dashboard.chart.currentStreakWithMax', { defaultValue: 'Série actuelle: {{current}} jours (max: {{max}})', current: showStreak, max: maxStreak }):t('dashboard.chart.currentStreak', { defaultValue: 'Série actuelle: {{streak}} jours', streak: showStreak })):t('dashboard.chart.bestStreak', { defaultValue: 'Meilleure série: {{streak}} jours', streak: showStreak })}>
+                  {/* Fire emoji background */}
+                  <span className="text-2xl sm:text-3xl md:text-4xl select-none filter drop-shadow-lg">🔥</span>
+                  {/* Streak number overlay */}
+                  <span className="absolute inset-0 flex items-center justify-center text-xs sm:text-sm font-bold text-black drop-shadow-md">
+                    {showStreak}
+                  </span>
+                </div>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={toggleView}
+                className="h-8 sm:h-9 px-2 sm:px-3 text-xs sm:text-sm font-medium"
+                disabled={windowWidth < 640}
+              >
+                {windowWidth < 640
+                  ? t('dashboard.chart.mobileView', { defaultValue: 'Vue mobile (4j)' })
+                  : viewMode === '7days'
+                    ? t('dashboard.chart.view30Days', { defaultValue: '30 jours' })
+                    : t('dashboard.chart.view7Days', { defaultValue: '7 jours' })
+                }
+              </Button>
             </div>
-          )}
-          <span className="ml-auto text-xs text-slate-500 dark:text-slate-400">{t('dashboard.chart.average', { defaultValue: 'Moy: {{avg}}/j', avg: avg.toFixed(1) })}</span>
-          <div className="flex items-center gap-1">
-            {DAY_WINDOWS.map(d => (
-              <button key={d} onClick={()=>setDays(d)} className={`px-2 py-0.5 rounded text-[11px] font-medium border transition ${days===d? 'bg-blue-600 text-white border-blue-600 shadow-sm':'bg-transparent dark:text-slate-300 border-border/40 hover:bg-blue-500/10'}`}>{d}j</button>
-            ))}
           </div>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="pb-[2px]">
-        <div className="w-full h-[280px] relative" style={{ minWidth: '300px', minHeight: '280px' }}>
-          {error && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-sm text-red-600 dark:text-red-400">
-              <span>{t('dashboard.chart.error', { defaultValue: 'Erreur: {{error}}', error })}</span>
-              <a href={`/api/dashboard/daily-activity?days=${days}&debug=1`} target="_blank" className="text-blue-600 dark:text-blue-400 hover:underline text-xs">{t('dashboard.chart.debugApi', { defaultValue: 'Débug API' })}</a>
+        </CardHeader>
+      <CardContent className="pb-[2px] px-1 sm:px-6">
+        <div 
+          className="w-full relative overflow-hidden scrollbar-hide flex justify-center" 
+          style={{ 
+            height: chartDimensions.height, 
+            maxWidth: windowWidth < 640 ? windowWidth - 8 : chartDimensions.minWidth
+          }}
+        >
+          {/* Mobile scroll indicator */}
+          {windowWidth < 640 && chartDimensions.minWidth > windowWidth - 32 && (
+            <div className="absolute top-1 right-1 z-10 text-xs text-muted-foreground bg-background/80 px-1 rounded">
+              ← →
             </div>
           )}
-          {!error && chartData.length>0 && mounted && (
-            <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={280}>
-              <BarChart data={chartData} key={days} margin={{ top: 15, right: 2, left: 2, bottom: 15 }} barCategoryGap="5%" barGap={0} width={800} height={280}>
-                <XAxis dataKey="date" tick={<CustomTick />} axisLine={false} tickLine={false} interval={0} />
-                <YAxis tick={{ fontSize: 12, fill: 'currentColor' }} axisLine={false} tickLine={false} allowDecimals={false} domain={[0, maxVal===0? 4: Math.max(maxVal+1, Math.ceil(maxVal*1.05))]} />
-                <Tooltip content={<CustomTooltip />} cursor={{fill:'rgba(148,163,184,0.12)'}} wrapperStyle={{pointerEvents:'none'}} />
-                {avg>0 && <ReferenceLine y={avg} stroke="#64748b" strokeDasharray="4 4" label={{ value: t('dashboard.chart.avgLabel', { defaultValue: 'Moy.' }), position: 'right', fill: 'currentColor', fontSize: 10 }} />}
-                <Bar dataKey="displayTotal" fill="#3b82f6" radius={[6,6,0,0]} minPointSize={10} barSize={days===7?70: days===14?20:12}>
-                  {chartData.map((e,i)=>(
-                    <Cell key={i} fill={e.total===0? 'rgba(59,130,246,0.25)':'#3b82f6'} stroke={e.date===todayKey? '#1d4ed8': undefined} strokeWidth={e.date===todayKey?2:0} />
-                  ))}
-                  <LabelList dataKey="total" position="top" fontSize={11} className="fill-current" formatter={(v:number)=> v>0? v:''} />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-          {!error && (chartData.length===0 || chartData.every(d=>d.total===0)) && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-xs text-muted-foreground">
-              <span>{t('dashboard.chart.noActivity', { defaultValue: 'Aucune activité' })}</span>
-              <a href={`/api/dashboard/daily-activity?days=${days}&debug=1`} target="_blank" className="text-blue-600 hover:underline">{t('dashboard.chart.checkApi', { defaultValue: 'Vérifier l\'API' })}</a>
-            </div>
-          )}
+          <div className="relative">
+            {error && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-sm text-red-600 dark:text-red-400 z-10">
+                <span>{t('dashboard.chart.error', { defaultValue: 'Erreur: {{error}}', error })}</span>
+                <a href={`/api/dashboard/daily-activity?days=${days}&debug=1`} target="_blank" className="text-blue-600 dark:text-blue-400 hover:underline text-xs">{t('dashboard.chart.debugApi', { defaultValue: 'Débug API' })}</a>
+              </div>
+            )}
+            {!error && chartData.length>0 && mounted && (
+              <>
+                {windowWidth < 640 ? (
+                  <MobileChart />
+                ) : (
+                  <BarChart 
+                    data={chartData} 
+                    key={days} 
+                    width={chartDimensions.minWidth} 
+                    height={chartDimensions.height} 
+                    margin={{ top: 15, right: 2, left: 2, bottom: 15 }} 
+                    barCategoryGap="5%" 
+                    barGap={0}
+                  >
+                    <XAxis dataKey="date" tick={<CustomTick />} axisLine={false} tickLine={false} interval={0} />
+                    <YAxis tick={{ fontSize: windowWidth < 640 ? 10 : 12, fill: 'currentColor' }} axisLine={false} tickLine={false} allowDecimals={false} domain={[0, maxVal===0? 4: Math.max(maxVal+1, Math.ceil(maxVal*1.05))]} />
+                    <Tooltip content={<CustomTooltip />} cursor={{fill:'rgba(148,163,184,0.12)'}} wrapperStyle={{pointerEvents:'none'}} />
+                    {avg>0 && <ReferenceLine y={avg} stroke="#64748b" strokeDasharray="4 4" label={{ value: t('dashboard.chart.avgLabel', { defaultValue: 'Moy.' }), position: 'right', fill: 'currentColor', fontSize: 10 }} />}
+                    <Bar dataKey="displayTotal" fill="#3b82f6" radius={[6,6,0,0]} minPointSize={10} barSize={barSize}>
+                      {chartData.map((e,i)=>(
+                        <Cell key={i} fill={e.total===0? 'rgba(59,130,246,0.25)':'#3b82f6'} stroke={e.date===todayKey? '#1d4ed8': undefined} strokeWidth={e.date===todayKey?2:0} />
+                      ))}
+                      <LabelList dataKey="total" position="top" fontSize={windowWidth < 640 ? 9 : 11} className="fill-current" formatter={(v:number)=> v>0? v:''} />
+                    </Bar>
+                  </BarChart>
+                )}
+              </>
+            )}
+            {!error && (chartData.length===0 || chartData.every(d=>d.total===0)) && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-xs text-muted-foreground z-10" style={{ width: chartDimensions.minWidth, height: chartDimensions.height }}>
+                <span>{t('dashboard.chart.noActivity', { defaultValue: 'Aucune activité' })}</span>
+                <a href={`/api/dashboard/daily-activity?days=${days}&debug=1`} target="_blank" className="text-blue-600 hover:underline">{t('dashboard.chart.checkApi', { defaultValue: 'Vérifier l\'API' })}</a>
+              </div>
+            )}
+          </div>
         </div>
       </CardContent>
     </Card>

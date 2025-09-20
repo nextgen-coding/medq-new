@@ -52,6 +52,7 @@ interface OpenQuestionProps {
   hideMeta?: boolean;
   enableAnswerHighlighting?: boolean; // enable highlighting for user answers
   disableIndividualSubmit?: boolean; // when true (grouped clinical case), block per-question submit & reference reveal until parent submit
+  showNotesAfterSubmit?: boolean; // force show notes area after question is submitted
 }
 
 export function OpenQuestion({ 
@@ -79,6 +80,7 @@ export function OpenQuestion({
   hideMeta,
   enableAnswerHighlighting = false,
   disableIndividualSubmit = false,
+  showNotesAfterSubmit = false,
 }: OpenQuestionProps) {
   const [answer, setAnswer] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -91,16 +93,31 @@ export function OpenQuestion({
   const [isPinned, setIsPinned] = useState(false); // Track if question is pinned
   const [showNotesArea, setShowNotesArea] = useState(false); // Control showing notes/comments after click
   const [notesHasContent, setNotesHasContent] = useState(false); // track if notes have content
+  const [notesManuallyControlled, setNotesManuallyControlled] = useState(false); // track if user manually opened/closed notes
 
-  // Auto-close notes when content becomes empty
+  // Auto-show notes when content is detected, but only if not manually controlled
   useEffect(() => {
-    if (!notesHasContent) {
+    if (!notesManuallyControlled) {
+      if (notesHasContent) {
+        setShowNotesArea(true);
+      } else {
+        setShowNotesArea(false);
+      }
+    }
+  }, [notesHasContent, notesManuallyControlled]);
+
+  // Force show notes after submission if showNotesAfterSubmit is enabled, but only if notes have content
+  useEffect(() => {
+    if (showNotesAfterSubmit && isAnswered && !notesManuallyControlled) {
+      setShowNotesArea(notesHasContent);
+    } else if (!showNotesAfterSubmit && !notesManuallyControlled) {
       setShowNotesArea(false);
     }
-  }, [notesHasContent]);
+  }, [showNotesAfterSubmit, isAnswered, notesManuallyControlled, notesHasContent]);
   const notesRef = useRef<HTMLDivElement | null>(null);
   const hasSubmittedRef = useRef(false); // Immediate synchronous access to submission state
   const selfAssessmentRef = useRef<HTMLDivElement | null>(null);
+  const questionRef = useRef<HTMLDivElement | null>(null); // Ref for question top
   const { t } = useTranslation();
   const { user } = useAuth();
   const { trackQuestionProgress } = useProgress();
@@ -253,6 +270,8 @@ export function OpenQuestion({
     setHasSubmitted(false);
   // Close notes area when navigating to another question
   setShowNotesArea(false);
+    setNotesHasContent(false);
+    setNotesManuallyControlled(false);
   }, [question.id]);
 
   // In grouped clinical case mode (disableIndividualSubmit) propagate answer live ONLY when it actually changes
@@ -329,10 +348,7 @@ export function OpenQuestion({
     setSubmitted(true);
     setHasSubmitted(true);
     
-    // Auto-open notes area on submission (only if notes are not hidden)
-    if (!hideNotes) {
-      setShowNotesArea(true);
-    }
+    // Keep notes hidden by default - user can manually open if needed
     
     // For clinical case questions (hideImmediateResults = true), 
     // call onSubmit immediately with a default result since self-assessment is hidden
@@ -344,10 +360,10 @@ export function OpenQuestion({
     } else {
       // For regular questions, show self-assessment
       setShowSelfAssessment(true);
-      // Auto-scroll to self-assessment section
+      // Auto-scroll to question top to see the full question and results
       setTimeout(() => {
-        if (selfAssessmentRef.current) {
-          selfAssessmentRef.current.scrollIntoView({ 
+        if (questionRef.current) {
+          questionRef.current.scrollIntoView({ 
             behavior: 'smooth', 
             block: 'start' 
           });
@@ -552,6 +568,7 @@ export function OpenQuestion({
 
   return (
     <motion.div
+      ref={questionRef}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
@@ -725,18 +742,16 @@ export function OpenQuestion({
           hasSubmitted={hasSubmitted}
           assessmentCompleted={assessmentCompleted}
           showNotesArea={showNotesArea}
-          hideNotesButton={notesHasContent} // Hide button when notes have content
+          hideNotesButton={false} // Always show notes button so users can hide/show notes
           onToggleNotes={() => {
             setShowNotesArea(prev => !prev);
+            setNotesManuallyControlled(true);
             setTimeout(() => {
               if (!showNotesArea && notesRef.current) {
                 notesRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
               }
             }, 30);
           }}
-          isPinned={isPinned}
-          onPinQuestion={handlePinQuestion}
-          onUnpinQuestion={handleUnpinQuestion}
         />
       )}
 
@@ -779,9 +794,9 @@ export function OpenQuestion({
     );
   })()}
 
-  {/* Notes - show when explicitly opened OR when has content (auto-open) */}
-  {!hideNotes && (showNotesArea || (submitted && notesHasContent)) && (
-        <div ref={notesRef}>
+  {/* Notes - always render for content detection, but show/hide based on showNotesArea */}
+  {!hideNotes && (
+        <div ref={notesRef} className={showNotesArea ? "" : "hidden"}>
           <QuestionNotes 
             questionId={question.id} 
             onHasContentChange={setNotesHasContent}

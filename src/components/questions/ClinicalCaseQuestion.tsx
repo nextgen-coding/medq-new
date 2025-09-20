@@ -795,7 +795,7 @@ export function ClinicalCaseQuestion({
                       className="flex items-center gap-1"
                     >
                       <StickyNote className="h-4 w-4" />
-                      <span className="hidden sm:inline">{showNotesArea ? 'Fermer les notes' : (notesHasContent ? 'Mes notes' : 'Prendre une note')}</span>
+                      <span className="hidden sm:inline">{showNotesArea ? 'Fermer les notes' : 'Mes notes'}</span>
                     </Button>
                   );
                 })()}

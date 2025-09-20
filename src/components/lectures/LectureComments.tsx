@@ -409,15 +409,15 @@ export function LectureComments({ lectureId }: LectureCommentsProps) {
                 
                 {/* Clickable Images */}
                 {comment.imageUrls && comment.imageUrls.length > 0 && (
-                  <div className="mt-3 grid grid-cols-2 gap-2">
+                  <div className="mt-3 flex flex-wrap gap-2">
                     {comment.imageUrls.slice(0, 4).map((url: string, idx: number) => (
                       <Dialog key={idx}>
                         <DialogTrigger asChild>
-                          <div className="cursor-pointer group relative">
+                          <div className="cursor-pointer group relative flex-1 min-w-0 max-w-sm">
                             <img 
                               src={url} 
                               alt="attachment" 
-                              className="w-full h-24 object-cover rounded-lg border group-hover:opacity-90 transition-opacity"
+                              className="w-full h-auto max-h-64 object-contain rounded-lg border group-hover:opacity-90 transition-opacity"
                               onError={(e) => {
                                 const target = e.target as HTMLImageElement;
                                 target.style.display = 'none';
@@ -449,23 +449,11 @@ export function LectureComments({ lectureId }: LectureCommentsProps) {
                   onChange={(e) => {
                     const value = e.target.value;
                     setEditContent(value);
-                    
-                    // Force cursor to end to prevent backward behavior
-                    setTimeout(() => {
-                      const len = value.length;
-                      e.target.setSelectionRange(len, len);
-                    }, 0);
                   }}
                   onFocus={(e) => {
                     e.target.style.direction = 'ltr';
                     e.target.style.textAlign = 'left';
                     e.target.style.unicodeBidi = 'plaintext';
-                    
-                    // Force cursor to end on focus
-                    setTimeout(() => {
-                      const len = e.target.value.length;
-                      e.target.setSelectionRange(len, len);
-                    }, 10);
                   }}
                   className="min-h-[70px] text-sm bg-transparent border-none resize-none" 
                   placeholder="Edit your comment..." 
@@ -605,10 +593,10 @@ export function LectureComments({ lectureId }: LectureCommentsProps) {
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <MessageCircle className="h-12 w-12 text-gray-400 mb-4" />
             <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-              No comments yet
+              Aucun commentaire pour le moment
             </h3>
             <p className="text-gray-500 dark:text-gray-400">
-              Be the first to share your thoughts!
+              Soyez le premier à partager vos réflexions !
             </p>
           </div>
         )}
@@ -649,22 +637,12 @@ export function LectureComments({ lectureId }: LectureCommentsProps) {
                     
                     // Auto-resize immediately
                     autoResizeTextarea(e.currentTarget, 3, 24);
-                    
-                    // Force cursor to end
-                    setTimeout(() => {
-                      const len = value.length;
-                      e.currentTarget.setSelectionRange(len, len);
-                    }, 0);
                   }}
                   onFocus={(e) => {
                     e.currentTarget.style.direction = 'ltr';
                     e.currentTarget.style.textAlign = 'left';
                     e.currentTarget.style.unicodeBidi = 'plaintext';
-                    setTimeout(() => {
-                      const len = e.currentTarget.value.length;
-                      e.currentTarget.setSelectionRange(len, len);
-                      autoResizeTextarea(e.currentTarget, 3, 28);
-                    }, 10);
+                    autoResizeTextarea(e.currentTarget, 3, 28);
                   }}
                   placeholder="Share your thoughts about this lecture..."
                   className="force-ltr flex-1 bg-transparent border-none outline-none resize-none text-base leading-6 placeholder:text-gray-500 dark:placeholder:text-gray-400 transition-all duration-200 ease-in-out"
