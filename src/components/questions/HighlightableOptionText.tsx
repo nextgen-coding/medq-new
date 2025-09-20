@@ -182,7 +182,15 @@ export const HighlightableOptionText: React.FC<HighlightableOptionTextProps> = (
       // Add highlighted text
       const highlightedText = text.slice(highlight.start, highlight.end);
       parts.push(
-        <span key={`highlight-${i}`} className="bg-yellow-200 dark:bg-yellow-800/50">
+        <span
+          key={`highlight-${i}`}
+          style={{
+            backgroundColor: user?.highlightColor || '#fde68a', // fallback to yellow-200
+            borderRadius: 4,
+            padding: '0 2px',
+            transition: 'background-color 0.2s',
+          }}
+        >
           <SimpleTextDisplay text={highlightedText} />
         </span>
       );

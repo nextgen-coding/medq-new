@@ -47,6 +47,7 @@ interface MCQQuestionProps {
   suppressReminder?: boolean; // hide reminder section (for clinical cases)
   enableOptionHighlighting?: boolean; // enable highlighting for MCQ options (for clinical cases)
   disableKeyboardHandlers?: boolean; // disable Enter/keyboard shortcuts (for clinical cases)
+  showNotesAfterSubmit?: boolean; // force show notes area after question is submitted
 }
 
 export function MCQQuestion({ 
@@ -69,7 +70,8 @@ export function MCQQuestion({
   hideMeta,
   suppressReminder,
   enableOptionHighlighting = false,
-  disableKeyboardHandlers = false
+  disableKeyboardHandlers = false,
+  showNotesAfterSubmit = false
 }: MCQQuestionProps) {
   const [selectedOptionIds, setSelectedOptionIds] = useState<string[]>([]);
   const [submitted, setSubmitted] = useState(false);
@@ -82,19 +84,34 @@ export function MCQQuestion({
   const [isPinned, setIsPinned] = useState(false); // Track if question is pinned
   const [showNotesArea, setShowNotesArea] = useState(false); // control notes/comments visibility
   const [notesHasContent, setNotesHasContent] = useState(false); // track if notes have content
+  const [notesManuallyControlled, setNotesManuallyControlled] = useState(false); // track if user manually opened/closed notes
 
-  // Auto-close notes when content becomes empty
+  // Auto-show notes when content is detected, but only if not manually controlled
   useEffect(() => {
-    if (!notesHasContent) {
+    if (!notesManuallyControlled) {
+      if (notesHasContent) {
+        setShowNotesArea(true);
+      } else {
+        setShowNotesArea(false);
+      }
+    }
+  }, [notesHasContent, notesManuallyControlled]);
+
+  // Force show notes after submission if showNotesAfterSubmit is enabled, but only if notes have content
+  useEffect(() => {
+    if (showNotesAfterSubmit && isAnswered && !notesManuallyControlled) {
+      setShowNotesArea(notesHasContent);
+    } else if (!showNotesAfterSubmit && !notesManuallyControlled) {
       setShowNotesArea(false);
     }
-  }, [notesHasContent]);
+  }, [showNotesAfterSubmit, isAnswered, notesManuallyControlled, notesHasContent]);
   // Server aggregated stats
   const [optionStats, setOptionStats] = useState<Record<string, number>>({});
   const [totalSubmissions, setTotalSubmissions] = useState(0);
   const [loadingStats, setLoadingStats] = useState(false);
   const notesRef = useRef<HTMLDivElement | null>(null);
   const resultsRef = useRef<HTMLDivElement | null>(null); // Ref for results section
+  const questionRef = useRef<HTMLDivElement | null>(null); // Ref for question top
   const hasSubmittedRef = useRef(false); // Ref for immediate access to submission state
   const buttonRef = useRef<HTMLButtonElement>(null); // Ref to directly control button
   const { t } = useTranslation();
@@ -219,6 +236,8 @@ export function MCQQuestion({
     setIsSubmitting(false);
   // Close notes area when moving to a different question to avoid leaking state
   setShowNotesArea(false);
+    setNotesHasContent(false);
+    setNotesManuallyControlled(false);
   }, [question.id]);
 
   // Handle userAnswer changes separately to avoid reinitialization loops
@@ -373,8 +392,8 @@ export function MCQQuestion({
     if (!hideImmediateResults) {
       setSubmitted(true);
     }
-    // Auto-open notes area on submission regardless of result visibility
-    setShowNotesArea(true);
+    // Keep notes hidden by default - user can manually open if needed
+    
     // If hideImmediateResults is true, keep submitted as false to show checkboxes
     
     // Compute detailed scoring (fractional credit)
@@ -420,12 +439,12 @@ export function MCQQuestion({
       
       setExpandedExplanations(autoExpandIds);
       
-      // Auto-scroll to results after a short delay to allow UI to update
+      // Auto-scroll to question top after submission to see the full question and results
       setTimeout(() => {
-        if (resultsRef.current) {
-          resultsRef.current.scrollIntoView({ 
+        if (questionRef.current) {
+          questionRef.current.scrollIntoView({ 
             behavior: 'smooth', 
-            block: 'center',
+            block: 'start',
             inline: 'nearest'
           });
         }
@@ -582,6 +601,7 @@ export function MCQQuestion({
 
   return (
     <motion.div
+      ref={questionRef}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
@@ -658,6 +678,31 @@ export function MCQQuestion({
         ))}
       </div>
 
+      {!hideActions && (
+        <div ref={resultsRef}>
+          <MCQActions 
+            isSubmitted={submitted}
+            canSubmit={!hasSubmitted && !isSubmitting && selectedOptionIds.length > 0}
+            isCorrect={isCorrect}
+            onSubmit={handleSubmit}
+            onNext={onNext}
+            hasSubmitted={hasSubmitted || isSubmitting}
+            buttonRef={buttonRef}
+            showNotesArea={showNotesArea}
+            hideNotesButton={false} // Always show notes button so users can hide/show notes
+            onToggleNotes={() => {
+              setShowNotesArea(prev => !prev);
+              setNotesManuallyControlled(true);
+              setTimeout(() => {
+                if (!showNotesArea && notesRef.current) {
+                  notesRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+              }, 30);
+            }}
+          />
+        </div>
+      )}
+      
   {/* Rappel du cours (après soumission) */}
   {submitted && !suppressReminder && (() => {
     const text = (question as any).course_reminder || (question as any).courseReminder || question.explanation;
@@ -667,7 +712,7 @@ export function MCQQuestion({
         return (
           <Card className="mt-2">
             <CardHeader className="py-3">
-              <Collapsible defaultOpen={true}>
+              <Collapsible defaultOpen={false}>
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center gap-2 text-base">
                     <BookOpen className="h-4 w-4" />
@@ -696,34 +741,10 @@ export function MCQQuestion({
           </Card>
         );
       })()}
-
-      {!hideActions && (
-        <div ref={resultsRef}>
-          <MCQActions 
-            isSubmitted={submitted}
-            canSubmit={!hasSubmitted && !isSubmitting && selectedOptionIds.length > 0}
-            isCorrect={isCorrect}
-            onSubmit={handleSubmit}
-            onNext={onNext}
-            hasSubmitted={hasSubmitted || isSubmitting}
-            buttonRef={buttonRef}
-            showNotesArea={showNotesArea}
-            hideNotesButton={notesHasContent} // Hide button when notes have content
-            onToggleNotes={() => {
-              setShowNotesArea(prev => !prev);
-              setTimeout(() => {
-                if (!showNotesArea && notesRef.current) {
-                  notesRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
-              }, 30);
-            }}
-          />
-        </div>
-      )}
       
-  {/* Notes - show when explicitly opened OR when has content (auto-open) */}
-  {!hideNotes && (showNotesArea || (submitted && notesHasContent)) && (
-        <div ref={notesRef}>
+  {/* Notes - always render for content detection, but show/hide based on showNotesArea */}
+  {!hideNotes && (
+        <div ref={notesRef} className={showNotesArea ? "" : "hidden"}>
           <QuestionNotes 
             questionId={question.id} 
             onHasContentChange={setNotesHasContent}

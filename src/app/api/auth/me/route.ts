@@ -20,10 +20,14 @@ async function handler(request: AuthenticatedRequest) {
         sexe: true,
         niveauId: true,
         semesterId: true,
+        faculty: true,
         profileCompleted: true,
+        highlightColor: true,
         // Subscription fields
         hasActiveSubscription: true,
         subscriptionExpiresAt: true,
+        // Google ID
+        google_id: true,
         niveau: {
           select: {
             id: true,

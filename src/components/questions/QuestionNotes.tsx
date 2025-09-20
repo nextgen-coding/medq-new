@@ -47,7 +47,7 @@ export function QuestionNotes({ questionId, onHasContentChange, autoEdit = false
   // Notify parent when content state changes
   useEffect(() => {
     onHasContentChange?.(hasContent);
-  }, [hasContent, onHasContentChange]);
+  }, [hasContent]);
 
   // Auto-enter edit mode when autoEdit is true and no content exists
   useEffect(() => {

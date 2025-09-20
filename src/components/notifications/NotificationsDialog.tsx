@@ -24,6 +24,7 @@ interface Notification {
 interface NotificationsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onNotificationsUpdated?: () => void;
 }
 
 // No mock data; notifications are fetched from the API
@@ -170,7 +171,7 @@ const NotificationItem = memo(({
 NotificationItem.displayName = 'NotificationItem';
 
 // Main component with performance optimizations
-export function NotificationsDialog({ open, onOpenChange }: NotificationsDialogProps) {
+export function NotificationsDialog({ open, onOpenChange, onNotificationsUpdated }: NotificationsDialogProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
 
   const formatTime = (d: string | Date) => {
@@ -229,9 +230,11 @@ export function NotificationsDialog({ open, onOpenChange }: NotificationsDialogP
       const res = await fetch(`/api/notifications?id=${id}`, { method: 'PATCH', credentials: 'include' });
       if (res.ok) {
         setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+        // Call the callback to update parent component
+        onNotificationsUpdated?.();
       }
     } catch {}
-  }, []);
+  }, [onNotificationsUpdated]);
 
   const markAllAsRead = useCallback(async () => {
     try {
@@ -240,8 +243,10 @@ export function NotificationsDialog({ open, onOpenChange }: NotificationsDialogP
       setNotifications(prev => prev.map(n => ({ ...n, read: true })));
       // Best-effort: call PATCH individually (no bulk endpoint yet)
       await Promise.all(unread.map(n => fetch(`/api/notifications?id=${n.id}`, { method: 'PATCH', credentials: 'include' })));
+      // Call the callback to update parent component
+      onNotificationsUpdated?.();
     } catch {}
-  }, [notifications]);
+  }, [notifications, onNotificationsUpdated]);
 
   const deleteNotification = useCallback(async (id: string) => {
     try {

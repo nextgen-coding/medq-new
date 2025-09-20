@@ -6,7 +6,6 @@ import {
   BookOpen, 
   FileText, 
   Users, 
-  Settings,
   BarChart3,
   Download,
   ArrowRight
@@ -63,15 +62,6 @@ export function QuickActions() {
       color: 'text-red-500',
       bgColor: 'from-red-100 to-red-50 dark:from-red-900/30 dark:to-red-800/20',
       hoverColor: 'hover:bg-red-50 dark:hover:bg-red-900/20'
-    },
-    {
-      title: t('admin.systemSettings'),
-      description: t('admin.systemSettingsDesc'),
-      icon: Settings,
-      onClick: () => router.push('/settings'),
-      color: 'text-gray-500',
-      bgColor: 'from-gray-100 to-gray-50 dark:from-gray-800/30 dark:to-gray-700/20',
-      hoverColor: 'hover:bg-gray-50 dark:hover:bg-gray-800/20'
     }
   ];
 

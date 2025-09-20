@@ -38,6 +38,7 @@ model User {
   verificationToken     String?        @map("verification_token")
   passwordUpdatedAt     DateTime?      @map("password_updated_at") @db.Timestamptz(6)
   sexe                  String?
+  faculty               String?
   niveauId              String?        @map("niveau_id") @db.Uuid
   semesterId            String?        @map("semester_id") @db.Uuid
   profileCompleted      Boolean        @default(false) @map("profile_completed")
@@ -57,6 +58,7 @@ model User {
   questionComments      QuestionComment[]
   commentLikes          CommentLike[]
   activities            UserActivity[]
+  highlightColor        String?         @map("highlight_color")
   // Added reverse relations for session corrections
   sessionCorrections            SessionCorrection[]
   sessionCorrectionSubmissions  SessionCorrectionSubmission[]
@@ -115,6 +117,8 @@ model CourseGroup {
   createdBy    String         @map("created_by") @db.Uuid
   createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  // Weight (coefficient) applied to this course group in dashboard averages
+  coefficient  Float          @default(1)
   specialty    Specialty      @relation(fields: [specialtyId], references: [id], onDelete: Cascade)
   creator      User           @relation(fields: [createdBy], references: [id], onDelete: Cascade)
   lectureGroups LectureGroup[]

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { UniversalHeader } from '@/components/layout/UniversalHeader';
 import { AppSidebar, AppSidebarProvider } from '@/components/layout/AppSidebar';
@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { toast } from '@/hooks/use-toast'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useTranslation } from 'react-i18next'
@@ -18,11 +19,59 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { ProfileCompletionGuard } from '@/components/ProfileCompletionGuard'
 
 export default function ProfilePageRoute() {
-  const { user } = useAuth()
-  const { t } = useTranslation()
+  const { user, refreshUser, updateUser } = useAuth();
+  const { t } = useTranslation();
+  const [isClient, setIsClient] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false)
-  // Local faculty selection (no faculty field on User type yet)
-  const [faculty, setFaculty] = useState('FMSF')
+  // Editable profile state
+  const [profile, setProfile] = useState({
+    name: user?.name || '',
+    email: user?.email || '',
+    niveauId: user?.niveauId || user?.niveau?.id || '',
+    image: user?.image || '',
+    faculty: user?.faculty || 'FMSF',
+    sexe: user?.sexe || 'M',
+    highlightColor: (user as any)?.highlightColor || '#ffe066', // default yellow
+  })
+
+  // Only render after client hydration to avoid SSR mismatch
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  // Niveaux state
+  const [niveaux, setNiveaux] = useState<{ id: string; name: string }[]>([])
+
+  // Fetch niveaux from backend
+  useEffect(() => {
+    fetch('/api/niveaux')
+      .then(res => res.json())
+      .then(data => {
+        setNiveaux(data)
+        // If user has no niveauId, set to first niveau's id
+        setProfile(prev => ({ ...prev, niveauId: prev.niveauId || (data[0]?.id || '') }))
+      })
+      .catch(() => setNiveaux([]))
+  }, [])
+
+  // Update form fields when user changes (after login/refresh)
+  useEffect(() => {
+    if (user) {
+      setProfile({
+        name: user?.name || '',
+        email: user?.email || '',
+        niveauId: user?.niveauId || user?.niveau?.id || '',
+        image: user?.image || '',
+        faculty: user?.faculty || 'FMSF',
+        sexe: user?.sexe || 'M',
+        highlightColor: (user as any)?.highlightColor || '#ffe066',
+      })
+    }
+  }, [user])
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
     newPassword: '',
@@ -34,97 +83,194 @@ export default function ProfilePageRoute() {
     confirm: false
   })
 
+  if (!isClient) return null;
+
   const handlePasswordChange = async () => {
-    // TODO: Implement password change logic
-    console.log('Changing password...', passwordData)
-    setShowChangePassword(false)
-    setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' })
+    try {
+      // Client-side password validation
+      if (passwordData.newPassword.length < 8) {
+        toast({ title: 'Erreur', description: 'Le mot de passe doit contenir au moins 8 caractères.', variant: 'destructive' });
+        return;
+      }
+      if (!/[A-Z]/.test(passwordData.newPassword)) {
+        toast({ title: 'Erreur', description: 'Le mot de passe doit contenir au moins une lettre majuscule.', variant: 'destructive' });
+        return;
+      }
+      if (!/[a-z]/.test(passwordData.newPassword)) {
+        toast({ title: 'Erreur', description: 'Le mot de passe doit contenir au moins une lettre minuscule.', variant: 'destructive' });
+        return;
+      }
+      const isGoogleUser = !!user?.google_id;
+      // Only send the fields required by the backend
+      const payload = isGoogleUser
+        ? { newPassword: passwordData.newPassword }
+        : { currentPassword: passwordData.currentPassword, newPassword: passwordData.newPassword };
+      const res = await fetch('/api/user/password', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) {
+        const errorData = await res.json();
+        toast({ title: 'Erreur', description: errorData.error || 'Impossible de changer le mot de passe', variant: 'destructive' });
+        return;
+      }
+      toast({ title: 'Succès', description: isGoogleUser ? 'Mot de passe défini' : 'Mot de passe mis à jour', variant: 'default' })
+      setShowChangePassword(false)
+      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' })
+      // Refresh user context so UI updates to require current password next time
+      if (refreshUser) await refreshUser();
+    } catch (e) {
+      toast({ title: 'Erreur', description: 'Impossible de changer le mot de passe', variant: 'destructive' })
+    }
+  }
+
+  const handleProfileSave = async () => {
+    setIsSaving(true)
+    try {
+      const res = await fetch('/api/user/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...profile,
+          niveau: undefined // remove niveau if present
+        }),
+      })
+      if (!res.ok) throw new Error('Erreur lors de la sauvegarde du profil')
+      const data = await res.json();
+      toast({ title: 'Succès', description: 'Profil mis à jour', variant: 'default' })
+      if (data.user && updateUser) updateUser(data.user);
+      refreshUser && refreshUser()
+    } catch (e) {
+      toast({ title: 'Erreur', description: 'Impossible de sauvegarder le profil', variant: 'destructive' })
+    }
+    setIsSaving(false)
+  }
+
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setIsUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      // Optimistically update UI
+      const tempUrl = URL.createObjectURL(file)
+      setProfile(prev => ({ ...prev, image: tempUrl }))
+      // Upload image
+      const res = await fetch('/api/upload/image', { method: 'POST', body: formData })
+      if (!res.ok) throw new Error('Erreur lors du téléversement de la photo')
+      const data = await res.json()
+      setProfile(prev => ({ ...prev, image: data.url }))
+      // Update image in DB
+      const saveRes = await fetch('/api/user/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: profile.name,
+          email: profile.email,
+          niveauId: profile.niveauId,
+          sexe: profile.sexe,
+          faculty: profile.faculty,
+          image: data.url,
+        }),
+      })
+      if (!saveRes.ok) throw new Error('Erreur lors de la sauvegarde de la photo')
+      // Optionally update user context immediately
+      if (refreshUser) refreshUser()
+      toast({ title: 'Succès', description: 'Photo de profil mise à jour', variant: 'default' })
+    } catch (e) {
+      toast({ title: 'Erreur', description: 'Impossible de mettre à jour la photo', variant: 'destructive' })
+    }
+    setIsUploading(false)
   }
 
   return (
     <ProtectedRoute>
       <ProfileCompletionGuard>
         <AppSidebarProvider>
-          <div className="flex min-h-screen w-full bg-background">
+          <div className="flex w-full bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-900">
             <AppSidebar />
-            <SidebarInset className="flex-1 flex flex-col">
+            <SidebarInset className="flex flex-col min-h-0">
               {/* Universal Header */}
               <UniversalHeader
                 title="Profil"
                 rightActions={
                   <Button 
-                    className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-md"
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
                     onClick={() => console.log('Save changes')}
                   >
                     <Save className="h-4 w-4 mr-2" />
-                    Enregistrer les modifications
+                    {isSaving ? 'Enregistrement...' : 'Enregistrer'}
                   </Button>
                 }
               />
 
               {/* Main Content */}
-              <div className="flex-1 bg-background">
+              <div className="flex-1 bg-gray-900 text-white">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                   <div className="mb-6">
-                    <p className="text-muted-foreground">Voir et mettre à jour vos informations de profil.</p>
+                    <p className="text-gray-400">Voir et mettre à jour vos informations de profil.</p>
                   </div>
 
                   <div className="grid gap-6 lg:grid-cols-2">
                     {/* Informations personnelles */}
-                    <Card className="border-border/50 bg-card/50 backdrop-blur-sm shadow-lg hover:shadow-xl transition-shadow">
+                    <Card className="bg-gray-800 border-gray-700">
                       <CardHeader>
-                        <CardTitle className="text-foreground">Informations personnelles</CardTitle>
+                        <CardTitle className="text-white">Informations personnelles</CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-6">
                         {/* Photo de profil */}
                         <div className="space-y-2">
-                          <Label className="text-foreground">Photo de profil</Label>
+                          <Label className="text-gray-300">Photo de profil</Label>
                           <div className="flex items-center space-x-4">
-                            <Avatar className="h-20 w-20 ring-2 ring-border">
+                            <Avatar className="h-20 w-20">
                               <AvatarImage src={user?.image} alt={user?.name || user?.email} />
-                              <AvatarFallback className="bg-primary text-primary-foreground text-lg">
+                              <AvatarFallback className="bg-blue-600 text-white text-lg">
                                 {user?.name?.charAt(0) || user?.email?.charAt(0) || 'U'}
                               </AvatarFallback>
                             </Avatar>
                             <div>
-                              <Button variant="outline" size="sm" className="border-primary/20 text-primary hover:bg-primary/10 hover:text-primary">
+                              <Button variant="outline" size="sm" className="border-blue-500 text-blue-400 hover:bg-blue-500 hover:text-white">
                                 <Camera className="h-4 w-4 mr-2" />
                                 Changer de photo
                               </Button>
-                              <p className="text-xs text-muted-foreground mt-1">PNG, JPG, GIF jusqu'à 5Mo</p>
+                              <p className="text-xs text-gray-400 mt-1">PNG, JPG, GIF jusqu'à 5Mo</p>
                             </div>
                           </div>
-                        </div>
+                        </CardContent>
+                      </Card>
+                    </div>
 
                         {/* Nom d'utilisateur */}
                         <div className="space-y-2">
-                          <Label htmlFor="username" className="text-foreground">Nom d'utilisateur</Label>
+                          <Label htmlFor="username" className="text-gray-300">Nom d'utilisateur</Label>
                           <Input 
                             id="username"
                             defaultValue={user?.name || ''}
-                            className="bg-background border-border focus:ring-primary/20"
+                            className="bg-gray-700 border-gray-600 text-white placeholder-gray-400"
                           />
                         </div>
 
                         {/* Email */}
                         <div className="space-y-2">
-                          <Label htmlFor="email" className="text-foreground">Email</Label>
+                          <Label htmlFor="email" className="text-gray-300">Email</Label>
                           <Input 
                             id="email"
                             type="email"
                             defaultValue={user?.email || ''}
-                            className="bg-background border-border focus:ring-primary/20"
+                            className="bg-gray-700 border-gray-600 text-white placeholder-gray-400"
                           />
                         </div>
 
                         {/* Faculté (local state only; add to backend if needed) */}
                         <div className="space-y-2">
-                          <Label className="text-foreground">Faculté</Label>
+                          <Label className="text-gray-300">Faculté</Label>
                           <Select value={faculty} onValueChange={setFaculty}>
-                            <SelectTrigger className="bg-background border-border">
+                            <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
                               <SelectValue />
                             </SelectTrigger>
-                            <SelectContent className="bg-popover border-border">
+                            <SelectContent className="bg-gray-700 border-gray-600">
                               <SelectItem value="FMSF">FMSF</SelectItem>
                               <SelectItem value="other">Autre</SelectItem>
                             </SelectContent>
@@ -133,12 +279,12 @@ export default function ProfilePageRoute() {
 
                         {/* Niveau */}
                         <div className="space-y-2">
-                          <Label className="text-foreground">Niveau</Label>
+                          <Label className="text-gray-300">Niveau</Label>
                           <Select defaultValue={user?.niveau?.name || 'DCEM2'}>
-                            <SelectTrigger className="bg-background border-border">
+                            <SelectTrigger className="bg-gray-700 border-gray-600 text-white">
                               <SelectValue />
                             </SelectTrigger>
-                            <SelectContent className="bg-popover border-border">
+                            <SelectContent className="bg-gray-700 border-gray-600">
                               <SelectItem value="DCEM1">DCEM1</SelectItem>
                               <SelectItem value="DCEM2">DCEM2 : Pediatrie / Chirurgie</SelectItem>
                               <SelectItem value="DCEM3">DCEM3</SelectItem>
@@ -149,17 +295,17 @@ export default function ProfilePageRoute() {
                     </Card>
 
                     {/* Informations du compte */}
-                    <Card className="border-border/50 bg-card/50 backdrop-blur-sm shadow-lg hover:shadow-xl transition-shadow">
+                    <Card className="bg-gray-800 border-gray-700">
                       <CardHeader>
-                        <CardTitle className="text-foreground">Informations du compte</CardTitle>
+                        <CardTitle className="text-white">Informations du compte</CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-6">
                         {/* Rôle */}
                         <div className="space-y-2">
-                          <Label className="text-foreground">Rôle</Label>
+                          <Label className="text-gray-300">Rôle</Label>
                           <div className="flex items-center space-x-2">
-                            <Shield className="h-4 w-4 text-primary" />
-                            <Badge className="bg-primary text-primary-foreground">
+                            <Shield className="h-4 w-4 text-blue-400" />
+                            <Badge className="bg-blue-600 text-white">
                               {user?.role === 'admin' ? 'Administrateur' : 'Étudiant'}
                             </Badge>
                           </div>
@@ -167,9 +313,9 @@ export default function ProfilePageRoute() {
 
                         {/* Dernière modification du mot de passe */}
                         <div className="space-y-2">
-                          <Label className="text-foreground">Dernière modification du mot de passe</Label>
+                          <Label className="text-gray-300">Dernière modification du mot de passe</Label>
                           <div className="flex items-center justify-between">
-                            <span className="text-muted-foreground text-sm">
+                            <span className="text-gray-400 text-sm">
                               {user?.passwordUpdatedAt ? 
                                 `Il y a ${Math.floor((Date.now() - new Date(user.passwordUpdatedAt).getTime()) / (1000 * 60 * 60 * 24 * 30))} mois` : 
                                 'Jamais modifié'}
@@ -177,28 +323,27 @@ export default function ProfilePageRoute() {
                             <Button 
                               variant="outline" 
                               size="sm"
-                              className="border-primary/20 text-primary hover:bg-primary/10 hover:text-primary"
+                              className="border-blue-500 text-blue-400 hover:bg-blue-500 hover:text-white"
                               onClick={() => setShowChangePassword(!showChangePassword)}
                             >
                               <Lock className="h-4 w-4 mr-2" />
-                              Changer le mot de passe
+                              {user?.password ? 'Changer' : 'Définir le mot de passe'}
                             </Button>
                           </div>
-                        </div>
 
                         {/* Change Password Section */}
                         {showChangePassword && (
-                          <div className="space-y-4 p-4 bg-muted/50 rounded-lg border border-border">
-                            <h4 className="font-medium text-foreground">Changer le mot de passe</h4>
+                          <div className="space-y-4 p-4 bg-gray-700 rounded-lg border border-gray-600">
+                            <h4 className="font-medium text-white">Changer le mot de passe</h4>
                             
                             <div className="space-y-2">
-                              <Label className="text-foreground">Mot de passe actuel</Label>
+                              <Label className="text-gray-300">Mot de passe actuel</Label>
                               <div className="relative">
                                 <Input 
                                   type={showPasswords.current ? "text" : "password"}
                                   value={passwordData.currentPassword}
                                   onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
-                                  className="bg-background border-border pr-10 focus:ring-primary/20"
+                                  className="bg-gray-600 border-gray-500 text-white pr-10"
                                 />
                                 <Button
                                   type="button"
@@ -207,19 +352,19 @@ export default function ProfilePageRoute() {
                                   className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
                                   onClick={() => setShowPasswords(prev => ({ ...prev, current: !prev.current }))}
                                 >
-                                  {showPasswords.current ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+                                  {showPasswords.current ? <EyeOff className="h-4 w-4 text-gray-400" /> : <Eye className="h-4 w-4 text-gray-400" />}
                                 </Button>
                               </div>
                             </div>
 
                             <div className="space-y-2">
-                              <Label className="text-foreground">Nouveau mot de passe</Label>
+                              <Label className="text-gray-300">Nouveau mot de passe</Label>
                               <div className="relative">
                                 <Input 
                                   type={showPasswords.new ? "text" : "password"}
                                   value={passwordData.newPassword}
                                   onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
-                                  className="bg-background border-border pr-10 focus:ring-primary/20"
+                                  className="bg-gray-600 border-gray-500 text-white pr-10"
                                 />
                                 <Button
                                   type="button"
@@ -228,19 +373,19 @@ export default function ProfilePageRoute() {
                                   className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
                                   onClick={() => setShowPasswords(prev => ({ ...prev, new: !prev.new }))}
                                 >
-                                  {showPasswords.new ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+                                  {showPasswords.new ? <EyeOff className="h-4 w-4 text-gray-400" /> : <Eye className="h-4 w-4 text-gray-400" />}
                                 </Button>
                               </div>
                             </div>
 
                             <div className="space-y-2">
-                              <Label className="text-foreground">Confirmer le nouveau mot de passe</Label>
+                              <Label className="text-gray-300">Confirmer le nouveau mot de passe</Label>
                               <div className="relative">
                                 <Input 
                                   type={showPasswords.confirm ? "text" : "password"}
                                   value={passwordData.confirmPassword}
                                   onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                                  className="bg-background border-border pr-10 focus:ring-primary/20"
+                                  className="bg-gray-600 border-gray-500 text-white pr-10"
                                 />
                                 <Button
                                   type="button"
@@ -249,7 +394,7 @@ export default function ProfilePageRoute() {
                                   className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
                                   onClick={() => setShowPasswords(prev => ({ ...prev, confirm: !prev.confirm }))}
                                 >
-                                  {showPasswords.confirm ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+                                  {showPasswords.confirm ? <EyeOff className="h-4 w-4 text-gray-400" /> : <Eye className="h-4 w-4 text-gray-400" />}
                                 </Button>
                               </div>
                             </div>
@@ -257,7 +402,7 @@ export default function ProfilePageRoute() {
                             <div className="flex space-x-2">
                               <Button 
                                 onClick={handlePasswordChange}
-                                className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                                className="bg-blue-600 hover:bg-blue-700 text-white"
                                 disabled={!passwordData.currentPassword || !passwordData.newPassword || passwordData.newPassword !== passwordData.confirmPassword}
                               >
                                 Mettre à jour le mot de passe
@@ -265,7 +410,7 @@ export default function ProfilePageRoute() {
                               <Button 
                                 variant="outline"
                                 onClick={() => setShowChangePassword(false)}
-                                className="border-border text-foreground"
+                                className="border-gray-600 text-gray-300"
                               >
                                 Annuler
                               </Button>
@@ -277,24 +422,24 @@ export default function ProfilePageRoute() {
                   </div>
 
                   {/* Subscription Card - Full Width */}
-                  <Card className="border-border/50 bg-card/50 backdrop-blur-sm shadow-lg hover:shadow-xl transition-shadow mt-6">
+                  <Card className="bg-gray-800 border-gray-700 mt-6">
                     <CardHeader>
-                      <CardTitle className="text-foreground">Abonnement</CardTitle>
+                      <CardTitle className="text-white">Abonnement</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="grid gap-6 md:grid-cols-3">
                         <div className="space-y-2">
-                          <Label className="text-foreground">Plan actuel</Label>
-                          <div className="text-xl font-semibold text-foreground">
+                          <Label className="text-gray-300">Plan actuel</Label>
+                          <div className="text-xl font-semibold text-white">
                             {user?.hasActiveSubscription ? 'Plan Annuel Pro' : 'Plan Gratuit'}
                           </div>
                         </div>
 
                         <div className="space-y-2">
-                          <Label className="text-foreground">Statut</Label>
+                          <Label className="text-gray-300">Statut</Label>
                           <div className="flex items-center space-x-2">
-                            <div className={`w-2 h-2 rounded-full ${user?.hasActiveSubscription ? 'bg-green-500' : 'bg-muted-foreground'}`}></div>
-                            <Badge className={user?.hasActiveSubscription ? 'bg-green-600 text-white dark:bg-green-700' : 'bg-muted text-muted-foreground'}>
+                            <div className={`w-2 h-2 rounded-full ${user?.hasActiveSubscription ? 'bg-green-500' : 'bg-gray-500'}`}></div>
+                            <Badge className={user?.hasActiveSubscription ? 'bg-green-600 text-white' : 'bg-gray-600 text-white'}>
                               {user?.hasActiveSubscription ? 'Actif' : 'Inactif'}
                             </Badge>
                           </div>
@@ -302,10 +447,10 @@ export default function ProfilePageRoute() {
 
                         {user?.hasActiveSubscription && user?.subscriptionExpiresAt && (
                           <div className="space-y-2">
-                            <Label className="text-foreground">Date d'expiration</Label>
+                            <Label className="text-gray-300">Date d'expiration</Label>
                             <div className="flex items-center space-x-2">
-                              <Calendar className="h-4 w-4 text-muted-foreground" />
-                              <span className="text-foreground">
+                              <Calendar className="h-4 w-4 text-gray-400" />
+                              <span className="text-white">
                                 Expire le {new Date(user.subscriptionExpiresAt).toLocaleDateString('fr-FR', {
                                   year: 'numeric',
                                   month: '2-digit',
@@ -319,7 +464,7 @@ export default function ProfilePageRoute() {
 
                       {!user?.hasActiveSubscription && (
                         <div className="mt-6">
-                          <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                          <Button className="bg-blue-600 hover:bg-blue-700 text-white">
                             Gérer l'abonnement
                           </Button>
                         </div>
