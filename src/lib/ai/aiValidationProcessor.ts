@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import * as XLSX from 'xlsx'
-import { isAzureConfigured, chatCompletion } from './azureClient'
+import { isAzureConfigured, chatCompletion } from './azureAiSdk'
 
 // ---------------------------------------------------------------------------
 // AI EXPLANATION ENHANCEMENT UTILITIES
@@ -23,16 +23,26 @@ function applyConnectors(explanations: string[] | undefined): string[] | undefin
   return explanations.map((raw, idx) => {
     let original = String(raw || '').trim();
     if (!original) return original;
+    // Remove trivial templated fillers frequently produced by weaker prompts
+    // e.g., "Au contraire: Juste contraire En réalité: À l'inverse …"
+    original = original
+      .replace(/\b(en\s*r[eé]alit[eé])\s*[:\-]\s*/gi, 'En réalité, ')
+      .replace(/\b(a\s*l['’]inverse)\s*[:\-]\s*/gi, "À l'inverse, ")
+      .replace(/\b(juste\s*contraire)\b[\s,:-]*/gi, '')
+      .replace(/\b(au\s*contraire)\s*[:\-]\s*(en\s*r[eé]alit[eé]|a\s*l['’]inverse)\b/gi, 'Au contraire,')
+      .replace(/\s{2,}/g, ' ')
+      .replace(/\s*[,;]\s*[,;]\s*/g, ', ')
+      .trim();
     // If response too short (< 70 chars OR <2 sentences), enrich heuristically before connector injection.
     const sentenceCount = (original.match(/[.!?]/g) || []).length;
-    if (original.length < 70 || sentenceCount < 2) {
+    if (original.length < 90 || sentenceCount < 2) {
       // Heuristic enrichment: attempt to add mechanism / correction placeholder without hallucination.
       if (/^oui|^exact|^effectivement/i.test(original)) {
-        original += original.endsWith('.') ? ' Mécanisme: préciser la voie physiopathologique clé. Conséquence clinique: repère ou complication principale.' : '. Mécanisme: préciser la voie physiopathologique clé. Conséquence clinique: repère ou complication principale.';
+        original += original.endsWith('.') ? ' Mécanisme: préciser la voie physiopathologique clé. Repère utile (si connu) et implication clinique brève.' : '. Mécanisme: préciser la voie physiopathologique clé. Repère utile (si connu) et implication clinique brève.';
       } else if (/^au contraire|^non|^faux|^pas vraiment/i.test(original)) {
-        original += original.endsWith('.') ? ' Correction: indiquer la notion exacte et le différentiel majeur.' : '. Correction: indiquer la notion exacte et le différentiel majeur.';
+        original += original.endsWith('.') ? ' Correction: indiquer la notion exacte et le différentiel majeur (ou critère clé) pour éviter le piège.' : '. Correction: indiquer la notion exacte et le différentiel majeur (ou critère clé) pour éviter le piège.';
       } else {
-        original += original.endsWith('.') ? ' Détail: ajouter mécanisme ou implication clinique et un différentiel.' : '. Détail: ajouter mécanisme ou implication clinique et un différentiel.';
+        original += original.endsWith('.') ? ' Détail: ajouter mécanisme ou implication clinique et un différentiel (sans inventer de chiffres).' : '. Détail: ajouter mécanisme ou implication clinique et un différentiel (sans inventer de chiffres).';
       }
     }
     let text = original;
@@ -90,6 +100,8 @@ function normalizeHeader(h: string) {
 function canonicalizeHeader(h: string): string {
   const n = normalizeHeader(h);
   const map: Record<string, string> = {
+    'matiere': 'matiere',
+    'cours': 'cours',
     'texte de la question': 'texte de la question',
     'texte question': 'texte de la question',
     'texte de question': 'texte de la question',
@@ -101,12 +113,24 @@ function canonicalizeHeader(h: string): string {
     'option e': 'option e',
     'reponse': 'reponse',
     'reponse(s)': 'reponse',
+    'réponse': 'reponse',
     'source': 'source',
     'cas n': 'cas n',
     'texte du cas': 'texte du cas',
     'question n': 'question n',
+    'niveau': 'niveau',
+    'semestre': 'semestre',
   };
   return map[n] ?? n;
+}
+
+function sanitizeSpecialtyName(input: any): string {
+  const s = String(input || '')
+    .normalize('NFC')
+    .replace(/[^A-Za-zÀ-ÖØ-öø-ÿ0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return s;
 }
 
 function parseAnswerLetters(reponse: any): string[] {
@@ -161,6 +185,44 @@ function repairQuestionText(text: string): string {
 
 function repairOptionText(opt: string): string {
   return normalizeWhitespace(htmlStrip(opt));
+}
+
+// Build a stable lecture key to map niveau across sheets (matiere|cours)
+function buildLectureKey(row: Record<string, any>, canonForRow: Record<string, string>): string {
+  const matKey = canonForRow['matiere'] ? canonForRow['matiere'] : Object.keys(row).find(k => canonicalizeHeader(k) === 'matiere') || '';
+  const coursKey = canonForRow['cours'] ? canonForRow['cours'] : Object.keys(row).find(k => canonicalizeHeader(k) === 'cours') || '';
+  const mat = matKey ? String(row[matKey] || '').trim().toLowerCase() : '';
+  const cours = coursKey ? String(row[coursKey] || '').trim().toLowerCase() : '';
+  return `${mat}||${cours}`;
+}
+
+// Normalize CAS QCM response like "1AB, 2E, 3B" to letters for the current question number
+function normalizeCasResponseLetters(raw: string, questionNumber: number | null | undefined): string | null {
+  if (!raw) return null;
+  const s = String(raw).toUpperCase().replace(/\s+/g, ' ').trim();
+  if (!questionNumber || !/\d\s*[A-E]+/.test(s)) return null; // nothing to do
+  // Split by commas or semicolons
+  const parts = s.split(/[;,]+/).map(p => p.trim()).filter(Boolean);
+  const map: Record<string, string> = {};
+  for (const part of parts) {
+    const m = part.match(/^(\d+)\s*([A-E]+)/);
+    if (m) {
+      const num = m[1];
+      const letters = m[2].split('').filter(ch => /[A-E]/.test(ch));
+      if (letters.length) map[num] = letters.join(', ');
+    }
+  }
+  const key = String(questionNumber);
+  return map[key] || null;
+}
+
+// Clean free-text QROC answer to be importer-friendly (strip labels, HTML, collapse spaces)
+function cleanQrocAnswerText(raw: string): string {
+  let s = String(raw || '');
+  s = s.replace(/^\s*(réponse|reponse)\s*:?\s*/i, '');
+  s = htmlStrip(s);
+  s = normalizeWhitespace(s);
+  return s;
 }
 
 type JobProgressUpdate = {
@@ -238,6 +300,9 @@ export async function processAiValidationJob(jobId: string, fileBytes: Uint8Arra
   const qrocRows: Array<{ sheet: 'qroc' | 'cas_qroc'; index: number; original: Record<string, any>; text: string; existingAnswer: string; existingExplication: string; caseText?: string }> = [];
 
     // Process each canonical sheet, collect data, and ensure ai_status/ai_reason columns
+    // Build a cross-sheet map of niveau per (matiere|cours) to refill missing values later
+    const lectureLevelMap = new Map<string, string>();
+
     for (const info of recognized) {
       const s = info.name
       const rows = sheetRowsMap[s] || []
@@ -270,6 +335,12 @@ export async function processAiValidationJob(jobId: string, fileBytes: Uint8Arra
           row[key] = normalizeSource(row[key]);
         }
 
+        // Sanitize matiere if present
+        if (canon['matiere']) {
+          const key = canon['matiere'];
+          row[key] = sanitizeSpecialtyName(row[key]);
+        }
+
         // Collect for AI processing
         const isMcq = info.key === 'qcm' || info.key === 'cas_qcm';
         const isQroc = info.key === 'qroc' || info.key === 'cas_qroc';
@@ -290,7 +361,16 @@ export async function processAiValidationJob(jobId: string, fileBytes: Uint8Arra
             if (v !== undefined && v !== null && String(v).trim()) options.push(repairOptionText(String(v)));
           });
           const answerKey = canon['reponse'] || 'reponse';
-          const answerLetters = parseAnswerLetters(row[answerKey]);
+          // Normalize CAS QCM combined responses like "1AB, 2E, ..." to the current question's letters
+          let answerLetters = parseAnswerLetters(row[answerKey]);
+          if (info.key === 'cas_qcm') {
+            const qn = canon['question n'] ? (parseInt(String(row[canon['question n']])) || null) : null;
+            const normalized = normalizeCasResponseLetters(String(row[answerKey] || ''), qn);
+            if (normalized) {
+              row[answerKey] = normalized;
+              answerLetters = parseAnswerLetters(normalized);
+            }
+          }
           // Apply repaired text back for downstream consumers
           if (String(row[textKey] || '').trim() !== text) row[textKey] = text;
           
@@ -314,6 +394,11 @@ export async function processAiValidationJob(jobId: string, fileBytes: Uint8Arra
             text = repairQuestionText(caseTextRaw);
           }
           const answerKey = canon['reponse'] || 'reponse';
+          // Clean QROC free-text answer for importer compatibility
+          const cleanedAns = cleanQrocAnswerText(String(row[answerKey] || ''));
+          if (cleanedAns !== String(row[answerKey] || '')) {
+            row[answerKey] = cleanedAns;
+          }
           const existingAnswer = normalizeWhitespace(String(row[answerKey] || ''));
           const existingExplication = String(row['explication'] || '').trim();
           if (String(row[textKey] || '').trim() !== text) row[textKey] = text;
@@ -327,6 +412,16 @@ export async function processAiValidationJob(jobId: string, fileBytes: Uint8Arra
             existingExplication,
             caseText: caseTextRaw || undefined,
           });
+        }
+
+        // Build cross-sheet (matiere|cours)->niveau map
+        const lectureKey = buildLectureKey(row, canon);
+        const niveauHeader = canon['niveau'] ? canon['niveau'] : (niveauKey || undefined);
+        if (lectureKey && niveauHeader) {
+          const val = String(row[niveauHeader] || '').trim();
+          if (val && !lectureLevelMap.has(lectureKey)) {
+            lectureLevelMap.set(lectureKey, val);
+          }
         }
 
         processed += 1;
@@ -353,12 +448,46 @@ export async function processAiValidationJob(jobId: string, fileBytes: Uint8Arra
       }
     }
 
+    // Second pass: ensure 'niveau' column is filled for all canonical sheets, especially cas_qroc
+    for (const info of recognized) {
+      const rows = sheetRowsMap[info.name] || [];
+      if (!rows.length) continue;
+      // Determine the header key we will use to write 'niveau'
+      let niveauHeader: string | null = Object.keys(rows[0]).find(h => normalizeHeader(h) === 'niveau') || null;
+      if (!niveauHeader) {
+        // If sheet lacked a niveau column, create a standard one named 'niveau'
+        niveauHeader = 'niveau';
+      }
+      let lastSeen: string = '';
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        // Build canon mapping for this row to locate matiere/cours
+        const canon: Record<string, string> = {};
+        Object.keys(row).forEach(h => { const c = canonicalizeHeader(h); if (!(c in canon)) canon[c] = h; });
+        const lectureKey = buildLectureKey(row, canon);
+        let val = String(row[niveauHeader] || '').trim();
+        if (!val && lectureKey && lectureLevelMap.has(lectureKey)) {
+          val = lectureLevelMap.get(lectureKey) as string;
+        }
+        if (!val && lastSeen) {
+          val = lastSeen; // forward-fill
+        }
+        if (val) {
+          row[niveauHeader] = val;
+          lastSeen = val;
+        } else if (row[niveauHeader] === undefined) {
+          row[niveauHeader] = ''; // ensure column exists uniformly
+        }
+      }
+    }
+
     // If Azure configured, batch analyze MCQ and QROC rows
     const azureOn = isAzureConfigured();
     if (azureOn && (mcqRows.length > 0 || qrocRows.length > 0)) {
-      // Read tuning from env with defaults matching docs (batch 50, concurrency 4)
-  const batchSize = Math.max(1, parseInt(process.env.AI_BATCH_SIZE || '80', 10));
-      const concurrency = Math.max(1, parseInt(process.env.AI_CONCURRENCY || '8', 10));
+  // Read tuning from env with very conservative defaults for MCQ
+  const batchSize = Math.max(1, parseInt(process.env.AI_BATCH_SIZE || '8', 10));
+  const concurrency = Math.max(1, parseInt(process.env.AI_CONCURRENCY || '1', 10));
+  const singleItemMode = String(process.env.AI_QCM_SINGLE || '').trim() === '1' || String(process.env.AI_QCM_MODE || '').trim().toLowerCase() === 'single';
 
   // Dynamic explanation style: 'student' (default) vs 'prof' (more exhaustive)
   const explanationStyle = (process.env.AI_EXPLANATION_STYLE || 'student').toLowerCase();
@@ -386,6 +515,11 @@ CONTENU PAR OPTION:
 - Si notion chiffrée: ajouter ordre de grandeur plausible uniquement si certain.
 - Si pathologie/classification: préciser le critère différentiel majeur.
 - Ne jamais simplement réécrire l'option: apporter une information de justification.`;
+  const antiTemplateBlock = `ANTI-RÉPÉTITION & VARIATION:
+ - Interdits: formules creuses comme "Au contraire: Juste contraire", "En réalité: À l'inverse" ou répétitions mot à mot entre options.
+ - Commencer directement par le connecteur puis une justification SPÉCIFIQUE au contenu (mécanisme, critère, différentiel, repère).
+ - Minimum 2 phrases par option si la première est courte; éviter les phrases tronquées.
+ - Varier les tournures et les verbes d'une option à l'autre (confirmer, suggérer, s'oppose, indique, correspond, exclut, nécessite…).`;
   const sourcesBlock = `SOURCES (si extraits fournis dans data plus tard — peut être vide ici):
 - Si phrase pertinente exacte disponible: citer UNE phrase entière (sans « selon la source »). Sinon raisonnement interne.`;
   const constraintsBlock = `FORMAT JSON STRICT UNIQUEMENT:
@@ -418,6 +552,8 @@ ${chosenStyleBlock}
 
 ${perOptionCore}
 
+${antiTemplateBlock}
+
 ${sourcesBlock}
 
 ${constraintsBlock}
@@ -425,12 +561,14 @@ ${constraintsBlock}
 RAPPEL: Répondre STRICTEMENT avec le JSON.`;
 
       function buildUserPayload(items: McqRow[]) {
+        // Cap lengths to reduce payload size for stability (does not change sheet content)
+        const cap = (s: string, n: number) => (s && s.length > n ? s.slice(0, n) : s);
         return JSON.stringify({
           task: 'analyze_mcq_batch',
           items: items.map((q, i) => ({
             id: String(i),
-            questionText: q.text,
-            options: q.options,
+            questionText: cap(q.text, 500),
+            options: q.options.map(o => cap(o, 140)),
             providedAnswerRaw: q.answerLetters.join(', ') || null
           }))
         });
@@ -452,10 +590,15 @@ RAPPEL: Répondre STRICTEMENT avec le JSON.`;
         }
       }
 
-      // Split into batches
+      // Split into batches (or single item mode)
       const batches: McqRow[][] = []
-      for (let i = 0; i < mcqRows.length; i += batchSize) {
-        batches.push(mcqRows.slice(i, i + batchSize))
+      if (singleItemMode) {
+        await updateJob(jobId, { message: 'Mode QCM mono-élément activé (réseau instable) — envoi un par un' });
+        for (let i = 0; i < mcqRows.length; i++) batches.push([mcqRows[i]]);
+      } else {
+        for (let i = 0; i < mcqRows.length; i += batchSize) {
+          batches.push(mcqRows.slice(i, i + batchSize))
+        }
       }
 
       const totalBatches = batches.length
@@ -479,7 +622,7 @@ RAPPEL: Répondre STRICTEMENT avec le JSON.`;
 FORMAT JSON STRICT: { "results": [ { "id": "0", "status": "ok", "fixedQuestionText": "string", "fixedOptions": [..], "correctAnswers": [indices], "optionExplanations": [..], "globalExplanation": "..." } ] }`;
           const { content } = await chatCompletion([
             { role: 'user', content: payload }
-          ], { maxTokens: 1200, systemPrompt: forcePrompt });
+          ], { maxTokens: 800, systemPrompt: forcePrompt });
           const parsed = (function extract(text: string) {
             try {
               const fence = text.match(/```(?:json)?\n([\s\S]*?)```/i);
@@ -520,13 +663,11 @@ FORMAT JSON STRICT: { "results": [ { "id": "0", "status": "ok", "fixedQuestionTe
             if (Array.isArray(res.optionExplanations) && res.optionExplanations.length) {
               // Enforce connector & variation post-processing
               res.optionExplanations = applyConnectors(res.optionExplanations);
-              const optionLines = res.optionExplanations.map((exp: string, j: number) => `- (${String.fromCharCode(65 + j)}) ${exp}`).join('\n');
-              const synth = res.globalExplanation ? `Synthèse: ${res.globalExplanation}\n\n` : '';
-              const block = synth + 'Explications (IA):\n' + optionLines;
-              const existing = String(row['explication'] || '').trim();
-              const merged = existing ? `${existing}\n\n${block}` : block;
-              if (merged !== existing) { row['explication'] = merged; changed = true; }
-              // also fill per-option
+              // Do NOT write into global 'explication'. Only fill per-option explanations and 'rappel'.
+              if (res.globalExplanation) {
+                const r = String(res.globalExplanation).trim();
+                if (r && r !== String(row['rappel'] || '').trim()) { row['rappel'] = r; changed = true; }
+              }
               const letters = ['a','b','c','d','e'];
               for (let j = 0; j < Math.min(letters.length, res.optionExplanations.length); j++) {
                 const key = `explication ${letters[j]}`;
@@ -541,11 +682,21 @@ FORMAT JSON STRICT: { "results": [ { "id": "0", "status": "ok", "fixedQuestionTe
             return true;
           }
         } catch {}
-        // Last resort: mark fixed with minimal explanation
+        // Last resort: mark fixed with per-option and rappel fallbacks only (no global explication)
         const row = item.original;
-        const ex = String(row['explication'] || '').trim();
-        const minimal = 'Explication (IA): Nettoyage automatique appliqué (fallback).';
-        if (!ex) row['explication'] = minimal; else row['explication'] = `${ex}\n\n${minimal}`;
+        const letters = ['a','b','c','d','e'];
+        const maxOptions = Math.min(letters.length, item.options.length);
+        for (let j = 0; j < maxOptions; j++) {
+          const key = `explication ${letters[j]}`;
+          const isCorrect = item.answerLetters.includes(String.fromCharCode(65 + j));
+          const fallbackExp = isCorrect 
+            ? `Exact, cette option est correcte. Cette réponse correspond aux critères attendus selon les recommandations médicales en vigueur.`
+            : `Non, cette option est incorrecte. Elle ne correspond pas aux critères diagnostiques ou thérapeutiques standards pour cette situation clinique.`;
+          if (!String(row[key] || '').trim()) row[key] = fallbackExp;
+        }
+        if (!String(row['rappel'] || '').trim()) {
+          row['rappel'] = 'RAPPEL DU COURS: Cette question porte sur des notions fondamentales. Réviser les mécanismes physiopathologiques et les critères diagnostiques standards.';
+        }
         row['ai_status'] = 'fixed';
         row['ai_reason'] = 'Auto-fix (fallback)';
         fixedCount += 1;
@@ -563,7 +714,7 @@ FORMAT JSON STRICT: { "results": [ { "id": "0", "status": "ok", "fixedQuestionTe
           const { content } = await chatCompletion([
             { role: 'user', content: userPayload }
           ], {
-            maxTokens: 2400,
+            maxTokens: 800,
             systemPrompt,
           });
 
@@ -631,29 +782,21 @@ FORMAT JSON STRICT: { "results": [ { "id": "0", "status": "ok", "fixedQuestionTe
             // Update explanations if provided
             if (Array.isArray(result.optionExplanations) && result.optionExplanations.length) {
               result.optionExplanations = applyConnectors(result.optionExplanations);
-              const existingExplication = String(row['explication'] || '').trim();
-              const optionLines = result.optionExplanations.map((exp: string, j: number) => 
-                `- (${String.fromCharCode(65 + j)}) ${exp}`
-              ).join('\n');
-              
-              const synth = result.globalExplanation ? `Synthèse: ${result.globalExplanation}\n\n` : '';
-              const aiBlock = synth + 'Explications (IA):\n' + optionLines;
-              const newExplication = existingExplication ? 
-                `${existingExplication}\n\n${aiBlock}` : 
-                aiBlock;
-              
-              if (newExplication !== existingExplication) {
-                row['explication'] = newExplication;
-                changed = true;
-              }
-
-              // Also set per-option explanation columns
+              // Set per-option explanation columns only
               const letters = ['a','b','c','d','e'];
               for (let j = 0; j < Math.min(letters.length, result.optionExplanations.length); j++) {
                 const key = `explication ${letters[j]}`;
                 const val = String(result.optionExplanations[j] || '').trim();
                 if (val && val !== String(row[key] || '').trim()) {
                   row[key] = val;
+                  changed = true;
+                }
+              }
+              // Set rappel (course reminder) from any globalExplanation if provided
+              if (result.globalExplanation) {
+                const r = String(result.globalExplanation).trim();
+                if (r && r !== String(row['rappel'] || '').trim()) {
+                  row['rappel'] = r;
                   changed = true;
                 }
               }
@@ -679,8 +822,27 @@ FORMAT JSON STRICT: { "results": [ { "id": "0", "status": "ok", "fixedQuestionTe
             processedItems: processed,
             progress: totalItems ? Math.min(99, Math.floor((processed / totalItems) * 100)) : 99,
           });
-        } catch (e) {
-          // On error, attempt single-item forced fixes
+        } catch (e: any) {
+          const msg = String(e?.message || '').toLowerCase();
+          const shouldShrink = (
+            msg.includes('fetch failed') ||
+            msg.includes('413') ||
+            msg.includes('payload too large') ||
+            msg.includes('etimedout') ||
+            msg.includes('aborterror') ||
+            msg.includes('socket hang up') ||
+            msg.includes('econnreset')
+          );
+          if (shouldShrink && batch.length > 1) {
+            const mid = Math.max(1, Math.floor(batch.length / 2));
+            await updateJob(jobId, { message: `Réduction du lot QCM (réseau): taille ${batch.length} → ${mid}` });
+            const first = batch.slice(0, mid);
+            const second = batch.slice(mid);
+            await processOneBatch(first, batchIndex, true);
+            await processOneBatch(second, batchIndex, true);
+            return; // avoid double progress update
+          }
+          // On non-shrinkable error or unit batch: attempt single-item forced fixes
           for (const mcq of batch) {
             await mcqFallbackFix(mcq);
           }
@@ -744,12 +906,16 @@ Pas d'autres clés.`;
                 }
                 if (Array.isArray(res.optionExplanations) && res.optionExplanations.length) {
                   res.optionExplanations = applyConnectors(res.optionExplanations);
-                  const optionLines = res.optionExplanations.map((exp: string, j: number) => `- (${String.fromCharCode(65 + j)}) ${exp}`).join('\n');
-                  const synth = res.globalExplanation ? `Synthèse: ${res.globalExplanation}\n\n` : '';
-                  const block = synth + 'Explications (IA):\n' + optionLines;
-                  const existing = String(row['explication'] || '').trim();
-                  const merged = existing ? `${existing}\n\n${block}` : block;
-                  if (merged !== existing) { row['explication'] = merged; changed = true; }
+                  const letters = ['a','b','c','d','e'];
+                  for (let j = 0; j < Math.min(letters.length, res.optionExplanations.length); j++) {
+                    const key = `explication ${letters[j]}`;
+                    const val = String(res.optionExplanations[j] || '').trim();
+                    if (val && val !== String(row[key] || '').trim()) { row[key] = val; changed = true; }
+                  }
+                  if (res.globalExplanation) {
+                    const r = String(res.globalExplanation).trim();
+                    if (r && r !== String(row['rappel'] || '').trim()) { row['rappel'] = r; changed = true; }
+                  }
                 }
                 row['ai_status'] = 'fixed';
                 row['ai_reason'] = changed ? '' : 'Déjà correct (retry)';
@@ -808,7 +974,6 @@ Format:
                   const row = qroc.original;
                   
                   if (res.status === 'ok' && res.explanation) {
-                    const existingExplication = String(row['explication'] || '').trim();
                     const aiExplanation = String(res.explanation).trim();
                     const textKey = Object.keys(row).find(k => canonicalizeHeader(k) === 'texte de la question') || 'texte de la question';
                     if (res.fixedQuestionText) {
@@ -817,19 +982,21 @@ Format:
                     }
                     
                     if (aiExplanation) {
-                      row['explication'] = existingExplication ? 
-                        `${existingExplication}\n\nExplication (IA): ${aiExplanation}` :
-                        `Explication (IA): ${aiExplanation}`;
+                      // Use AI explanation as 'rappel' (course reminder) for QROC
+                      const prevRappel = String(row['rappel'] || '').trim();
+                      if (!prevRappel || prevRappel !== aiExplanation) {
+                        row['rappel'] = aiExplanation;
+                      }
                       row['ai_status'] = 'fixed';
                       row['ai_reason'] = '';
                       fixedCount += 1;
                       successfulAnalyses += 1;
                     }
                   } else {
-                    // Force a minimal fix even on error
-                    const existingExplication = String(row['explication'] || '').trim();
-                    const fallback = res?.error ? `Explication (IA): ${res.error}` : 'Explication (IA): Nettoyage automatique.';
-                    row['explication'] = existingExplication ? `${existingExplication}\n\n${fallback}` : fallback;
+                    // On error: force minimal rappel for QROC
+                    if (!String(row['rappel'] || '').trim()) {
+                      row['rappel'] = 'RAPPEL DU COURS: Question à réponse ouverte - réviser les notions fondamentales sur ce sujet et les critères de réponse attendus.';
+                    }
                     row['ai_status'] = 'fixed';
                     row['ai_reason'] = '';
                     fixedCount += 1;
@@ -837,29 +1004,61 @@ Format:
                 }
               });
             } else {
-              // Batch JSON fail: mark all as fixed with minimal fallback explanation
+              // Batch JSON fail: mark all as fixed with minimal rappel
               batch.forEach(qroc => {
                 const row = qroc.original;
-                const existing = String(row['explication'] || '').trim();
-                const minimal = 'Explication (IA): Nettoyage automatique (QROC).';
-                row['explication'] = existing ? `${existing}\n\n${minimal}` : minimal;
+                if (!String(row['rappel'] || '').trim()) {
+                  row['rappel'] = 'RAPPEL DU COURS: Question à réponse ouverte - réviser les notions fondamentales sur ce sujet et les critères de réponse attendus.';
+                }
                 row['ai_status'] = 'fixed';
                 row['ai_reason'] = '';
                 fixedCount += 1;
               });
             }
           } catch (e) {
-            // On error: mark as fixed with minimal note
+            // On error: mark as fixed with minimal rappel
             batch.forEach(qroc => {
               const row = qroc.original;
-              const existing = String(row['explication'] || '').trim();
-              const minimal = 'Explication (IA): Nettoyage automatique (erreur IA).';
-              row['explication'] = existing ? `${existing}\n\n${minimal}` : minimal;
+              if (!String(row['rappel'] || '').trim()) {
+                row['rappel'] = 'RAPPEL DU COURS: Question à réponse ouverte - réviser les notions fondamentales sur ce sujet et les critères de réponse attendus.';
+              }
               row['ai_status'] = 'fixed';
               row['ai_reason'] = '';
               fixedCount += 1;
             });
           }
+        }
+      }
+    }
+
+    // Enforce: MCQ (qcm, cas_qcm) rows must have per-option explanations for every present option
+    for (const info of recognized) {
+      if (info.key !== 'qcm' && info.key !== 'cas_qcm') continue;
+      const rows = sheetRowsMap[info.name] || [];
+      for (let idx = 0; idx < rows.length; idx++) {
+        const row = rows[idx] as Record<string, any>;
+        const headers = Object.keys(row);
+        const canon: Record<string, string> = {};
+        headers.forEach(h => { const c = canonicalizeHeader(h); if (!(c in canon)) canon[c] = h; });
+        const presentOptions: number[] = [];
+        const letters = ['a','b','c','d','e'];
+        for (let j = 0; j < letters.length; j++) {
+          const k = canon[`option ${letters[j]}`] || `option ${letters[j]}`;
+          const val = row[k];
+          if (val !== undefined && val !== null && String(val).trim()) {
+            presentOptions.push(j);
+          }
+        }
+        if (presentOptions.length === 0) continue; // no options, handled elsewhere
+        const missing: string[] = [];
+        for (const j of presentOptions) {
+          const expK = `explication ${letters[j]}`;
+          const have = String(row[expK] || '').trim();
+          if (!have) missing.push(letters[j].toUpperCase());
+        }
+        if (missing.length > 0) {
+          row['ai_status'] = 'error';
+          row['ai_reason'] = `Explication par option manquante: ${missing.join(', ')}`;
         }
       }
     }

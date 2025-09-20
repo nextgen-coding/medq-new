@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface DashboardStats {
-  averageScore: number;
+  averageScore: number | null;
   totalQuestions: number;
   completedQuestions: number;
   learningStreak: number;
@@ -89,26 +89,28 @@ export function useDashboardData(): DashboardData {
         setData(prev => ({ ...prev, isLoading: true, error: null }));
 
         // Fetch all data in parallel (added performance endpoint)
-        const [statsRes, dailyRes, resultsRes, coursesRes, reviewCoursesRes, performanceRes] = await Promise.all([
+        const [statsRes, dailyRes, resultsRes, coursesRes, reviewCoursesRes, performanceRes, specAvgRes] = await Promise.all([
           fetch('/api/dashboard/stats'),
           fetch('/api/dashboard/daily-activity?days=14'),
           fetch('/api/dashboard/recent-results'),
           fetch('/api/dashboard/popular-courses'),
           fetch('/api/dashboard/courses-to-review'),
-          fetch('/api/dashboard/performance')
+          fetch('/api/dashboard/performance'),
+          fetch('/api/dashboard/specialty-averages')
         ]);
 
         if (!statsRes.ok || !dailyRes.ok || !resultsRes.ok || !coursesRes.ok || !reviewCoursesRes.ok || !performanceRes.ok) {
           throw new Error('Failed to fetch dashboard data');
         }
 
-  const [stats, dailyActivityRaw, recentResults, popularCourses, coursesToReview, performance] = await Promise.all([
+  const [stats, dailyActivityRaw, recentResults, popularCourses, coursesToReview, performance, specialtyAveragesApi] = await Promise.all([
           statsRes.json(),
           dailyRes.json(),
           resultsRes.json(),
           coursesRes.json(),
           reviewCoursesRes.json(),
-          performanceRes.json()
+          performanceRes.json(),
+          specAvgRes.ok ? specAvgRes.json() : []
         ]);
 
         // coursesToReview now fetched directly (already filtered by API)
@@ -119,11 +121,20 @@ export function useDashboardData(): DashboardData {
           if (!specialtyMap[c.specialty.name]) specialtyMap[c.specialty.name] = { name: c.specialty.name, scores: [] };
           specialtyMap[c.specialty.name].scores.push(c.averageScore);
         });
-        const specialtyAverages = Object.entries(specialtyMap).map(([name, v], i) => ({
-          id: `spec-${i}`,
-          name,
-          average: v.scores.reduce((a,b)=>a+b,0)/v.scores.length
-        })).sort((a,b)=> b.average - a.average).slice(0,15);
+        let specialtyAverages: SpecialtyAverage[] = [];
+        if (Array.isArray(specialtyAveragesApi) && specialtyAveragesApi.length) {
+          specialtyAverages = specialtyAveragesApi
+            .filter((s: any) => s && typeof s.id === 'string' && s.average != null)
+            .map((s: any) => ({ id: s.id, name: s.name, average: s.average }))
+            .sort((a: any, b: any) => b.average - a.average)
+            .slice(0, 15);
+        } else {
+          specialtyAverages = Object.entries(specialtyMap).map(([name, v], i) => ({
+            id: `spec-${i}`,
+            name,
+            average: v.scores.reduce((a,b)=>a+b,0)/v.scores.length
+          })).sort((a,b)=> b.average - a.average).slice(0,15);
+        }
 
         // Normalize daily activity (API may return array OR an object { dailyData:[], metrics:... })
         const normalizedDailyActivity = Array.isArray(dailyActivityRaw)

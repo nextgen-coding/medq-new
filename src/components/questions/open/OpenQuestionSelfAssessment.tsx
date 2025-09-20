@@ -47,31 +47,10 @@ export function OpenQuestionSelfAssessment({ onAssessment, userAnswerText, quest
       animate={{ opacity: 1, y: 0 }}
       className="space-y-4 w-full max-w-full"
     >
-      <div className="p-4 rounded-lg bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
-        <h4 className="font-medium mb-4 text-blue-900 dark:text-blue-200">
-          Évaluez votre réponse: {userAnswerText !== undefined && (
-            <span className="font-normal text-blue-800 dark:text-blue-100">
-              {userAnswerText.trim() ? (
-                enableHighlighting && questionId ? (
-                  <HighlightableAnswerDisplay 
-                    questionId={questionId}
-                    answer={userAnswerText}
-                    confirmMode={highlightConfirm}
-                  />
-                ) : (
-                  <RichTextDisplay text={userAnswerText} enableImageZoom={true} />
-                )
-              ) : (
-                <span className="italic opacity-70">(vide)</span>
-              )}
-            </span>
-          )}
-        </h4>
+      <div className="p-3 md:p-4 rounded-lg bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
+        <h4 className="font-medium mb-1 text-blue-900 dark:text-blue-200">Évaluez votre réponse</h4>
 
-        {/* Separator */}
-        <div className="border-t border-blue-200/60 dark:border-blue-700/60 my-4"></div>
-
-        <div className="flex flex-row gap-3 w-full">
+        <div className="mt-1 flex flex-row gap-2 w-full">
           <Button
             size="lg"
             className="flex-1 gap-3 bg-green-600/90 hover:bg-green-600 text-white shadow-md hover:shadow-lg transition-all duration-200 transform-gpu hover:-translate-y-0.5 active:translate-y-0 focus-visible:ring-2 focus-visible:ring-green-400"

@@ -718,16 +718,23 @@ export function CreateQuestionDialog({ lecture, isOpen, onOpenChange, onQuestion
   useEffect(()=> {
     if (!( (formData.type === 'clinical_case') || (formData.type === 'qroc' && multiQrocMode) )) return;
     const handler = (e: KeyboardEvent) => {
+      // Don't interfere while typing in inputs/textarea/contentEditable
+      const activeEl = e.target as HTMLElement | null;
+      const tag = activeEl?.tagName;
+      const type = (activeEl as HTMLInputElement | undefined)?.type;
+      const isEditable = !!activeEl && ((activeEl as any).isContentEditable === true);
+      const isTextInput = tag === 'TEXTAREA' || (tag === 'INPUT' && type && !['radio','checkbox','button','submit'].includes(type!));
+      if (isTextInput || isEditable) return;
       if (e.altKey || e.metaKey || e.ctrlKey) return;
       if (!/^[1-9]$/.test(e.key)) return;
       const idx = parseInt(e.key,10) - 1;
-      const target = document.querySelector(`[data-sub-text="${idx}"]`) as HTMLTextAreaElement | HTMLInputElement | null;
-      if (target) {
+      const focusTarget = document.querySelector(`[data-sub-text="${idx}"]`) as HTMLTextAreaElement | HTMLInputElement | null;
+      if (focusTarget) {
         e.preventDefault();
-        target.focus();
+        focusTarget.focus();
         // Select content shortly after focus to ensure selection applies
         setTimeout(()=> {
-          if (typeof (target as any).select === 'function') (target as any).select();
+          if (typeof (focusTarget as any).select === 'function') (focusTarget as any).select();
         }, 0);
       }
     };
@@ -994,7 +1001,19 @@ export function CreateQuestionDialog({ lecture, isOpen, onOpenChange, onQuestion
                       )}
                       {sq.type === 'clinic_croq' && (
                         <div className="space-y-3">
-                          <div className="space-y-2"><Label>Réponse attendue *</Label><Input data-clinic-sub-answer={idx} value={sq.qrocAnswer} onChange={e=> updateSubQuestion(sq.id, prev => ({ ...prev, qrocAnswer: e.target.value }))} placeholder="Réponse attendue" onKeyDown={(e)=> handleClinicQrocAnswerKey(e, idx)} className="font-medium bg-blue-50/40 dark:bg-blue-950/20 border-blue-300/50 dark:border-blue-800" /></div>
+                          <div className="space-y-2">
+                            <Label>Réponse attendue *</Label>
+                            <Textarea
+                              data-clinic-sub-answer={idx}
+                              value={sq.qrocAnswer}
+                              onChange={e=> updateSubQuestion(sq.id, prev => ({ ...prev, qrocAnswer: e.target.value }))}
+                              placeholder="Réponse attendue (multi-lignes possible)"
+                              rows={3}
+                              className="font-medium bg-blue-50/40 dark:bg-blue-950/20 border-blue-300/50 dark:border-blue-800 resize-y"
+                              onKeyDown={(e)=> handleClinicQrocAnswerKey(e as any, idx)}
+                            />
+                            <p className="text-[11px] text-muted-foreground">Les retours à la ligne seront conservés.</p>
+                          </div>
                           <div><Button type="button" variant="outline" size="sm" onClick={()=> addSubQuestionOfType('clinic_croq')} className="w-full"><Plus className="h-3 w-3 mr-1" /> Ajouter une autre QROC</Button></div>
                         </div>
                       )}

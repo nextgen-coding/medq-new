@@ -76,6 +76,13 @@ export function PersistentAiJob({ onJobCreated }: PersistentAiJobProps) {
       if (response.ok) {
         const data = await response.json();
         setRecentSessions(data.jobs || []);
+      } else {
+        const code = response.status;
+        if (code === 401) {
+          toast.error('Session expirée ou non autorisée', { description: 'Reconnectez-vous pour voir vos sessions AI.' });
+        } else if (code === 503) {
+          toast.warning('Service temporairement indisponible', { description: 'Le service de sessions est indisponible (DB). Nouvel essai dans 20s.' });
+        }
       }
     } catch (error) {
       console.error('Error loading sessions:', error);
