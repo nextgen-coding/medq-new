@@ -821,16 +821,16 @@ export function OpenQuestion({
     );
   })()}
 
-  {/* Notes - always render for content detection, but show/hide based on showNotesArea */}
-  {!hideNotes && (
-        <div ref={notesRef} className={showNotesArea ? "" : "hidden"}>
-          <QuestionNotes 
-            questionId={question.id} 
-            onHasContentChange={setNotesHasContent}
-            autoEdit={showNotesArea && !notesHasContent} // Auto-edit when manually opened and empty
-          />
-        </div>
-      )}
+  // Only render notes if not a clinical case sub-question (i.e., not in a clinical case context)
+  {!hideNotes && question.text !== '' && !disableIndividualSubmit && !hideImmediateResults && (
+    <div ref={notesRef} className={showNotesArea ? "" : "hidden"}>
+      <QuestionNotes
+        questionId={question.id}
+        onHasContentChange={setNotesHasContent}
+        autoEdit={showNotesArea && !notesHasContent}
+      />
+    </div>
+  )}
   {/* Comments (after submission) */}
   {submitted && !hideComments && <QuestionComments questionId={question.id} />}
       

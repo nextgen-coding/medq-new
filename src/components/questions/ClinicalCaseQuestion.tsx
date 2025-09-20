@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { CheckCircle, Circle, AlertCircle, Eye, FileText, Pin, PinOff, EyeOff, Trash2, Pencil, StickyNote, ChevronRight, Flag, Keyboard, XCircle } from 'lucide-react';
 import { ReportQuestionDialog } from './ReportQuestionDialog';
 import { HighlightableCaseText } from './HighlightableCaseText';
+import { HighlightableQuestionText } from './HighlightableQuestionText';
 import { RichTextDisplay } from '@/components/ui/rich-text-display';
 import { ClinicalCaseEditDialog } from '@/components/questions/edit/ClinicalCaseEditDialog';
 import { GroupedQrocEditDialog } from '@/components/questions/edit/GroupedQrocEditDialog';
@@ -349,28 +350,25 @@ export function ClinicalCaseQuestion({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // After submission, allow Enter to go to next task
+      const target = e.target as HTMLElement;
+      const isTextInput = target && (
+        target.tagName === 'TEXTAREA' ||
+        (target.tagName === 'INPUT' && (target as HTMLInputElement).type === 'text') ||
+        target.isContentEditable
+      );
       if (showResults && e.key === 'Enter' && !e.shiftKey) {
-        // Don't trigger if focus is in an input, textarea, or contenteditable (e.g., notes)
-        const target = e.target as HTMLElement;
-        const isTextInput = target && (
-          target.tagName === 'TEXTAREA' ||
-          (target.tagName === 'INPUT' && (target as HTMLInputElement).type === 'text') ||
-          target.isContentEditable
-        );
         if (isTextInput) return;
         e.preventDefault();
         // Only trigger if at the end (all questions shown, not in evaluation phase)
         if (evaluationComplete || evaluationOrder.length === 0) {
           onNext();
         }
-
         return;
       }
 
       // Answering phase - controlled progression through questions
       if (!showResults && e.key === 'Enter' && !e.shiftKey) {
-        // Don't hijack Enter from text inputs
-        if (isTextInput || isEditable) return;
+        if (isTextInput) return;
         e.preventDefault();
         // For multi QROC mode, all questions are visible, so just scroll between them
         if (displayMode === 'multi_qroc') {
@@ -674,7 +672,7 @@ export function ClinicalCaseQuestion({
                 hideImmediateResults={!showResults}
                 // Hide per-question actions; we submit once for all
                 hideActions
-                hideNotes={!showResults}
+                hideNotes={true}
                 hideComments={true} // Always hide individual question comments in clinical cases
                 highlightConfirm
                 hideMeta
@@ -733,7 +731,13 @@ export function ClinicalCaseQuestion({
           {clinicalCase.caseText && (
             <div className="mb-4">
               <div className="text-lg sm:text-xl leading-relaxed whitespace-pre-wrap text-foreground font-medium">
-                <HighlightableCaseText lectureId={lectureId} text={clinicalCase.caseText} className="break-words" />
+                {/* Use first sub-question id for highlight saving (backend requires real UUID) */}
+                <HighlightableQuestionText
+                  questionId={clinicalCase.questions[0]?.id}
+                  text={clinicalCase.caseText}
+                  className="break-words"
+                  confirmMode
+                />
               </div>
             </div>
           )}
@@ -896,13 +900,15 @@ export function ClinicalCaseQuestion({
                 <div id={`clinical-case-notes-${clinicalCase.caseNumber}`} className="space-y-6">
                   {/* Always render for content detection, but show/hide based on showNotesArea */}
                   <div className={showNotesArea ? '' : 'hidden'}>
-                    <QuestionNotes 
-                      questionId={clinicalCase.questions[0]?.id}
+                    <QuestionNotes
+                      questionId={displayMode === 'multi_qroc' ? `group-qroc-${clinicalCase.caseNumber}` : displayMode === 'multi_qcm' ? `group-qcm-${clinicalCase.caseNumber}` : `clinical-case-${clinicalCase.caseNumber}`}
                       onHasContentChange={setNotesHasContent}
                       autoEdit={showNotesArea && !notesHasContent}
                     />
                   </div>
-                  <QuestionComments questionId={displayMode === 'multi_qroc' ? `group-qroc-${clinicalCase.caseNumber}` : displayMode === 'multi_qcm' ? `group-qcm-${clinicalCase.caseNumber}` : `clinical-case-${clinicalCase.caseNumber}`} />
+                  <QuestionComments
+                    questionId={clinicalCase.questions[0]?.id}
+                  />
                 </div>
               )}
             </div>
@@ -929,7 +935,12 @@ export function ClinicalCaseQuestion({
             </DialogTitle>
           </DialogHeader>
           <div className="mt-4 prose max-w-none text-sm leading-relaxed whitespace-pre-wrap text-foreground">
-            <HighlightableCaseText lectureId={lectureId} text={clinicalCase.caseText} />
+            {/* Use first sub-question id for highlight saving (backend requires real UUID) */}
+            <HighlightableQuestionText
+              questionId={clinicalCase.questions[0]?.id}
+              text={clinicalCase.caseText}
+              confirmMode
+            />
           </div>
         </DialogContent>
       </Dialog>
