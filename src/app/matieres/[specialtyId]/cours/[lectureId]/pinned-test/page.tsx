@@ -466,21 +466,7 @@ export default function QuestionsEpingleesTestPage() {
         <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6">
           <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 pb-10 lg:pb-0">
             <div className="flex-1 space-y-4 sm:space-y-6 min-w-0 w-full max-w-full">
-              <div className="flex justify-between items-center">
-                {/* Back to specialty button */}
-                <Button
-                  onClick={handleBack}
-                  variant="ghost"
-                  className="flex items-center gap-2 text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Retour à la matière
-                </Button>
-                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                  <Dumbbell className="w-4 h-4" />
-                  Test de questions épinglées
-                </div>
-              </div>
+              {/* Header with 'Retour à la matière' and 'Test de questions épinglées' removed as requested */}
 
               {currentQuestion && !isTestComplete && (
                 <div className="space-y-4 sm:space-y-6">
