@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { UniversalHeader } from '@/components/layout/UniversalHeader';
 import { AppSidebar, AppSidebarProvider } from '@/components/layout/AppSidebar';
@@ -10,7 +10,6 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { toast } from '@/hooks/use-toast'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useTranslation } from 'react-i18next'
@@ -19,59 +18,11 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { ProfileCompletionGuard } from '@/components/ProfileCompletionGuard'
 
 export default function ProfilePageRoute() {
-  const { user, refreshUser, updateUser } = useAuth();
-  const { t } = useTranslation();
-  const [isClient, setIsClient] = useState(false);
+  const { user } = useAuth()
+  const { t } = useTranslation()
   const [showChangePassword, setShowChangePassword] = useState(false)
-  // Editable profile state
-  const [profile, setProfile] = useState({
-    name: user?.name || '',
-    email: user?.email || '',
-    niveauId: user?.niveauId || user?.niveau?.id || '',
-    image: user?.image || '',
-    faculty: user?.faculty || 'FMSF',
-    sexe: user?.sexe || 'M',
-    highlightColor: (user as any)?.highlightColor || '#ffe066', // default yellow
-  })
-
-  // Only render after client hydration to avoid SSR mismatch
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
-
-  // Niveaux state
-  const [niveaux, setNiveaux] = useState<{ id: string; name: string }[]>([])
-
-  // Fetch niveaux from backend
-  useEffect(() => {
-    fetch('/api/niveaux')
-      .then(res => res.json())
-      .then(data => {
-        setNiveaux(data)
-        // If user has no niveauId, set to first niveau's id
-        setProfile(prev => ({ ...prev, niveauId: prev.niveauId || (data[0]?.id || '') }))
-      })
-      .catch(() => setNiveaux([]))
-  }, [])
-
-  // Update form fields when user changes (after login/refresh)
-  useEffect(() => {
-    if (user) {
-      setProfile({
-        name: user?.name || '',
-        email: user?.email || '',
-        niveauId: user?.niveauId || user?.niveau?.id || '',
-        image: user?.image || '',
-        faculty: user?.faculty || 'FMSF',
-        sexe: user?.sexe || 'M',
-        highlightColor: (user as any)?.highlightColor || '#ffe066',
-      })
-    }
-  }, [user])
-  const [imageFile, setImageFile] = useState<File | null>(null)
-  const [isSaving, setIsSaving] = useState(false)
-  const [isUploading, setIsUploading] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  // Local faculty selection (no faculty field on User type yet)
+  const [faculty, setFaculty] = useState('FMSF')
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
     newPassword: '',
@@ -83,115 +34,20 @@ export default function ProfilePageRoute() {
     confirm: false
   })
 
-  if (!isClient) return null;
-
   const handlePasswordChange = async () => {
-    try {
-      // Client-side password validation
-      if (passwordData.newPassword.length < 8) {
-        toast({ title: 'Erreur', description: 'Le mot de passe doit contenir au moins 8 caractères.', variant: 'destructive' });
-        return;
-      }
-      if (!/[A-Z]/.test(passwordData.newPassword)) {
-        toast({ title: 'Erreur', description: 'Le mot de passe doit contenir au moins une lettre majuscule.', variant: 'destructive' });
-        return;
-      }
-      if (!/[a-z]/.test(passwordData.newPassword)) {
-        toast({ title: 'Erreur', description: 'Le mot de passe doit contenir au moins une lettre minuscule.', variant: 'destructive' });
-        return;
-      }
-      const isGoogleUser = !!user?.google_id;
-      // Only send the fields required by the backend
-      const payload = isGoogleUser
-        ? { newPassword: passwordData.newPassword }
-        : { currentPassword: passwordData.currentPassword, newPassword: passwordData.newPassword };
-      const res = await fetch('/api/user/password', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      if (!res.ok) {
-        const errorData = await res.json();
-        toast({ title: 'Erreur', description: errorData.error || 'Impossible de changer le mot de passe', variant: 'destructive' });
-        return;
-      }
-      toast({ title: 'Succès', description: isGoogleUser ? 'Mot de passe défini' : 'Mot de passe mis à jour', variant: 'default' })
-      setShowChangePassword(false)
-      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' })
-      // Refresh user context so UI updates to require current password next time
-      if (refreshUser) await refreshUser();
-    } catch (e) {
-      toast({ title: 'Erreur', description: 'Impossible de changer le mot de passe', variant: 'destructive' })
-    }
-  }
-
-  const handleProfileSave = async () => {
-    setIsSaving(true)
-    try {
-      const res = await fetch('/api/user/profile', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...profile,
-          niveau: undefined // remove niveau if present
-        }),
-      })
-      if (!res.ok) throw new Error('Erreur lors de la sauvegarde du profil')
-      const data = await res.json();
-      toast({ title: 'Succès', description: 'Profil mis à jour', variant: 'default' })
-      if (data.user && updateUser) updateUser(data.user);
-      refreshUser && refreshUser()
-    } catch (e) {
-      toast({ title: 'Erreur', description: 'Impossible de sauvegarder le profil', variant: 'destructive' })
-    }
-    setIsSaving(false)
-  }
-
-  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setIsUploading(true)
-    try {
-      const formData = new FormData()
-      formData.append('file', file)
-      // Optimistically update UI
-      const tempUrl = URL.createObjectURL(file)
-      setProfile(prev => ({ ...prev, image: tempUrl }))
-      // Upload image
-      const res = await fetch('/api/upload/image', { method: 'POST', body: formData })
-      if (!res.ok) throw new Error('Erreur lors du téléversement de la photo')
-      const data = await res.json()
-      setProfile(prev => ({ ...prev, image: data.url }))
-      // Update image in DB
-      const saveRes = await fetch('/api/user/profile', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: profile.name,
-          email: profile.email,
-          niveauId: profile.niveauId,
-          sexe: profile.sexe,
-          faculty: profile.faculty,
-          image: data.url,
-        }),
-      })
-      if (!saveRes.ok) throw new Error('Erreur lors de la sauvegarde de la photo')
-      // Optionally update user context immediately
-      if (refreshUser) refreshUser()
-      toast({ title: 'Succès', description: 'Photo de profil mise à jour', variant: 'default' })
-    } catch (e) {
-      toast({ title: 'Erreur', description: 'Impossible de mettre à jour la photo', variant: 'destructive' })
-    }
-    setIsUploading(false)
+    // TODO: Implement password change logic
+    console.log('Changing password...', passwordData)
+    setShowChangePassword(false)
+    setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' })
   }
 
   return (
     <ProtectedRoute>
       <ProfileCompletionGuard>
         <AppSidebarProvider>
-          <div className="flex w-full bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-900">
+          <div className="flex min-h-screen w-full bg-gray-900">
             <AppSidebar />
-            <SidebarInset className="flex flex-col min-h-0">
+            <SidebarInset className="flex-1 flex flex-col">
               {/* Universal Header */}
               <UniversalHeader
                 title="Profil"
@@ -201,7 +57,7 @@ export default function ProfilePageRoute() {
                     onClick={() => console.log('Save changes')}
                   >
                     <Save className="h-4 w-4 mr-2" />
-                    {isSaving ? 'Enregistrement...' : 'Enregistrer'}
+                    Enregistrer les modifications
                   </Button>
                 }
               />
@@ -238,9 +94,7 @@ export default function ProfilePageRoute() {
                               <p className="text-xs text-gray-400 mt-1">PNG, JPG, GIF jusqu'à 5Mo</p>
                             </div>
                           </div>
-                        </CardContent>
-                      </Card>
-                    </div>
+                        </div>
 
                         {/* Nom d'utilisateur */}
                         <div className="space-y-2">
@@ -327,9 +181,10 @@ export default function ProfilePageRoute() {
                               onClick={() => setShowChangePassword(!showChangePassword)}
                             >
                               <Lock className="h-4 w-4 mr-2" />
-                              {user?.password ? 'Changer' : 'Définir le mot de passe'}
+                              Changer le mot de passe
                             </Button>
                           </div>
+                        </div>
 
                         {/* Change Password Section */}
                         {showChangePassword && (
