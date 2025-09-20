@@ -770,7 +770,9 @@ SORTIE JSON STRICTE:
       return out;
     }
 
-    const enhanced = await enhanceMcqRows(enhanceTargets);
+  // Optional FAST mode: skip enhancement stage to maximize throughput
+  const FAST_MODE = String(process.env.AI_FAST_MODE || '').trim() === '1';
+  const enhanced = FAST_MODE ? new Map<string, any>() : await enhanceMcqRows(enhanceTargets);
     // Apply enhanced content where available
     for (const t of enhanceTargets) {
       const res = enhanced.get(t.id);

@@ -1,5 +1,6 @@
 import { createAzure } from '@ai-sdk/azure';
 import { generateText } from 'ai';
+import { z } from 'zod';
 
 export type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string };
 
@@ -28,22 +29,58 @@ export async function chatCompletionStructured(messages: ChatMessage[], options:
   const deployment = getEnv('AZURE_OPENAI_CHAT_DEPLOYMENT') || getEnv('AZURE_OPENAI_DEPLOYMENT_NAME') || getEnv('AZURE_OPENAI_DEPLOYMENT');
   const model = azure(deployment);
 
-  const sys = options.systemPrompt ? [{ role: 'system' as const, content: options.systemPrompt }] : [];
-  const hasJson = [...sys, ...messages].some(m => /json/i.test(String((m as any).content || '')));
+  const extraDetail = 'explication more detailed , make it professor level and more detailed aka the student understand everything';
+  const sysPromptCombined = options.systemPrompt ? `${options.systemPrompt}\n\n${extraDetail}` : extraDetail;
+  const sysBase = sysPromptCombined ? [{ role: 'system' as const, content: sysPromptCombined }] : [];
+  const hasJson = [...sysBase, ...messages].some(m => /json/i.test(String((m as any).content || '')));
   const prepend = hasJson ? [] : [{ role: 'system' as const, content: 'Return a strict JSON object only. Reply in json. No prose.' }];
-  const all = [...prepend, ...sys, ...messages];
+  const all = [...prepend, ...sysBase, ...messages];
+
+  // Zod schema for MCQ results to enforce structured JSON
+  const resultItemSchema = z.object({
+    id: z.union([z.string(), z.number()]).transform(v => String(v)),
+    status: z.union([z.literal('ok'), z.literal('error')]).optional(),
+    correctAnswers: z.array(z.number()).optional(),
+    noAnswer: z.boolean().optional(),
+    globalExplanation: z.string().optional(),
+    optionExplanations: z.array(z.string()).optional(),
+    error: z.string().optional(),
+  }).passthrough();
+  const mcqResultsSchema = z.object({ results: z.array(resultItemSchema) });
 
   try {
-    const result = await generateText({
+    // Use dynamic import to avoid build-time dependency on a specific ai version
+    const aiPkg: any = await import('ai');
+    if (typeof aiPkg.generateObject !== 'function') {
+      throw new Error('generateObject not available in ai package');
+    }
+    const result = await aiPkg.generateObject({
       model,
       messages: all,
+      schema: mcqResultsSchema,
       maxTokens: options.maxTokens ?? 8000
     });
-
-    return { content: result.text, finishReason: result.finishReason };
+    // Return stringified JSON to keep compatibility with callers expecting .content text
+    return { content: JSON.stringify(result.object), finishReason: result.finishReason };
   } catch (err: any) {
-    console.error('[AzureAI SDK] Error:', err);
-    throw new Error(`Azure AI SDK call failed: ${err?.message || err}`);
+    console.warn('[AzureAI SDK] generateObject failed, falling back to generateText:', err?.message || err);
+    // Fallback: append extra detailed instruction to system prompt and retry with text generation
+    const extraDetail = 'explication more detailed , make it professor level and more detailed aka the student understand everything';
+    const sysFallback = options.systemPrompt ? [{ role: 'system' as const, content: `${options.systemPrompt}\n\n${extraDetail}` }] : [{ role: 'system' as const, content: extraDetail }];
+    const hasJsonFb = [...sysFallback, ...messages].some(m => /json/i.test(String((m as any).content || '')));
+    const prependFb = hasJsonFb ? [] : [{ role: 'system' as const, content: 'Return a strict JSON object only. Reply in json. No prose.' }];
+    const allFb = [...prependFb, ...sysFallback, ...messages];
+    try {
+      const resultText = await generateText({
+        model,
+        messages: allFb,
+        maxTokens: options.maxTokens ?? 8000
+      });
+      return { content: resultText.text, finishReason: resultText.finishReason };
+    } catch (err2: any) {
+      console.error('[AzureAI SDK] Fallback generateText failed:', err2);
+      throw new Error(`Azure AI SDK structured+text fallback failed: ${err2?.message || err2}`);
+    }
   }
 }
 

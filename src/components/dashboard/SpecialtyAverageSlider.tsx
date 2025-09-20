@@ -38,19 +38,24 @@ export const SpecialtyAverageSlider: React.FC = () => {
   const avgMap = useMemo(() => {
     const map: Record<string, number> = {};
     visible.forEach(sp => {
-      // collect courses belonging to this specialty by name
-      const courses = popularCourses.filter(c => c.specialty?.name === sp.name);
-      if (courses.length) map[sp.id] = courses.reduce((a,b)=> a + b.averageScore, 0) / courses.length; else {
-        const pre = specialtyAverages.find(sa => sa.name === sp.name);
-        map[sp.id] = pre ? pre.average : 0;
+      // Prefer API-provided weighted average per specialty
+      const pre = specialtyAverages.find(sa => sa.name === sp.name || sa.id === sp.id);
+      if (pre && typeof pre.average === 'number') {
+        map[sp.id] = pre.average;
+        return;
       }
+      // Fallback: compute from popular courses if API not available
+      const courses = popularCourses.filter(c => c.specialty?.name === sp.name);
+      map[sp.id] = courses.length ? (courses.reduce((a,b)=> a + b.averageScore, 0) / courses.length) : 0;
     });
     return map;
   }, [visible, popularCourses, specialtyAverages]);
 
-  const percent = current ? (avgMap[current.id] || 0) : 0; // 0-100
+  const percent = current ? (avgMap[current.id] || 0) : 0; // already 0-100 scale
   const out20 = (percent / 5).toFixed(2); // convert to /20
-  const unfinishedHint = percent === 0 ? "Aucune progression" : "Terminez tous les cours pour une moyenne réelle";
+  const unfinishedHint = percent === 0
+    ? "Commencez un cours dans cette spécialité pour voir votre moyenne pondérée"
+    : "Moyenne pondérée par groupe (coefficients) – basée sur vos questions complétées";
 
   const next = useCallback(() => { if (visible.length) setIndex(i => (i + 1) % visible.length); }, [visible.length]);
   const prev = useCallback(() => { if (visible.length) setIndex(i => (i - 1 + visible.length) % visible.length); }, [visible.length]);
@@ -124,7 +129,7 @@ export const SpecialtyAverageSlider: React.FC = () => {
                 </defs>
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center px-2 text-center">
-                <span className="text-4xl font-bold tracking-tight bg-gradient-to-r from-blue-600 to-blue-800 dark:from-blue-400 dark:to-blue-600 bg-clip-text text-transparent">{out20}</span>
+                <span className="text-4xl font-bold tracking-tight bg-gradient-to-r from-blue-600 to-blue-800 dark:from-blue-400 dark:to-blue-600 bg-clip-text text-transparent">{percent === 0 ? '—' : out20}</span>
                 <span className="mt-0.5 text-[11px] uppercase tracking-wide text-muted-foreground">/20</span>
               </div>
             </div>
