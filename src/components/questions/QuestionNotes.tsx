@@ -366,12 +366,6 @@ export function QuestionNotes({ questionId, onHasContentChange, autoEdit = false
   }, [value, onHasContentChange]);
 
   // Explicitly trigger a state update in the task navigator
-  useEffect(() => {
-    if (onHasContentChange) {
-      onHasContentChange(value.trim().length > 0);
-    }
-  }, [value, onHasContentChange]);
-
   // Force a re-render or state update in the task navigator
   const notifyTaskNavigator = () => {
     if (onHasContentChange) {
