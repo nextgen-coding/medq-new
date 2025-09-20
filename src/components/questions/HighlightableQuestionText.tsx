@@ -44,7 +44,7 @@ export const HighlightableQuestionText: React.FC<HighlightableQuestionTextProps>
   const [bubble, setBubble] = useState<{ x: number; y: number } | null>(null);
   const isSelectingRef = useRef(false);
 
-  // Check if text contains inline images
+  // Check if text contains inline images or raw image URLs
   const containsImages = hasInlineImages(text);
   const plainText = extractPlainText(text);
 
@@ -98,7 +98,7 @@ export const HighlightableQuestionText: React.FC<HighlightableQuestionTextProps>
     return elements;
   }, [highlights, user?.highlightColor]);
 
-  // Render text with highlights and images
+  // Render text with highlights and images, and render raw image URLs as images (preserving highlight for other text)
   const renderHighlightedText = useCallback((): React.ReactNode => {
     if (!text) return null;
     const parts: React.ReactNode[] = [];
@@ -154,8 +154,32 @@ export const HighlightableQuestionText: React.FC<HighlightableQuestionTextProps>
       );
       lastIndex = matchEnd;
     }
-    if (lastIndex < text.length) {
-      const remainingText = text.substring(lastIndex);
+    // Now handle raw image URLs (e.g. https://...png)
+    const imageUrlRegex = /https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?[^\s]*)?/gi;
+    lastIndex = 0;
+    let textToProcess = text;
+    let urlMatch;
+    while ((urlMatch = imageUrlRegex.exec(textToProcess)) !== null) {
+      const [fullMatch] = urlMatch;
+      const matchStart = urlMatch.index;
+      const matchEnd = matchStart + fullMatch.length;
+      if (matchStart > lastIndex) {
+        const textBefore = textToProcess.substring(lastIndex, matchStart);
+        parts.push(...renderTextSegmentWithHighlights(textBefore, plainTextIndex, `text-${key++}`));
+        plainTextIndex += textBefore.length;
+      }
+      parts.push(
+        <ZoomableImage
+          key={`raw-image-${key++}`}
+          src={fullMatch.trim()}
+          alt="Image"
+          thumbnailClassName="inline-block max-w-full h-auto my-2"
+        />
+      );
+      lastIndex = matchEnd;
+    }
+    if (lastIndex < textToProcess.length) {
+      const remainingText = textToProcess.substring(lastIndex);
       parts.push(...renderTextSegmentWithHighlights(remainingText, plainTextIndex, `text-${key++}`));
     }
     if (parts.length === 0) {
