@@ -1,5 +1,5 @@
 import { config } from 'dotenv';
-import { isAzureConfigured, chatCompletion } from '../src/lib/ai/azureClient';
+import { isAzureConfigured, chatCompletion } from '../src/lib/ai/azureAiSdk';
 
 // Load environment variables
 config();

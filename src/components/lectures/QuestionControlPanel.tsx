@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Question, ClinicalCase } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -68,19 +68,110 @@ export function QuestionControlPanel({
   const hasInitiallyScrolled = useRef<boolean>(false);
   const [lastPinTime, setLastPinTime] = useState(0);
   const savedScrollPosition = useRef<number>(0);
+  const prefersReducedMotion = useReducedMotion();
+  const pendingScrollRaf = useRef<number | null>(null);
+  const isProgrammaticScrolling = useRef<boolean>(false);
+  const scrollLockUntil = useRef<number>(0);
+
+  // Resolve the actual scrollable viewport element from Radix ScrollArea
+  const getScrollViewport = () => {
+    if (!scrollAreaRef.current) return null;
+    return (
+      (scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]') as HTMLElement | null) ||
+      (scrollAreaRef.current.querySelector('div > div') as HTMLElement | null) ||
+      (scrollAreaRef.current as HTMLElement)
+    );
+  };
+
+  // Compute an element's top relative to the scrollable viewport (not the window)
+  const getRelativeTop = (el: HTMLElement, parent: HTMLElement): number => {
+    let y = 0;
+    let n: HTMLElement | null = el;
+    while (n && n !== parent) {
+      y += n.offsetTop;
+      n = n.offsetParent as HTMLElement | null;
+    }
+    return y;
+  };
+
+  // On mount, disable browser scroll anchoring on the scroll viewport to avoid auto jumps
+  useEffect(() => {
+    const vp = getScrollViewport();
+    if (vp) {
+      // Prevent Chrome/Firefox from auto-adjusting scroll on DOM changes above
+      (vp.style as any).overflowAnchor = 'none';
+    }
+  }, []);
+
+  // Smoothly position an item into view with controlled easing
+  const scrollItemIntoView = (index: number, behavior: ScrollBehavior) => {
+    const viewport = getScrollViewport();
+    const btn = questionRefs.current[index];
+    if (!viewport || !btn) return;
+
+    // Lock scrolling during animations to prevent interference
+    const now = Date.now();
+    if (now < scrollLockUntil.current) return;
+    scrollLockUntil.current = now + 400; // 400ms lock for smooth animation
+
+    try {
+      // Cancel any pending scroll operations
+      if (pendingScrollRaf.current) cancelAnimationFrame(pendingScrollRaf.current);
+      
+      // Use proper scheduling for smooth layout
+      pendingScrollRaf.current = requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          try {
+            const padding = 20; // generous padding for smooth UX
+            const visibleTop = viewport.scrollTop;
+            const visibleBottom = visibleTop + viewport.clientHeight;
+            const elTop = getRelativeTop(btn, viewport);
+            const elBottom = elTop + btn.offsetHeight;
+            const above = elTop < visibleTop + padding;
+            const below = elBottom > visibleBottom - padding;
+
+            if (!above && !below) return; // already visible
+
+            isProgrammaticScrolling.current = true;
+
+            // Calculate minimal target position within viewport coordinates
+            let targetScroll: number | undefined;
+            if (above) {
+              targetScroll = elTop - padding;
+            } else if (below) {
+              targetScroll = elBottom - viewport.clientHeight + padding;
+            }
+            
+            if (targetScroll !== undefined) {
+              // Use smooth scrolling with custom easing
+              viewport.scrollTo({ 
+                top: Math.max(0, targetScroll), 
+                behavior: prefersReducedMotion ? 'auto' : 'smooth'
+              });
+            }
+            
+            // Clear flags after animation completes
+            setTimeout(() => { 
+              isProgrammaticScrolling.current = false; 
+              scrollLockUntil.current = 0;
+            }, prefersReducedMotion ? 50 : 350);
+          } catch {
+            // Fallback with smooth behavior
+            btn.scrollIntoView({ behavior, block: 'center', inline: 'nearest' });
+          }
+        });
+      });
+    } catch {
+      btn.scrollIntoView({ behavior, block: 'center', inline: 'nearest' });
+    }
+  };
 
   // Listen for pin events to prevent unwanted scrolling
   useEffect(() => {
     const handlePinUpdate = () => {
       // Save current scroll position before pin update
-      if (scrollAreaRef.current) {
-        const scrollElement = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]') ||
-                             scrollAreaRef.current.querySelector('div > div') ||
-                             scrollAreaRef.current;
-        if (scrollElement) {
-          savedScrollPosition.current = scrollElement.scrollTop;
-        }
-      }
+      const viewport = getScrollViewport();
+      if (viewport) savedScrollPosition.current = viewport.scrollTop;
       setLastPinTime(Date.now());
     };
 
@@ -94,14 +185,8 @@ export function QuestionControlPanel({
     if (timeSincePinAction < 100 && savedScrollPosition.current > 0) {
       // Small delay to ensure DOM has updated
       const timeoutId = setTimeout(() => {
-        if (scrollAreaRef.current) {
-          const scrollElement = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]') ||
-                               scrollAreaRef.current.querySelector('div > div') ||
-                               scrollAreaRef.current;
-          if (scrollElement) {
-            scrollElement.scrollTop = savedScrollPosition.current;
-          }
-        }
+        const viewport = getScrollViewport();
+        if (viewport) viewport.scrollTop = savedScrollPosition.current;
       }, 50);
       return () => clearTimeout(timeoutId);
     }
@@ -116,22 +201,14 @@ export function QuestionControlPanel({
     // Only scroll if the index has actually changed
     if (lastScrolledIndex.current !== currentQuestionIndex) {
       const scrollToCurrentQuestion = () => {
-        const currentButton = questionRefs.current[currentQuestionIndex];
-        if (!currentButton) return;
-        
-        // Simple and reliable scrolling
-        currentButton.scrollIntoView({
-          behavior: 'auto',
-          block: 'center',
-          inline: 'nearest'
-        });
-        
+        // Use smooth scrolling for navigation
+        const behavior: ScrollBehavior = prefersReducedMotion ? 'auto' : 'smooth';
+        scrollItemIntoView(currentQuestionIndex, behavior);
         lastScrolledIndex.current = currentQuestionIndex;
       };
 
-      // Small delay for smooth rendering
-      const timeoutId = setTimeout(scrollToCurrentQuestion, 50);
-      
+      // Optimized delay for smooth rendering
+      const timeoutId = setTimeout(scrollToCurrentQuestion, 80);
       return () => clearTimeout(timeoutId);
     }
   }, [currentQuestionIndex, lastPinTime]);
@@ -141,23 +218,15 @@ export function QuestionControlPanel({
     // Only do initial scroll once when questions are loaded
     if (questions.length > 0 && !hasInitiallyScrolled.current) {
       const scrollToCurrentQuestion = () => {
-        const currentButton = questionRefs.current[currentQuestionIndex];
-        if (!currentButton) return;
-        
-        // Simple approach: just use scrollIntoView with proper options
-        currentButton.scrollIntoView({
-          behavior: 'auto', // Use 'auto' for initial scroll to avoid conflicts
-          block: 'center',
-          inline: 'nearest'
-        });
-        
+        // Use instant positioning on initial mount to avoid any startup jank
+        scrollItemIntoView(currentQuestionIndex, 'auto');
         lastScrolledIndex.current = currentQuestionIndex;
         hasInitiallyScrolled.current = true;
       };
 
-      // Use requestAnimationFrame for better timing on initial load
+      // Optimized timing for initial positioning
       const animationFrame = requestAnimationFrame(() => {
-        setTimeout(scrollToCurrentQuestion, 200);
+        setTimeout(scrollToCurrentQuestion, 250);
       });
       
       return () => cancelAnimationFrame(animationFrame);
@@ -366,10 +435,16 @@ export function QuestionControlPanel({
         <motion.div
           key={entry.id}
           layout
-          initial={{ opacity: 0, y: 4, scale: 0.995 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: -4, scale: 0.99 }}
-          transition={{ type: 'spring', stiffness: 160, damping: 22, mass: 0.6 }}
+          initial={{ opacity: 0.8, y: 3 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0.8, y: -3 }}
+          transition={{ 
+            type: 'spring', 
+            stiffness: 300, 
+            damping: 30, 
+            mass: 0.8,
+            opacity: { duration: 0.2 }
+          }}
         >
           <Button
             ref={(el) => { 
@@ -423,8 +498,21 @@ export function QuestionControlPanel({
                 <motion.div
                   layout
                   className="flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-700"
-                  animate={isCurrent ? { scale: 1.08 } : { scale: 1 }}
-                  transition={{ type: 'spring', stiffness: 180, damping: 18 }}
+                  animate={isCurrent ? { 
+                    opacity: 1, 
+                    scale: 1.05,
+                    boxShadow: '0 0 0 2px rgba(59, 130, 246, 0.3)'
+                  } : { 
+                    opacity: 0.95, 
+                    scale: 1,
+                    boxShadow: '0 0 0 0px rgba(59, 130, 246, 0)'
+                  }}
+                  transition={{ 
+                    type: 'spring', 
+                    stiffness: 250, 
+                    damping: 25,
+                    boxShadow: { duration: 0.2 }
+                  }}
                 >
                   {mode === 'revision' ? (
                     <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
@@ -582,12 +670,7 @@ export function QuestionControlPanel({
       arr.forEach((q: any, idx: number) => { q.displayNumber = idx + 1; });
     });
 
-    console.log('QuestionControlPanel - Questions grouped:', {
-      totalQuestions: questions.length,
-      regularQuestions: regularQuestions.length,
-      clinicalCases: clinicalCases.length,
-      groupedByType: Object.keys(groupedQuestions).map(type => ({ type, count: groupedQuestions[type].length }))
-    });
+    // Debug log removed for production smoothness
 
     // Define type order and labels - include base types; clinical are shown separately below
     const typeOrder = ['mcq', 'qroc', 'open'];
@@ -634,10 +717,16 @@ export function QuestionControlPanel({
               <motion.div
                 key={question.id}
                 layout
-                initial={{ opacity: 0, y: 4, scale: 0.995 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -4, scale: 0.99 }}
-                transition={{ type: 'spring', stiffness: 160, damping: 22, mass: 0.6 }}
+                initial={{ opacity: 0.8, y: 3 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0.8, y: -3 }}
+                transition={{ 
+                  type: 'spring', 
+                  stiffness: 300, 
+                  damping: 30, 
+                  mass: 0.8,
+                  opacity: { duration: 0.2 }
+                }}
               >
                 <Button
                   ref={(el) => { questionRefs.current[question.originalIndex] = el; }}
@@ -702,8 +791,21 @@ export function QuestionControlPanel({
                       <motion.div
                         layout
                         className="flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-700"
-                        animate={isCurrent ? { scale: 1.08 } : { scale: 1 }}
-                        transition={{ type: 'spring', stiffness: 180, damping: 18 }}
+                        animate={isCurrent ? { 
+                          opacity: 1, 
+                          scale: 1.05,
+                          boxShadow: '0 0 0 2px rgba(59, 130, 246, 0.3)'
+                        } : { 
+                          opacity: 0.95, 
+                          scale: 1,
+                          boxShadow: '0 0 0 0px rgba(59, 130, 246, 0)'
+                        }}
+                        transition={{ 
+                          type: 'spring', 
+                          stiffness: 250, 
+                          damping: 25,
+                          boxShadow: { duration: 0.2 }
+                        }}
                       >
                         {mode === 'revision' ? (
                           <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
@@ -783,6 +885,8 @@ export function QuestionControlPanel({
                 // Aggregate pin/hidden for clinical case
                 const anyPinned = clinicalCase.questions.some(q => pinnedIds.includes(q.id));
                 const allHidden = clinicalCase.questions.every(q => (q as any).hidden);
+                // Derive session from first subquestion if present
+                const firstSession = (clinicalCase.questions[0] as any)?.session as string | undefined;
                 return (
                   <Button
                     key={`case-${clinicalCase.caseNumber}`}
@@ -800,12 +904,16 @@ export function QuestionControlPanel({
                   >
                     <div className="flex items-center w-full relative">
                       <div className="flex flex-col items-start mr-3 flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <Stethoscope className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                          <span className="font-medium text-gray-900 dark:text-gray-100">Cas {clinicalCase.caseNumber}</span>
-                        </div>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          {clinicalCase.totalQuestions} question{clinicalCase.totalQuestions>1?'s':''}
+                        {firstSession && (
+                          <span
+                            className="text-left text-sm sm:text-base font-semibold text-gray-900 dark:text-gray-100 truncate w-full"
+                            title={firstSession}
+                          >
+                            {firstSession}
+                          </span>
+                        )}
+                        <span className="text-left text-xs text-gray-600 dark:text-gray-400 truncate w-full">
+                          {`Cas ${clinicalCase.caseNumber}`}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">

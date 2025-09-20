@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { RichTextDisplay } from '@/components/ui/rich-text-display';
 import { HighlightableOptionText } from '../HighlightableOptionText';
@@ -126,12 +126,14 @@ export function MCQOptionItem({
                   {isExpanded ? (
                     <>
                       <ChevronUp className="h-4 w-4 mr-1" />
-                      Masquer l'explication
+                      <span>Masquer l'explication IA</span>
+                      <Sparkles className="h-4 w-4 ml-1 text-blue-500" />
                     </>
                   ) : (
                     <>
                       <ChevronDown className="h-4 w-4 mr-1" />
-                      Afficher l'explication
+                      <span>Voir explication par IA</span>
+                      <Sparkles className="h-4 w-4 ml-1 text-blue-500" />
                     </>
                   )}
                 </button>

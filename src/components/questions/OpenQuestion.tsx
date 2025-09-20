@@ -604,7 +604,7 @@ export function OpenQuestion({
         if (!(submitted && isSimpleQroc)) return null;
 
         return (
-          <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-3 sm:p-4 space-y-2">
+          <div className="p-0 sm:p-0 space-y-1">
             {/* Inline compact question text inside the same container */}
             <div className="inline-block">
               <HighlightableQuestionText
@@ -616,9 +616,9 @@ export function OpenQuestion({
               />
             </div>
 
-            {/* Reference answer (green card) */}
+            {/* Reference answer (green block, keep styling) */}
             {canShowReferenceInline && (
-              <div className="mt-1">
+              <div className="mt-0.5">
                 <div className="rounded-xl border border-emerald-300/60 dark:border-emerald-600/70 bg-emerald-50/80 dark:bg-emerald-900/50 px-6 py-2 shadow-sm">
                   <div className="mb-2">
                     <h3 className="text-base md:text-lg font-bold tracking-tight text-emerald-800 dark:text-emerald-50">Réponse</h3>
@@ -630,7 +630,7 @@ export function OpenQuestion({
               </div>
             )}
 
-            {/* Self assessment buttons */}
+            {/* Self assessment buttons (no surrounding white box) */}
             {showSelfAssessment && (!hideImmediateResults || showDeferredSelfAssessment) && (
               <div ref={selfAssessmentRef}>
                 <OpenQuestionSelfAssessment
@@ -729,7 +729,7 @@ export function OpenQuestion({
     const canShowReference = submitted && expectedReference && (!hideImmediateResults || (showSelfAssessment && showDeferredSelfAssessment) || assessmentCompleted);
     if (!canShowReference) return null;
     return (
-      <div className="mt-1">
+      <div className="mt-0.5">
         <div className="rounded-xl border border-emerald-300/60 dark:border-emerald-600/70 bg-emerald-50/80 dark:bg-emerald-900/50 px-6 py-2 shadow-sm">
           <div className="mb-2">
             <h3 className="text-base md:text-lg font-bold tracking-tight text-emerald-800 dark:text-emerald-50">Réponse</h3>

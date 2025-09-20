@@ -13,7 +13,12 @@ function normalizeSheet(name: string): string {
 
 // Canonicalize header names to expected keys
 function canonicalizeHeader(header: string): string {
-  const h = String(header || '').toLowerCase().trim();
+  const h = String(header || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+  if (h.includes('rappel')) return 'rappel';
   if (h.includes('texte') && h.includes('question')) return 'texte de la question';
   if (h.includes('texte') && h.includes('cas')) return 'texte du cas';
   if (h.includes('option') && h.includes('a')) return 'option a';
@@ -140,6 +145,17 @@ async function validateWorkbook(file: File) {
           bad.push({ sheet, row: i + 1, reason: 'MCQ missing correct answers (A–E)', original: record });
           continue;
         }
+        // New rule: per-option explanations are REQUIRED for each present option (A–E)
+        const missing: string[] = [];
+        const letters = ['a','b','c','d','e'];
+        for (let li = 0; li < Math.min(letters.length, options.length); li++) {
+          const exp = String(record[`explication ${letters[li]}`] || '').trim();
+          if (!exp) missing.push(letters[li].toUpperCase());
+        }
+        if (missing.length > 0) {
+          bad.push({ sheet, row: i + 1, reason: `Missing per-option explanations: ${missing.join(', ')}` , original: record });
+          continue;
+        }
       }
 
       if (sheet === 'qroc' || sheet === 'cas_qroc') {
@@ -180,8 +196,8 @@ export async function POST(request: NextRequest) {
 
     // Pre-generate and store downloadable files to avoid massive URL payloads
     const buildHeader = (mode: 'good'|'bad') => mode === 'good'
-      ? ['sheet', 'row', 'matiere', 'cours', 'question n', 'cas n', 'texte du cas', 'texte de la question', 'reponse', 'option a', 'option b', 'option c', 'option d', 'option e', 'explication', 'explication a', 'explication b', 'explication c', 'explication d', 'explication e', 'image', 'niveau', 'semestre']
-      : ['sheet', 'row', 'reason', 'matiere', 'cours', 'question n', 'cas n', 'texte du cas', 'texte de la question', 'reponse', 'option a', 'option b', 'option c', 'option d', 'option e', 'explication', 'image'];
+      ? ['sheet', 'row', 'matiere', 'cours', 'question n', 'cas n', 'texte du cas', 'texte de la question', 'reponse', 'option a', 'option b', 'option c', 'option d', 'option e', 'rappel', 'explication', 'explication a', 'explication b', 'explication c', 'explication d', 'explication e', 'image', 'niveau', 'semestre']
+      : ['sheet', 'row', 'reason', 'matiere', 'cours', 'question n', 'cas n', 'texte du cas', 'texte de la question', 'reponse', 'option a', 'option b', 'option c', 'option d', 'option e', 'rappel', 'explication', 'image'];
 
     const mapRows = (mode: 'good'|'bad') => (mode === 'good' ? good : bad).map((r: any) => {
       const rec = mode === 'good' ? r.data : r.original;
@@ -205,6 +221,7 @@ export async function POST(request: NextRequest) {
         'option c': rec?.['option c'] ?? '',
         'option d': rec?.['option d'] ?? '',
         'option e': rec?.['option e'] ?? '',
+        rappel: rec?.['rappel'] ?? '',
         explication: rec?.['explication'] ?? '',
         'explication a': rec?.['explication a'] ?? '',
         'explication b': rec?.['explication b'] ?? '',
@@ -273,8 +290,8 @@ export async function GET(request: NextRequest) {
     }
 
     const header = mode === 'good'
-      ? ['sheet', 'row', 'matiere', 'cours', 'question n', 'cas n', 'texte du cas', 'texte de la question', 'reponse', 'option a', 'option b', 'option c', 'option d', 'option e', 'explication', 'explication a', 'explication b', 'explication c', 'explication d', 'explication e', 'image', 'niveau', 'semestre']
-      : ['sheet', 'row', 'reason', 'matiere', 'cours', 'question n', 'cas n', 'texte du cas', 'texte de la question', 'reponse', 'option a', 'option b', 'option c', 'option d', 'option e', 'explication', 'image'];
+      ? ['sheet', 'row', 'matiere', 'cours', 'question n', 'cas n', 'texte du cas', 'texte de la question', 'reponse', 'option a', 'option b', 'option c', 'option d', 'option e', 'rappel', 'explication', 'explication a', 'explication b', 'explication c', 'explication d', 'explication e', 'image', 'niveau', 'semestre']
+      : ['sheet', 'row', 'reason', 'matiere', 'cours', 'question n', 'cas n', 'texte du cas', 'texte de la question', 'reponse', 'option a', 'option b', 'option c', 'option d', 'option e', 'rappel', 'explication', 'image'];
 
     const dataObjects = rows.map((r: any) => {
       const rec = mode === 'good' ? r.data : r.original;
@@ -298,6 +315,7 @@ export async function GET(request: NextRequest) {
         'option c': rec?.['option c'] ?? '',
         'option d': rec?.['option d'] ?? '',
         'option e': rec?.['option e'] ?? '',
+        rappel: rec?.['rappel'] ?? '',
         explication: rec?.['explication'] ?? '',
         'explication a': rec?.['explication a'] ?? '',
         'explication b': rec?.['explication b'] ?? '',

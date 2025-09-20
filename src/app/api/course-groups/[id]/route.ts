@@ -30,19 +30,21 @@ export async function PUT(
 ) {
   try {
     const { id } = await params
-    const { name } = await request.json()
+    const { name, coefficient } = await request.json()
 
-    if (!name) {
-      return NextResponse.json({ error: 'Name is required' }, { status: 400 })
+    if (!name && (coefficient === undefined || coefficient === null)) {
+      return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
     }
+
+    const data: any = {}
+    if (name) data.name = name
+    if (typeof coefficient === 'number' && !isNaN(coefficient)) data.coefficient = coefficient
 
     const updatedGroup = await prisma.courseGroup.update({
       where: {
         id,
       },
-      data: {
-        name,
-      },
+      data,
       include: {
         lectureGroups: {
           include: {

@@ -532,11 +532,17 @@ export function QuestionOrganizerDialog({ lecture, isOpen, onOpenChange, onSaved
             .filter(e => e.kind === 'group' && (e as any).groupKind === 'grouped_qroc')
             .map(e => (e as any).caseNumber as number);
           const newCaseNumber = (existingCaseNumbers.length ? Math.max(...existingCaseNumbers) : 0) + 1;
+          // Derive shared metadata from the clinical case
+          const sharedSession = (clinicalQuestions.find(q => (q as any).session && String((q as any).session).trim().length > 0) as any)?.session || null;
+          const sharedCaseText = (clinicalQuestions.find(q => (q as any).caseText && String((q as any).caseText).trim().length > 0) as any)?.caseText || '';
           // Convert each question to plain qroc inside grouped block
             clinicalQuestions.forEach((q, idx) => {
               q.type = 'qroc' as any;
               q.caseNumber = newCaseNumber as any;
               q.caseQuestionNumber = idx + 1 as any;
+              // Preserve source session and case text on each grouped base question
+              (q as any).session = sharedSession;
+              (q as any).caseText = sharedCaseText;
               // Clinical specific caseText stays on each sub for now (renderer can show once); optional future: lift to reminder
             });
           // Build grouped_qroc entry
@@ -556,10 +562,16 @@ export function QuestionOrganizerDialog({ lecture, isOpen, onOpenChange, onSaved
             .filter(e => e.kind === 'group' && (e as any).groupKind === 'grouped_mcq')
             .map(e => (e as any).caseNumber as number);
           const newCaseNumber = (existingCaseNumbers.length ? Math.max(...existingCaseNumbers) : 0) + 1;
+          // Derive shared metadata from the clinical case
+          const sharedSession = (clinicalQuestions.find(q => (q as any).session && String((q as any).session).trim().length > 0) as any)?.session || null;
+          const sharedCaseText = (clinicalQuestions.find(q => (q as any).caseText && String((q as any).caseText).trim().length > 0) as any)?.caseText || '';
           clinicalQuestions.forEach((q, idx) => {
             q.type = 'mcq' as any;
             q.caseNumber = newCaseNumber as any;
             q.caseQuestionNumber = idx + 1 as any;
+            // Preserve source session and case text on each grouped base question
+            (q as any).session = sharedSession;
+            (q as any).caseText = sharedCaseText;
           });
           const groupedEntry: OrganizerEntry = { kind: 'group', groupKind: 'grouped_mcq', caseNumber: newCaseNumber, questions: clinicalQuestions } as any;
           const targetArrForDrop = next.mcq;
@@ -887,6 +899,8 @@ export function QuestionOrganizerDialog({ lecture, isOpen, onOpenChange, onSaved
           // keep at most first answer
           correct = correct.slice(0,1);
         }
+        // Preserve caseText for grouped base questions (converted from clinical) so grouped QROC/QCM keep common header
+        const isGroupedBase = ((targetType === 'qroc' || targetType === 'mcq') && !!q.caseNumber);
         const payload: any = {
           id: q.id,
           lectureId: lecture.id,
@@ -903,7 +917,7 @@ export function QuestionOrganizerDialog({ lecture, isOpen, onOpenChange, onSaved
           courseReminderMediaUrl: (q as any).courseReminderMediaUrl ?? (q as any).course_reminder_media_url ?? null,
           courseReminderMediaType: (q as any).courseReminderMediaType ?? (q as any).course_reminder_media_type ?? null,
           caseNumber: (q.type === 'clinic_mcq' || q.type === 'clinic_croq') ? q.caseNumber ?? null : (q.type === 'qroc' && q.caseNumber ? q.caseNumber : null),
-          caseText: (q.type === 'clinic_mcq' || q.type === 'clinic_croq') ? q.caseText ?? null : null,
+          caseText: (q.type === 'clinic_mcq' || q.type === 'clinic_croq' || isGroupedBase) ? (q as any).caseText ?? null : null,
           caseQuestionNumber: (q.type === 'clinic_mcq' || q.type === 'clinic_croq' || q.type === 'qroc') ? q.caseQuestionNumber ?? null : null,
         };
   tasks.push(fetch(`/api/questions/${q.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }));

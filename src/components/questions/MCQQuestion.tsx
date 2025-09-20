@@ -47,7 +47,8 @@ interface MCQQuestionProps {
   suppressReminder?: boolean; // hide reminder section (for clinical cases)
   enableOptionHighlighting?: boolean; // enable highlighting for MCQ options (for clinical cases)
   disableKeyboardHandlers?: boolean; // disable Enter/keyboard shortcuts (for clinical cases)
-  showNotesAfterSubmit?: boolean; // force show notes area after question is submitted
+  allowEnterSubmit?: boolean; // when false, Enter won't submit/next; lets parent handle Enter
+  isActive?: boolean; // when true, this instance accepts keyboard shortcuts
 }
 
 export function MCQQuestion({ 
@@ -71,7 +72,8 @@ export function MCQQuestion({
   suppressReminder,
   enableOptionHighlighting = false,
   disableKeyboardHandlers = false,
-  showNotesAfterSubmit = false
+  allowEnterSubmit = true,
+  isActive = false
 }: MCQQuestionProps) {
   const [selectedOptionIds, setSelectedOptionIds] = useState<string[]>([]);
   const [submitted, setSubmitted] = useState(false);
@@ -97,14 +99,9 @@ export function MCQQuestion({
     }
   }, [notesHasContent, notesManuallyControlled]);
 
-  // Force show notes after submission if showNotesAfterSubmit is enabled, but only if notes have content
-  useEffect(() => {
-    if (showNotesAfterSubmit && isAnswered && !notesManuallyControlled) {
-      setShowNotesArea(notesHasContent);
-    } else if (!showNotesAfterSubmit && !notesManuallyControlled) {
-      setShowNotesArea(false);
-    }
-  }, [showNotesAfterSubmit, isAnswered, notesManuallyControlled, notesHasContent]);
+  // If another branch introduced a prop to force-show notes after submit,
+  // we intentionally keep local behavior (auto-show only when content exists
+  // and user hasn't manually toggled), so no extra effect is needed here.
   // Server aggregated stats
   const [optionStats, setOptionStats] = useState<Record<string, number>>({});
   const [totalSubmissions, setTotalSubmissions] = useState(0);
@@ -526,12 +523,19 @@ export function MCQQuestion({
   };
 
   // Keyboard shortcuts (robust): digits/numpad 1-9 or letters A-I to toggle, Backspace clear, Enter submit/next
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const shortcutHandler = useCallback((event: KeyboardEvent) => {
     if (event.metaKey || event.ctrlKey) return;
-    const target = event.target as HTMLElement | null;
+  const target = event.target as HTMLElement | null;
+  // Scope by active question index from parent
+  if (!isActive) return;
+    // Don't interfere with typing in textarea or text-like inputs; allow radio/checkbox
     if (target) {
       const tag = target.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || (target as any).isContentEditable) return;
+      const type = (target as HTMLInputElement).type;
+      const isEditable = (target as any).isContentEditable;
+      const isTextualInput = tag === 'INPUT' && type && !['radio','checkbox','button','submit'].includes(type);
+      if (tag === 'TEXTAREA' || isTextualInput || isEditable) return;
     }
     const opts = normalizedOptions; // use normalized list with guaranteed ids
     if (!opts.length) return;
@@ -570,25 +574,25 @@ export function MCQQuestion({
       event.preventDefault();
       return;
     }
-    // Submit with Enter when not submitted
-    if (key === 'Enter' && !submitted && selectedOptionIds.length > 0) {
+    // Submit with Enter when not submitted (if allowed)
+    if (allowEnterSubmit && key === 'Enter' && !submitted && selectedOptionIds.length > 0) {
       event.preventDefault();
       handleSubmit();
       return;
     }
     // Next with Enter when submitted
-    if (key === 'Enter' && submitted) {
+    if (allowEnterSubmit && key === 'Enter' && submitted) {
       event.preventDefault();
       onNext();
       return;
     }
     // Next after submission: N (keeping as backup)
-    if (submitted && key.toLowerCase() === 'n') {
+    if (allowEnterSubmit && submitted && key.toLowerCase() === 'n') {
       onNext();
       event.preventDefault();
       return;
     }
-  }, [normalizedOptions, submitted, selectedOptionIds, onNext, handleSubmit]);
+  }, [normalizedOptions, submitted, selectedOptionIds, onNext, handleSubmit, allowEnterSubmit, isActive]);
 
   useEffect(() => {
     // Don't add keyboard handlers if disabled (for clinical cases)
@@ -601,7 +605,7 @@ export function MCQQuestion({
 
   return (
     <motion.div
-      ref={questionRef}
+  ref={(el) => { rootRef.current = el; questionRef.current = el; }}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
