@@ -612,6 +612,7 @@ export function OpenQuestion({
                 text={question.text}
                 className="mt-0 text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100 leading-relaxed break-words whitespace-pre-wrap inline"
                 confirmMode={highlightConfirm}
+                images={question.images}
               />
             </div>
 
