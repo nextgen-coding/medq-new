@@ -89,15 +89,12 @@ export function MCQQuestion({
   const [notesHasContent, setNotesHasContent] = useState(false); // track if notes have content
   const [notesManuallyControlled, setNotesManuallyControlled] = useState(false); // track if user manually opened/closed notes
 
-  // Auto-show notes when content is detected, but only if not manually controlled
+  // Auto-show notes when content is detected, but don't auto-hide when content is deleted
   useEffect(() => {
-    if (!notesManuallyControlled) {
-      if (notesHasContent) {
-        setShowNotesArea(true);
-      } else {
-        setShowNotesArea(false);
-      }
+    if (!notesManuallyControlled && notesHasContent) {
+      setShowNotesArea(true);
     }
+    // Don't auto-hide when content becomes empty - let user manually close
   }, [notesHasContent, notesManuallyControlled]);
 
   // If another branch introduced a prop to force-show notes after submit,

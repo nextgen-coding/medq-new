@@ -21,6 +21,24 @@ import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 
+// Helper function to generate a deterministic UUID from a string
+function generateDeterministicUUID(input: string): string {
+  // Use a simple hash of the input to create a UUID-like string
+  let hash = 0;
+  for (let i = 0; i < input.length; i++) {
+    const char = input.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+
+  // Convert hash to hex and ensure we have enough characters
+  const hashStr = Math.abs(hash).toString(16).padStart(32, '0');
+
+  // Create a valid UUID format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+  // where y is one of 8, 9, a, b
+  return `${hashStr.slice(0, 8)}-${hashStr.slice(8, 12)}-4${hashStr.slice(12, 15)}-a${hashStr.slice(15, 18)}-${hashStr.slice(18, 30)}`;
+}
+
 interface ClinicalCaseQuestionProps {
   clinicalCase: ClinicalCase;
   onSubmit: (caseNumber: number, answers: Record<string, any>, results: Record<string, boolean | 'partial'>) => void;
@@ -75,12 +93,13 @@ export function ClinicalCaseQuestion({
   const [revealIndex, setRevealIndex] = useState<number>(clinicalCase.questions.length - 1);
   // Removed per-question submission; single global submit after all questions answered
 
-  // Auto-close notes when content becomes empty
+  // Auto-show notes when content is detected, but don't auto-hide when content is deleted
   useEffect(() => {
-    if (!notesHasContent) {
-      setShowNotesArea(false);
+    if (notesHasContent && !showNotesArea) {
+      setShowNotesArea(true);
     }
-  }, [notesHasContent]);
+    // Don't auto-hide when content becomes empty - let user manually close
+  }, [notesHasContent, showNotesArea]);
   const [openCaseEdit, setOpenCaseEdit] = useState(false);
   const [openGroupQrocEdit, setOpenGroupQrocEdit] = useState(false);
   const [openGroupMcqEdit, setOpenGroupMcqEdit] = useState(false);
@@ -834,14 +853,14 @@ export function ClinicalCaseQuestion({
             {(hasOpen || displayMode === 'multi_qcm') && (
             <div id={`clinical-case-notes-${clinicalCase.caseNumber}`} className="space-y-6">
               {(showNotesArea || notesHasContent) && (
-                <QuestionNotes 
-                  questionId={displayMode === 'multi_qroc' ? `group-qroc-${clinicalCase.caseNumber}` : displayMode === 'multi_qcm' ? `group-qcm-${clinicalCase.caseNumber}` : `clinical-case-${clinicalCase.caseNumber}`}
+                <QuestionNotes
+                  questionId={displayMode === 'multi_qroc' ? generateDeterministicUUID(`group-qroc-${clinicalCase.caseNumber}`) : displayMode === 'multi_qcm' ? generateDeterministicUUID(`group-qcm-${clinicalCase.caseNumber}`) : generateDeterministicUUID(`clinical-case-${clinicalCase.caseNumber}`)}
                   onHasContentChange={setNotesHasContent}
                   autoEdit={showNotesArea && !notesHasContent}
                 />
               )}
               {isCaseComplete && (
-                <QuestionComments questionId={displayMode === 'multi_qroc' ? `group-qroc-${clinicalCase.caseNumber}` : displayMode === 'multi_qcm' ? `group-qcm-${clinicalCase.caseNumber}` : `clinical-case-${clinicalCase.caseNumber}`} />
+                <QuestionComments questionId={displayMode === 'multi_qroc' ? generateDeterministicUUID(`group-qroc-${clinicalCase.caseNumber}`) : displayMode === 'multi_qcm' ? generateDeterministicUUID(`group-qcm-${clinicalCase.caseNumber}`) : generateDeterministicUUID(`clinical-case-${clinicalCase.caseNumber}`)} />
               )}
             </div>)}
           </div>

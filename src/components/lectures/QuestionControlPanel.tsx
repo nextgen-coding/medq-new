@@ -248,50 +248,47 @@ export function QuestionControlPanel({
   }, [questions]);
 
   // Fetch whether the user has notes for each question (used to show a small notes icon)
-  // TEMPORARILY DISABLED to debug infinite loop
-  /*
-  const processedIdsRef = useRef<Set<string>>(new Set());
-  const stableRegularQuestionIdsRef = useRef<string[]>([]);
-  const lastUserIdRef = useRef<string>('');
-  
-  // Only update when IDs actually change or user changes
-  const idsKey = regularQuestionIds.join(',');
-  const currentUserId = user?.id || '';
-  
-  // Use a separate effect for updating the stable IDs reference
   useEffect(() => {
-    const hasIdsChanged = idsKey !== stableRegularQuestionIdsRef.current.join(',');
-    const hasUserChanged = currentUserId !== lastUserIdRef.current;
-    
-    if (hasIdsChanged || hasUserChanged) {
-      stableRegularQuestionIdsRef.current = regularQuestionIds;
-      lastUserIdRef.current = currentUserId;
-      // Only clear processed IDs if the question set actually changed
-      if (hasIdsChanged) {
-        processedIdsRef.current.clear();
-      }
-    }
-  }, [idsKey, currentUserId, regularQuestionIds]);
-  
-  useEffect(() => {
-    if (!currentUserId || stableRegularQuestionIdsRef.current.length === 0) return;
-
-    const idsToFetch = stableRegularQuestionIdsRef.current.filter((id) => 
-      notesMap[id] === undefined && !processedIdsRef.current.has(id)
-    );
-    if (idsToFetch.length === 0) return;
-
-    // Mark these IDs as being processed to prevent duplicate fetches
-    idsToFetch.forEach(id => processedIdsRef.current.add(id));
+    if (!user?.id || questions.length === 0) return;
 
     const controller = new AbortController();
 
     (async () => {
       try {
+        // Build list of all possible note IDs to check
+        const noteIdsToCheck: string[] = [];
+        
+        questions.forEach((item, index) => {
+          if ('questions' in item && 'caseNumber' in item) {
+            // Clinical case or grouped question
+            const caseItem = item as ClinicalCase;
+            const allQroc = caseItem.questions.every(q => (q as any).type === 'qroc');
+            const allMcq = caseItem.questions.every(q => (q as any).type === 'mcq');
+            
+            if (allQroc) {
+              // Multi QROC group - check for group-qroc-{caseNumber} notes
+              noteIdsToCheck.push(`group-qroc-${caseItem.caseNumber}`);
+            } else if (allMcq) {
+              // Multi MCQ group - check for group-qcm-{caseNumber} notes
+              noteIdsToCheck.push(`group-qcm-${caseItem.caseNumber}`);
+            } else {
+              // Clinical case - check for clinical-case-{caseNumber} notes
+              noteIdsToCheck.push(`clinical-case-${caseItem.caseNumber}`);
+            }
+          } else {
+            // Regular question - check for question ID notes
+            const question = item as Question;
+            noteIdsToCheck.push(question.id);
+          }
+        });
+
         const results = await Promise.all(
-          idsToFetch.map(async (id) => {
+          noteIdsToCheck.map(async (id) => {
             try {
-              const res = await fetch(`/api/user-question-state?userId=${encodeURIComponent(currentUserId)}&questionId=${encodeURIComponent(id)}` , { signal: controller.signal });
+              const res = await fetch(`/api/user-question-state?userId=${encodeURIComponent(user.id)}&questionId=${encodeURIComponent(id)}`, {
+                signal: controller.signal,
+                cache: 'no-cache'
+              });
               if (!res.ok) {
                 return [id, false] as [string, boolean];
               }
@@ -303,21 +300,41 @@ export function QuestionControlPanel({
             }
           })
         );
-        setNotesMap((prev) => {
-          const next = { ...prev };
-          results.forEach(([id, has]) => {
-            next[id] = has;
+        
+        if (!controller.signal.aborted) {
+          const newNotesMap: Record<string, boolean> = {};
+          results.forEach(([id, hasNote]) => {
+            newNotesMap[id] = hasNote;
           });
-          return next;
-        });
+          setNotesMap(newNotesMap);
+        }
       } catch {
-        // ignore
+        // ignore fetch errors
       }
     })();
 
     return () => controller.abort();
-  }, [currentUserId]); // Only depend on userId
-  */
+  }, [user?.id, questions.length]); // Re-fetch when user or questions change
+
+  // Listen for notes updates to refresh the notes map
+  useEffect(() => {
+    const handleNotesUpdate = (event: any) => {
+      const { questionId, hasContent } = event.detail || {};
+      if (questionId) {
+        setNotesMap(prev => ({
+          ...prev,
+          [questionId]: hasContent
+        }));
+      }
+    };
+
+    // Listen for custom events dispatched when notes are saved/cleared
+    window.addEventListener('notes-updated', handleNotesUpdate);
+    
+    return () => {
+      window.removeEventListener('notes-updated', handleNotesUpdate);
+    };
+  }, []);
 
 
   // Only show on mobile devices using a drawer
@@ -436,23 +453,21 @@ export function QuestionControlPanel({
       }
       
       isCurrent = actualIndex === currentQuestionIndex && !isComplete;
-      // For clinical/group entries, check notesMap for the first sub-question's UUID
+      // For clinical/group entries, check notesMap using the correct note ID format
       let hasNote = false;
-      if (entry.type === 'clinical' || entry.type === 'group-qcm' || entry.type === 'group-qroc') {
-        // Find the ClinicalCase object with matching caseNumber
-        const foundCase = questions.find(item => {
-          if ('questions' in item && 'caseNumber' in item) {
-            return (item as any).caseNumber === entry.caseNumber;
-          }
-          return false;
-        });
-        if (foundCase && 'questions' in foundCase && foundCase.questions[0]) {
-          hasNote = notesMap[foundCase.questions[0].id] === true;
-        }
+      if (entry.type === 'clinical') {
+        // Clinical case uses clinical-case-{caseNumber}
+        hasNote = notesMap[`clinical-case-${entry.caseNumber}`] === true;
+      } else if (entry.type === 'group-qcm') {
+        // Multi MCQ group uses group-qcm-{caseNumber}
+        hasNote = notesMap[`group-qcm-${entry.caseNumber}`] === true;
+      } else if (entry.type === 'group-qroc') {
+        // Multi QROC group uses group-qroc-{caseNumber}
+        hasNote = notesMap[`group-qroc-${entry.caseNumber}`] === true;
       } else {
+        // Regular question uses question ID
         hasNote = notesMap[entry.id] === true;
       }
-      console.log(`QuestionControlPanel: Entry ${entry.id}, hasNote: ${hasNote}, notesMap value: ${notesMap[entry.id]}, notesMap keys:`, Object.keys(notesMap));
       const isPinned = pinnedIds.includes(entry.id);
 
       return (
@@ -732,9 +747,22 @@ export function QuestionControlPanel({
               : answers[question.id] !== undefined;
             const isCurrent = question.originalIndex === currentQuestionIndex && !isComplete;
             const isCorrect = answerResults[question.id];
-            const hasNote = notesMap[question.id] === true;
-            const isHidden = (question as any).hidden === true;
+            
+            // Determine the correct note ID to check
+            let noteId = question.id;
             const groupMeta = (question as any).meta;
+            if (groupMeta?.multiQroc) {
+              // Multi QROC group uses group-qroc-{caseNumber}
+              const caseNumber = question.number || question.id.replace('multiqroc-', '');
+              noteId = `group-qroc-${caseNumber}`;
+            } else if (groupMeta?.multiMcq) {
+              // Multi MCQ group uses group-qcm-{caseNumber}
+              const caseNumber = question.number || question.id.replace('multimcq-', '');
+              noteId = `group-qcm-${caseNumber}`;
+            }
+            
+            const hasNote = notesMap[noteId] === true;
+            const isHidden = (question as any).hidden === true;
             const isPinned = pinnedIds.includes(question.id) || (isGroup && groupChildren.some((q: any)=> pinnedIds.includes(q.id)));
             const isGroupHidden = isGroup && groupChildren.every((q:any)=> q.hidden);
             return (
@@ -906,6 +934,9 @@ export function QuestionControlPanel({
                   isCorrect = allCorrect ? true : (someCorrect ? 'partial' : false);
                 }
                 
+                // Check for notes using clinical-case-{caseNumber} format
+                const hasNote = notesMap[`clinical-case-${clinicalCase.caseNumber}`] === true;
+                
                 // Aggregate pin/hidden for clinical case
                 const anyPinned = clinicalCase.questions.some(q => pinnedIds.includes(q.id));
                 const allHidden = clinicalCase.questions.every(q => (q as any).hidden);
@@ -942,8 +973,8 @@ export function QuestionControlPanel({
                       </div>
                       <div className="flex items-center gap-2">
                         {anyPinned && <Pin className="h-4 w-4 text-pink-600 dark:text-pink-400" />}
-                        {/* Show StickyNote icon if the first sub-question in the clinical case has a note */}
-                        {clinicalCase.questions[0] && notesMap[clinicalCase.questions[0].id] === true && (
+                        {/* Show StickyNote icon if the clinical case has notes */}
+                        {hasNote && (
                           <StickyNote className="h-4 w-4 text-yellow-500" />
                         )}
                         {allHidden && <EyeOff className="h-4 w-4 text-red-500" />}

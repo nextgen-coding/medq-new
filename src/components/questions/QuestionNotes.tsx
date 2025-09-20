@@ -86,7 +86,7 @@ export function QuestionNotes({ questionId, onHasContentChange, autoEdit = false
       }
     });
     
-    return cleanedContent.trim();
+    return cleanedContent;
   };
 
   // Check if there are unsaved changes
@@ -307,6 +307,11 @@ export function QuestionNotes({ questionId, onHasContentChange, autoEdit = false
         setSaveState('saved');
         if (!silent) toast({ title: 'Sauvegardé', description: 'Votre note a été sauvegardée.' });
         
+        // Notify other components that notes have been updated
+        window.dispatchEvent(new CustomEvent('notes-updated', {
+          detail: { questionId, hasContent: cleanedContent.trim().length > 0 }
+        }));
+        
         // Sync to server in background with debounce
         if (syncDebounceRef.current) clearTimeout(syncDebounceRef.current);
         syncDebounceRef.current = setTimeout(() => {
@@ -350,6 +355,11 @@ export function QuestionNotes({ questionId, onHasContentChange, autoEdit = false
     if (user?.id) {
       syncToServer('', [], true);
     }
+    
+    // Notify other components that notes have been cleared
+    window.dispatchEvent(new CustomEvent('notes-updated', {
+      detail: { questionId, hasContent: false }
+    }));
     
     lastSavedValueRef.current = '';
     lastSavedImagesRef.current = [];
@@ -415,17 +425,18 @@ export function QuestionNotes({ questionId, onHasContentChange, autoEdit = false
   // Ensure input field remains visible when notes are cleared
   const handleInputChange = (newValue: string) => {
     setValue(newValue);
+    // Keep editing mode active when content is empty to prevent auto-hide
     if (newValue.trim().length === 0) {
       setIsEditing(true); // Force editing mode to stay active
     }
   };
 
-  // Ensure isEditing is always true when value is empty
+  // Ensure isEditing is always true when value is empty to prevent auto-hide
   useEffect(() => {
-    if (!isEditing && value.trim().length === 0) {
+    if (!isEditing && value.trim().length === 0 && images.length === 0) {
       setIsEditing(true);
     }
-  }, [value, isEditing]);
+  }, [value, images, isEditing]);
 
   const status = (
     <div className="flex items-center gap-2 text-xs">
