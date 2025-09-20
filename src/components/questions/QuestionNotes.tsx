@@ -386,11 +386,6 @@ export function QuestionNotes({ questionId, onHasContentChange, autoEdit = false
     }
   };
 
-  // Trigger notifyTaskNavigator in useEffect to ensure updates
-  useEffect(() => {
-    notifyTaskNavigator();
-  }, [value]);
-
   // Ensure input field remains visible when notes are cleared
   const handleInputChange = (newValue: string) => {
     setValue(newValue);
