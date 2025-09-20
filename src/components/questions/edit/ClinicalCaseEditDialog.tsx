@@ -66,6 +66,29 @@ export function ClinicalCaseEditDialog({ caseNumber, questions, isOpen, onOpenCh
   const updateSub = (id: string, patch: Partial<EditableSub>) => { 
     setSubs(prev => prev.map(s=> s.id===id ? { ...s, ...patch } : s)); 
   };
+  const addSub = () => {
+    setSubs(prev => [
+      ...prev,
+      {
+        id: `new_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
+        type: 'clinic_mcq',
+        text: '',
+        explanation: '',
+        answer: '',
+        options: [
+          { id: `opt_${Math.random().toString(36).slice(2)}`, text: '', explanation: '' },
+          { id: `opt_${Math.random().toString(36).slice(2)}`, text: '', explanation: '' }
+        ],
+        correctAnswers: [],
+        images: [],
+        explanationImages: [],
+        answerImages: [],
+      }
+    ]);
+  };
+  const removeSub = (id: string) => {
+    setSubs(prev => prev.length > 1 ? prev.filter(s => s.id !== id) : prev);
+  };
   const updateOption = (sid: string, oid: string, patch: Partial<Option>) => { setSubs(prev => prev.map(s=> s.id===sid ? { ...s, options: s.options.map(o=> o.id===oid? { ...o, ...patch } : o) } : s)); };
   const addOption = (sid: string) => { setSubs(prev => prev.map(s=> s.id===sid ? { ...s, options: [...s.options, { id: `opt_${Math.random().toString(36).slice(2)}`, text: '', explanation: '' }] } : s)); };
   const removeOption = (sid: string, oid: string) => { setSubs(prev => prev.map(s=> s.id===sid ? { ...s, options: s.options.filter(o=> o.id!==oid), correctAnswers: s.correctAnswers.filter(c=> c!==oid) } : s)); };
@@ -144,8 +167,13 @@ export function ClinicalCaseEditDialog({ caseNumber, questions, isOpen, onOpenCh
             />
           </div>
           {subs.map((s, idx)=>(
-            <div key={s.id} className="border rounded-md p-4 space-y-4 bg-muted/30">
-              <div className="text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200 px-2 py-0.5 rounded w-fit">Sous-question {idx+1}</div>
+            <div key={s.id} className="border rounded-md p-4 space-y-4 bg-muted/30 relative">
+              <div className="flex items-center gap-2">
+                <div className="text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200 px-2 py-0.5 rounded w-fit">Sous-question {idx+1}</div>
+                {subs.length > 1 && (
+                  <Button type="button" size="sm" variant="ghost" className="text-destructive ml-2" onClick={()=>removeSub(s.id)}><Trash2 className="h-3 w-3" /></Button>
+                )}
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="space-y-2">
                   <Label>Type</Label>
@@ -208,20 +236,12 @@ export function ClinicalCaseEditDialog({ caseNumber, questions, isOpen, onOpenCh
                   </div>
                 </div>
               )}
-              <div className="space-y-2">
-                <Label>Explication (optionnel)</Label>
-                <RichTextInput
-                  value={s.explanation}
-                  onChange={(newExplanation) => updateSub(s.id, { explanation: newExplanation })}
-                  images={s.explanationImages || []}
-                  onImagesChange={(newImages) => updateSub(s.id, { explanationImages: newImages })}
-                  placeholder="Explication détaillée..."
-                  rows={3}
-                />
-              </div>
+
             </div>
           ))}
-          <p className="text-[11px] text-muted-foreground pl-1">Ajout / suppression de sous-questions non encore supporté.</p>
+          <Button type="button" variant="outline" size="sm" className="mt-4" onClick={addSub}>
+            <Plus className="h-4 w-4 mr-1" /> Ajouter une sous-question
+          </Button>
         </div>
         <div className="flex justify-end gap-2 border-t pt-4">
           <Button variant="outline" onClick={()=> onOpenChange(false)} disabled={saving}>Annuler</Button>

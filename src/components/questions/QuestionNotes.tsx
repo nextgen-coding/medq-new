@@ -543,7 +543,6 @@ export function QuestionNotes({ questionId, onHasContentChange, autoEdit = false
                 <RichTextInput
                   value={value}
                   onChange={handleInputChange}
-                  onChange={handleInputChange}
                   images={images}
                   onImagesChange={setImages}
                   placeholder={hasContent ? "Tapez votre note ici…" : "Ajouter une note..."}
