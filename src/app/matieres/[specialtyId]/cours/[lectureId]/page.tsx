@@ -857,6 +857,17 @@ export default function CoursPageRoute() {
                         </Dialog>
                       )}
                       
+                      {/* Quit button - mobile only, positioned between Admin and Timer */}
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={handleBackToSpecialtyNested}
+                        className="sm:hidden whitespace-nowrap bg-red-600 hover:bg-red-700 text-white border-0 rounded-xl shadow-md"
+                      >
+                        <ArrowLeft className="h-4 w-4 mr-2" />
+                        <span>Quitter</span>
+                      </Button>
+                      
                       {/* Timer at the very right */}
                       <LectureTimer lectureId={lectureId} />
                     </div>

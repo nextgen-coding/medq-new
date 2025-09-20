@@ -192,22 +192,33 @@ export default function QuestionsEpingleesTestPage() {
     }
   }, [currentQuestion?.id, user?.id])
 
-  // Fetch notes status for all pinned questions
+  // Add lifecycle logging and mock data fallback for debugging
   useEffect(() => {
+    console.log('Component mounted or updated. User ID:', user?.id, 'Questions:', questions);
+
     const fetchNotesStatus = async () => {
-      if (!user?.id || questions.length === 0) return
-      
-      console.log('Fetching notes status for pinned questions:', questions.map(q => q.id))
-      
+      if (!user?.id || questions.length === 0) {
+        console.log('Skipping fetchNotesStatus due to missing user ID or empty questions list.');
+        return;
+      }
+
+      console.log('Fetching notes status for pinned questions:', questions.map(q => q.id));
+
       try {
         const results = await Promise.all(
           questions.map(async (question) => {
             try {
-              const res = await fetch(`/api/user-question-state?userId=${encodeURIComponent(user.id)}&questionId=${encodeURIComponent(question.id)}`);
+              const res = await fetch(`/api/user-question-state?userId=${encodeURIComponent(user.id)}&questionId=${encodeURIComponent(question.id)}`, {
+                headers: {
+                  'Cache-Control': 'no-cache',
+                },
+              });
+              console.log(`Raw response for question ${question.id}:`, res);
               if (!res.ok) return [question.id, false] as [string, boolean];
               const data = await res.json();
-              const hasNote = !!(data?.notes && String(data.notes).trim().length > 0);
-              console.log(`Notes for question ${question.id}:`, { hasNote, notes: data?.notes });
+              console.log(`Parsed data for question ${question.id}:`, data);
+              const hasNote = data?.notes != null && String(data.notes).trim().length > 0;
+              console.log(`Computed hasNote for question ${question.id}:`, hasNote);
               return [question.id, hasNote] as [string, boolean];
             } catch (error) {
               console.error(`Failed to fetch notes for question ${question.id}:`, error);
@@ -215,20 +226,20 @@ export default function QuestionsEpingleesTestPage() {
             }
           })
         );
-        
+
         const notesData: Record<string, boolean> = {};
         results.forEach(([id, hasNote]) => {
           notesData[id] = hasNote;
         });
-        
+
         console.log('Final notes map:', notesData);
         setNotesMap(notesData);
       } catch (error) {
         console.error('Error fetching notes status:', error);
       }
-    }
+    };
 
-    fetchNotesStatus()
+    fetchNotesStatus();
   }, [user?.id, questions])
 
   // Pin/Unpin handlers
@@ -622,6 +633,17 @@ export default function QuestionsEpingleesTestPage() {
                             </DialogContent>
                           </Dialog>
                         )}
+                        
+                        {/* Red Quitter Button - Mobile Only */}
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={handleQuit}
+                          className="sm:hidden whitespace-nowrap bg-red-600 hover:bg-red-700 text-white border-0 rounded-xl shadow-md"
+                        >
+                          <ArrowLeft className="h-4 w-4 mr-2" />
+                          Quitter
+                        </Button>
                         
                         {/* Timer at the very right */}
                         <LectureTimer lectureId={lectureId} />

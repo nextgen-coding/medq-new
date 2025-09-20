@@ -486,10 +486,10 @@ export default function SpecialtyPageRoute() {
     <ProtectedRoute>
       <AppSidebarProvider>
         <AppSidebar />
-        <SidebarInset className="flex flex-col min-h-0 overflow-x-hidden">
+  <SidebarInset className="flex flex-col min-h-screen overflow-x-hidden">
           <UniversalHeader title={specialty.name} />
 
-          <div className="bg-gray-50 dark:bg-gray-900 p-4 sm:p-6 lg:p-8 min-w-0 overflow-x-hidden">
+          <div className="bg-gray-50 dark:bg-gray-900 p-4 sm:p-6 lg:p-8 min-w-0 overflow-x-hidden flex-1">
             <div className="max-w-7xl mx-auto space-y-6 min-w-0">
               {/* Breadcrumb */}
               <div className="flex items-center gap-4 min-w-0">
@@ -659,29 +659,29 @@ export default function SpecialtyPageRoute() {
                     <Table className="min-w-full w-full">
                       <TableHeader>
                         <TableRow>
-                          {isAdmin && (
-                            <TableHead className="w-8">
-                              <Checkbox
-                                aria-label="Tout sélectionner"
-                                checked={(() => {
-                                  const ids = [...ungroupedLectures, ...Object.values(groupedLectures).flat()].map(l => l.id)
-                                  return ids.length > 0 && ids.every(id => selectedCourseIds[id])
-                                })()}
-                                onCheckedChange={(checked) => {
-                                  const allIds = [...ungroupedLectures, ...Object.values(groupedLectures).flat()].map(l => l.id)
-                                  const next: Record<string, boolean> = { ...selectedCourseIds }
-                                  allIds.forEach(id => { next[id] = !!checked })
-                                  setSelectedCourseIds(next)
-                                }}
-                              />
-                            </TableHead>
-                          )}
-                          <TableHead className="min-w-0">Cours</TableHead>
-                          {isAdmin && <TableHead className="hidden lg:table-cell min-w-0">Rapports</TableHead>}
-                          <TableHead className="hidden md:table-cell min-w-0">Note /20</TableHead>
-                          <TableHead className="min-w-0 w-20 sm:w-24 md:w-32 lg:w-40">Progression</TableHead>
-                          <TableHead className="hidden xl:table-cell min-w-0">Commentaires</TableHead>
-                          <TableHead className="min-w-0 w-16 sm:w-20 md:w-24">Action</TableHead>
+                            {isAdmin && (
+                              <TableHead className="w-8">{/* always show select on desktop */}
+                                <Checkbox
+                                  aria-label="Tout sélectionner"
+                                  checked={(() => {
+                                    const ids = [...ungroupedLectures, ...Object.values(groupedLectures).flat()].map(l => l.id)
+                                    return ids.length > 0 && ids.every(id => selectedCourseIds[id])
+                                  })()}
+                                  onCheckedChange={(checked) => {
+                                    const allIds = [...ungroupedLectures, ...Object.values(groupedLectures).flat()].map(l => l.id)
+                                    const next: Record<string, boolean> = { ...selectedCourseIds }
+                                    allIds.forEach(id => { next[id] = !!checked })
+                                    setSelectedCourseIds(next)
+                                  }}
+                                />
+                              </TableHead>
+                            )}
+                            <TableHead className="min-w-0">Cours</TableHead>
+                            {isAdmin && <TableHead className="hidden lg:table-cell min-w-0">Rapports</TableHead>}
+                            <TableHead className="hidden md:table-cell min-w-0">Note /20</TableHead>
+                            <TableHead className="min-w-0 w-20 sm:w-24 md:w-32 lg:w-40">Progression</TableHead>
+                            <TableHead className="hidden xl:table-cell min-w-0">Commentaires</TableHead>
+                            <TableHead className="min-w-0 w-16 sm:w-20 md:w-24">Action</TableHead>
                         </TableRow>
                       </TableHeader>
                     <TableBody>
@@ -722,8 +722,15 @@ export default function SpecialtyPageRoute() {
                             <div className="flex items-center gap-2">
                               <File className="w-4 h-4 text-gray-500 flex-shrink-0" />
                               <div className="min-w-0 flex-1">
-                                <div className="font-medium truncate">{lecture.title}</div>
-                                <div className="text-sm text-gray-500 truncate">{lecture.description}</div>
+                                {/* Mobile: truncate to half, desktop: full */}
+                                <div className="font-medium truncate">
+                                  <span className="block sm:hidden">{lecture.title.length > 16 ? lecture.title.slice(0, Math.ceil(lecture.title.length/2)) + '…' : lecture.title}</span>
+                                  <span className="hidden sm:block">{lecture.title}</span>
+                                </div>
+                                <div className="text-sm text-gray-500 truncate">
+                                  <span className="block sm:hidden">{lecture.description && lecture.description.length > 16 ? lecture.description.slice(0, Math.ceil(lecture.description.length/2)) + '…' : lecture.description}</span>
+                                  <span className="hidden sm:block">{lecture.description}</span>
+                                </div>
                               </div>
                             </div>
                           </TableCell>
@@ -854,8 +861,14 @@ export default function SpecialtyPageRoute() {
                               <div className="flex items-center gap-2 pl-4 sm:pl-6">
                                 <File className="w-4 h-4 text-gray-500 flex-shrink-0" />
                                 <div className="min-w-0 flex-1">
-                                  <div className="font-medium truncate">{lecture.title}</div>
-                                  <div className="text-sm text-gray-500 truncate">{lecture.description}</div>
+                                  <div className="font-medium truncate">
+                                    <span className="block sm:hidden">{lecture.title.length > 16 ? lecture.title.slice(0, Math.ceil(lecture.title.length/2)) + '…' : lecture.title}</span>
+                                    <span className="hidden sm:block">{lecture.title}</span>
+                                  </div>
+                                  <div className="text-sm text-gray-500 truncate">
+                                    <span className="block sm:hidden">{lecture.description && lecture.description.length > 16 ? lecture.description.slice(0, Math.ceil(lecture.description.length/2)) + '…' : lecture.description}</span>
+                                    <span className="hidden sm:block">{lecture.description}</span>
+                                  </div>
                                 </div>
                               </div>
                             </TableCell>
