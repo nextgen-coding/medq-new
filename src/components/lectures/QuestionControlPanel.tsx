@@ -248,13 +248,41 @@ export function QuestionControlPanel({
   }, [questions]);
 
   // Fetch whether the user has notes for each question (used to show a small notes icon)
+  // TEMPORARILY DISABLED to debug infinite loop
+  /*
+  const processedIdsRef = useRef<Set<string>>(new Set());
+  const stableRegularQuestionIdsRef = useRef<string[]>([]);
+  const lastUserIdRef = useRef<string>('');
+  
+  // Only update when IDs actually change or user changes
+  const idsKey = regularQuestionIds.join(',');
+  const currentUserId = user?.id || '';
+  
+  // Use a separate effect for updating the stable IDs reference
   useEffect(() => {
-    if (!user?.id || regularQuestionIds.length === 0) return;
+    const hasIdsChanged = idsKey !== stableRegularQuestionIdsRef.current.join(',');
+    const hasUserChanged = currentUserId !== lastUserIdRef.current;
+    
+    if (hasIdsChanged || hasUserChanged) {
+      stableRegularQuestionIdsRef.current = regularQuestionIds;
+      lastUserIdRef.current = currentUserId;
+      // Only clear processed IDs if the question set actually changed
+      if (hasIdsChanged) {
+        processedIdsRef.current.clear();
+      }
+    }
+  }, [idsKey, currentUserId, regularQuestionIds]);
+  
+  useEffect(() => {
+    if (!currentUserId || stableRegularQuestionIdsRef.current.length === 0) return;
 
-    const idsToFetch = regularQuestionIds.filter((id) => notesMap[id] === undefined);
+    const idsToFetch = stableRegularQuestionIdsRef.current.filter((id) => 
+      notesMap[id] === undefined && !processedIdsRef.current.has(id)
+    );
     if (idsToFetch.length === 0) return;
 
-    console.log('QuestionControlPanel: Fetching notes for question IDs:', idsToFetch);
+    // Mark these IDs as being processed to prevent duplicate fetches
+    idsToFetch.forEach(id => processedIdsRef.current.add(id));
 
     const controller = new AbortController();
 
@@ -263,37 +291,33 @@ export function QuestionControlPanel({
         const results = await Promise.all(
           idsToFetch.map(async (id) => {
             try {
-              const res = await fetch(`/api/user-question-state?userId=${encodeURIComponent(user.id)}&questionId=${encodeURIComponent(id)}` , { signal: controller.signal });
+              const res = await fetch(`/api/user-question-state?userId=${encodeURIComponent(currentUserId)}&questionId=${encodeURIComponent(id)}` , { signal: controller.signal });
               if (!res.ok) {
-                console.log(`QuestionControlPanel: API call failed for question ${id}, status: ${res.status}`);
                 return [id, false] as [string, boolean];
               }
               const data = await res.json();
               const hasNote = !!(data?.notes && String(data.notes).trim().length > 0);
-              console.log(`QuestionControlPanel: Notes for question ${id}:`, { hasNote, notes: data?.notes, data });
               return [id, hasNote] as [string, boolean];
-            } catch (error) {
-              console.log(`QuestionControlPanel: Error fetching notes for question ${id}:`, error);
+            } catch {
               return [id, false] as [string, boolean];
             }
           })
         );
-        console.log('QuestionControlPanel: Setting notes map with results:', results);
         setNotesMap((prev) => {
           const next = { ...prev };
           results.forEach(([id, has]) => {
             next[id] = has;
           });
-          console.log('QuestionControlPanel: Updated notes map:', next);
           return next;
         });
-      } catch (error) {
-        console.log('QuestionControlPanel: Error in notes fetching:', error);
+      } catch {
+        // ignore
       }
     })();
 
     return () => controller.abort();
-  }, [user?.id, regularQuestionIds]);
+  }, [currentUserId]); // Only depend on userId
+  */
 
 
   // Only show on mobile devices using a drawer

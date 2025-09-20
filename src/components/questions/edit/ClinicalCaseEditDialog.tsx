@@ -124,6 +124,8 @@ export function ClinicalCaseEditDialog({ caseNumber, questions, isOpen, onOpenCh
       };
 
       const legacyCaseText = convertNewToLegacy(caseText.trim(), caseImages);
+      const lectureId = questions[0]?.lectureId; // all subs belong to same lecture
+      const caseNum = caseNumber; // provided via props
       for (let order = 0; order < subs.length; order++) {
         const s = subs[order];
         const processedText = convertNewToLegacy(s.text.trim(), s.images);
@@ -132,7 +134,16 @@ export function ClinicalCaseEditDialog({ caseNumber, questions, isOpen, onOpenCh
         const base: any = { text: processedText, explanation: processedExplanation, caseText: legacyCaseText, caseQuestionNumber: order + 1 };
         if (s.type === 'clinic_mcq') { base.type='clinic_mcq'; base.options = s.options.filter(o=> o.text.trim()).map(o=> ({ id:o.id, text:o.text.trim(), explanation:o.explanation?.trim()||'' })); base.correctAnswers = s.correctAnswers; }
         else { base.type='clinic_croq'; base.correctAnswers = [processedAnswer]; base.options = []; }
-        const resp = await fetch(`/api/questions/${s.id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify(base) });
+        // If this is a new sub-question (temporary id), create it instead of updating
+        const isNew = s.id.startsWith('new_');
+        let resp: Response;
+        if (isNew) {
+          if (!lectureId) { throw new Error('Lecture introuvable pour la création.'); }
+          const createPayload = { ...base, lectureId, caseNumber: caseNum };
+          resp = await fetch(`/api/questions`, { method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify(createPayload) });
+        } else {
+          resp = await fetch(`/api/questions/${s.id}`, { method:'PUT', headers:{'Content-Type':'application/json'}, credentials:'include', body: JSON.stringify(base) });
+        }
         if (!resp.ok) { const err = await resp.json().catch(()=>({})); throw new Error(err.error || `Échec sous-question ${order+1}`); }
         updated.push(await resp.json());
       }

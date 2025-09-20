@@ -38,6 +38,16 @@ import { toast } from '@/hooks/use-toast'
 export default function CoursPageRoute() {
   const params = useParams()
   const searchParams = useSearchParams()
+  // Render only one control panel variant depending on screen size to avoid duplicate mounts
+  const [isLargeScreen, setIsLargeScreen] = useState<boolean>(false)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const mq = window.matchMedia('(min-width: 1024px)') // lg breakpoint
+    const update = () => setIsLargeScreen(prev => (prev !== mq.matches ? mq.matches : prev))
+    update()
+    mq.addEventListener?.('change', update as any)
+    return () => mq.removeEventListener?.('change', update as any)
+  }, [])
   const router = useRouter()
   const { t } = useTranslation()
   const { user } = useAuth()
@@ -570,6 +580,8 @@ export default function CoursPageRoute() {
           enableOptionHighlighting={true}
           hideActions={revisionMode}
           showNotesAfterSubmit={isAnswered}
+          // Ensure keyboard shortcuts (digits/letters, Enter) are active on this route
+          isActive={true}
         />
       );
     } else {
@@ -882,7 +894,28 @@ export default function CoursPageRoute() {
               </div>
             </div>
 
-            <div className="hidden lg:block lg:w-80 lg:flex-shrink-0">
+            {isLargeScreen && (
+              <div className="lg:w-80 lg:flex-shrink-0">
+                <QuestionControlPanel
+                  questions={questions}
+                  currentQuestionIndex={currentQuestionIndex}
+                  answers={answers}
+                  answerResults={answerResults}
+                  onQuestionSelect={handleQuestionSelect}
+                  onPrevious={handlePrevious}
+                  onNext={handleNext}
+                  isComplete={isComplete}
+                  pinnedIds={pinnedQuestionIds}
+                  onQuit={handleBackToSpecialtyNested}
+                  mode={mode}
+                />
+              </div>
+            )}
+          </div>
+          
+          {/* Mobile Control Panel - rendered exclusively on mobile */}
+          {!isLargeScreen && (
+            <div className="mt-4 sm:mt-6">
               <QuestionControlPanel
                 questions={questions}
                 currentQuestionIndex={currentQuestionIndex}
@@ -895,28 +928,9 @@ export default function CoursPageRoute() {
                 pinnedIds={pinnedQuestionIds}
                 onQuit={handleBackToSpecialtyNested}
                 mode={mode}
-                // onNotesVisibilityChange and showAllNotes removed
               />
             </div>
-          </div>
-          
-          {/* Mobile Control Panel - rendered separately to avoid layout issues */}
-          <div className="lg:hidden mt-4 sm:mt-6">
-            <QuestionControlPanel
-              questions={questions}
-              currentQuestionIndex={currentQuestionIndex}
-              answers={answers}
-              answerResults={answerResults}
-              onQuestionSelect={handleQuestionSelect}
-              onPrevious={handlePrevious}
-              onNext={handleNext}
-              isComplete={isComplete}
-              pinnedIds={pinnedQuestionIds}
-              onQuit={handleBackToSpecialtyNested}
-              mode={mode}
-              // onNotesVisibilityChange and showAllNotes removed
-            />
-          </div>
+          )}
             
         </div>
       </div>

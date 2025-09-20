@@ -708,8 +708,12 @@ export function OpenQuestion({
       </div>
     )}
 
-    {/* Show input field only when not in revision mode */}
-    {(!submitted || keepInputAfterSubmit) && !hideActions && (
+    {/* Show input field: even when actions are hidden in grouped clinical cases (disableIndividualSubmit),
+        we still need the input visible so users can type their answer. */}
+    {(() => {
+      const showInput = (!submitted || keepInputAfterSubmit) && (!hideActions || disableIndividualSubmit);
+      return showInput;
+    })() && (
         <OpenQuestionInput
           answer={answer}
           setAnswer={setAnswer}
@@ -821,8 +825,7 @@ export function OpenQuestion({
     );
   })()}
 
-  // Only render notes if not a clinical case sub-question (i.e., not in a clinical case context)
-  {!hideNotes && question.text !== '' && !disableIndividualSubmit && !hideImmediateResults && (
+    {!hideNotes && question.text !== '' && !disableIndividualSubmit && !hideImmediateResults && (
     <div ref={notesRef} className={showNotesArea ? "" : "hidden"}>
       <QuestionNotes
         questionId={question.id}

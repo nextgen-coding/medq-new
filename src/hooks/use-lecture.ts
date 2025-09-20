@@ -402,7 +402,7 @@ export function useLecture(lectureId: string | undefined, mode?: string | null) 
         revisionPrefilledRef.current = true;
       }
     }
-  }, [mode, allQuestions, answers, setAnswers, setAnswerResults]);
+  }, [mode, allQuestions, setAnswers, setAnswerResults]);
 
   // Load pinned questions (needed to show pin icon in navigation regardless of mode)
   useEffect(() => {

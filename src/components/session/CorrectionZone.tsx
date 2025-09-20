@@ -1657,7 +1657,7 @@ export function CorrectionZone({ sessionId, mode, onQuestionLink, pdfLinks = [],
                         ) : (
                           <PenLine className="h-4 w-4 text-green-600 dark:text-green-400 flex-shrink-0" />
                         )}
-                        <div className="text-sm font-medium text-blue-100/90 dark:text-blue-200/90 bg-blue-900/20 border border-transparent rounded-md px-3 py-1.5 leading-snug">
+                        <div className="text-sm font-medium text-blue-800 dark:text-blue-200 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md px-3 py-1.5 leading-snug">
                           {(() => {
                             const raw = (question.question || '').trim();
                             const cleaned = raw.replace(/^(question\s+n?°?\s*\d+\s*[:.)\-]\s*)/i, '').trim();
@@ -1723,7 +1723,7 @@ export function CorrectionZone({ sessionId, mode, onQuestionLink, pdfLinks = [],
                     <CardHeader className="pb-2 px-4">
                       <div className="flex items-center gap-2">
                         <FileText className="h-4 w-4 text-purple-600 dark:text-purple-400 flex-shrink-0" />
-                        <div className="text-sm font-medium text-purple-100/90 dark:text-purple-200/90 bg-purple-900/20 border border-transparent rounded-md px-3 py-1.5 leading-snug">
+                        <div className="text-sm font-medium text-purple-800 dark:text-purple-200 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-md px-3 py-1.5 leading-snug">
                           {clinicalCase.title || `Cas Clinique ${index + 1}`}
                         </div>
                       </div>
@@ -2086,7 +2086,7 @@ export function CorrectionZone({ sessionId, mode, onQuestionLink, pdfLinks = [],
                       className="h-7 sm:h-8 flex-1 text-xs sm:text-sm bg-white/80 dark:bg-gray-800/50 border-gray-300 dark:border-gray-600 focus:ring-blue-500"
                     />
                   ) : (
-                    <div className="flex-1 text-xs sm:text-sm md:text-base font-medium text-blue-100/90 dark:text-blue-200/90 bg-blue-900/20 border border-transparent rounded-md px-2 sm:px-3 py-1 sm:py-1.5 leading-snug select-text">
+                    <div className="flex-1 text-xs sm:text-sm md:text-base font-medium text-blue-800 dark:text-blue-200 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md px-2 sm:px-3 py-1 sm:py-1.5 leading-snug select-text">
                       {(() => {
                         const raw = (question.question || '').trim();
                         // Only remove very specific question prefixes like "Question 1:", "Question n°1:", etc.
@@ -2188,7 +2188,7 @@ export function CorrectionZone({ sessionId, mode, onQuestionLink, pdfLinks = [],
                       <div className="space-y-2">
                         <div className="flex gap-2">
                           {availableOptions.map(letter => (
-                            <div key={letter} className="h-9 flex-1 px-2 border-2 border-orange-400 rounded flex items-center justify-center bg-gray-800 dark:bg-gray-900">
+                            <div key={letter} className="h-9 flex-1 px-2 border-2 border-orange-400 rounded flex items-center justify-center bg-white dark:bg-gray-900">
                               <span className="text-orange-400 font-bold text-lg leading-none select-none">{letter}</span>
                             </div>
                           ))}
@@ -2539,7 +2539,7 @@ export function CorrectionZone({ sessionId, mode, onQuestionLink, pdfLinks = [],
                       className="h-7 sm:h-8 flex-1 text-xs sm:text-sm bg-white/80 dark:bg-gray-800/50 border-purple-300 dark:border-purple-600 focus:ring-purple-500 font-semibold"
                     />
                   ) : (
-                    <div className="flex-1 text-xs sm:text-sm md:text-base font-semibold text-purple-100/90 dark:text-purple-200/90 bg-purple-900/20 border border-transparent rounded-md px-2 sm:px-3 py-1 sm:py-1.5 leading-snug select-text">
+                    <div className="flex-1 text-xs sm:text-sm md:text-base font-semibold text-purple-800 dark:text-purple-200 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-md px-2 sm:px-3 py-1 sm:py-1.5 leading-snug select-text">
                       {(clinicalCase.title || '').replace(/^cas\s*clinique[:.)-]*\s*/i,'Cas Clinique ').trim() || 'Cas Clinique'}
                     </div>
                   )}
@@ -2677,7 +2677,7 @@ export function CorrectionZone({ sessionId, mode, onQuestionLink, pdfLinks = [],
                           className="h-8 flex-1 bg-white/80 dark:bg-gray-800/50 border-gray-300 dark:border-gray-600 focus:ring-blue-500"
                         />
                       ) : (
-                        <div className="flex-1 text-sm sm:text-base font-medium text-blue-100/90 dark:text-blue-200/90 bg-blue-900/20 border border-transparent rounded-md px-3 py-1.5 leading-snug select-text">
+                        <div className="flex-1 text-sm sm:text-base font-medium text-blue-800 dark:text-blue-200 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md px-3 py-1.5 leading-snug select-text">
                           {(() => {
                             const raw = (question.question || '').trim();
                             // Only remove very specific question prefixes like "Question 1:", "Question n°1:", etc.
@@ -2760,7 +2760,7 @@ export function CorrectionZone({ sessionId, mode, onQuestionLink, pdfLinks = [],
                             <div className="space-y-2">
                               <div className="flex gap-2">
                                 {availableOptions.map(letter => (
-                                  <div key={letter} className="h-9 flex-1 px-2 border-2 border-orange-400 rounded flex items-center justify-center bg-gray-800 dark:bg-gray-900">
+                                  <div key={letter} className="h-9 flex-1 px-2 border-2 border-orange-400 rounded flex items-center justify-center bg-white dark:bg-gray-900">
                                     <span className="text-orange-400 font-bold text-lg leading-none select-none">{letter}</span>
                                   </div>
                                 ))}

@@ -279,7 +279,7 @@ export const HighlightableQuestionText: React.FC<HighlightableQuestionTextProps>
         try {
           const res = await fetch(`/api/user-question-state?userId=${user.id}&questionId=${questionId}`);
           const data = res.ok ? await res.json() : {};
-          const currentNotes = data.notes || '';
+          const currentNotes = data?.notes || '';
           await fetch('/api/user-question-state', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
