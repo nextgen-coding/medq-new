@@ -239,6 +239,9 @@ export function QuestionControlPanel({
     questions.forEach((item) => {
       if (!('questions' in item)) {
         ids.push((item as Question).id);
+      } else if (Array.isArray((item as any).questions) && (item as any).questions[0]) {
+        // For clinical cases/groups, add the first sub-question's UUID
+        ids.push((item as any).questions[0].id);
       }
     });
     return ids;
@@ -409,7 +412,22 @@ export function QuestionControlPanel({
       }
       
       isCurrent = actualIndex === currentQuestionIndex && !isComplete;
-      const hasNote = notesMap[entry.id] === true;
+      // For clinical/group entries, check notesMap for the first sub-question's UUID
+      let hasNote = false;
+      if (entry.type === 'clinical' || entry.type === 'group-qcm' || entry.type === 'group-qroc') {
+        // Find the ClinicalCase object with matching caseNumber
+        const foundCase = questions.find(item => {
+          if ('questions' in item && 'caseNumber' in item) {
+            return (item as any).caseNumber === entry.caseNumber;
+          }
+          return false;
+        });
+        if (foundCase && 'questions' in foundCase && foundCase.questions[0]) {
+          hasNote = notesMap[foundCase.questions[0].id] === true;
+        }
+      } else {
+        hasNote = notesMap[entry.id] === true;
+      }
       console.log(`QuestionControlPanel: Entry ${entry.id}, hasNote: ${hasNote}, notesMap value: ${notesMap[entry.id]}, notesMap keys:`, Object.keys(notesMap));
       const isPinned = pinnedIds.includes(entry.id);
 
@@ -900,6 +918,10 @@ export function QuestionControlPanel({
                       </div>
                       <div className="flex items-center gap-2">
                         {anyPinned && <Pin className="h-4 w-4 text-pink-600 dark:text-pink-400" />}
+                        {/* Show StickyNote icon if the first sub-question in the clinical case has a note */}
+                        {clinicalCase.questions[0] && notesMap[clinicalCase.questions[0].id] === true && (
+                          <StickyNote className="h-4 w-4 text-yellow-500" />
+                        )}
                         {allHidden && <EyeOff className="h-4 w-4 text-red-500" />}
                         <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100 dark:bg-gray-700">
                         {mode === 'revision' ? (

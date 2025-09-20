@@ -229,9 +229,35 @@ export function QuestionNotes({ questionId, onHasContentChange, autoEdit = false
     }
   };
 
+  // Add validation and logging to prevent null values in syncToServer
+  // Add validation and logging to prevent null values in syncToServer
   const syncToServer = async (content: string, imageUrls: string[], silent = true) => {
-    if (!user?.id) return false;
-    
+    if (!user?.id) {
+      console.warn('Skipping server sync: user is not logged in');
+      return false;
+    }
+
+    // Validate content and imageUrls
+    if (!content.trim() && imageUrls.length === 0) {
+      console.warn('Skipping server sync: notes content and image URLs are empty');
+      return false;
+    }
+
+    console.log('Syncing to server with content:', content, 'and image URLs:', imageUrls);
+
+    if (!user?.id) {
+      console.warn('Skipping server sync: user is not logged in');
+      return false;
+    }
+
+    // Validate content and imageUrls
+    if (!content.trim() && imageUrls.length === 0) {
+      console.warn('Skipping server sync: notes content and image URLs are empty');
+      return false;
+    }
+
+    console.log('Syncing to server with content:', content, 'and image URLs:', imageUrls);
+
     try {
       const res = await fetch('/api/user-question-state', {
         method: 'POST',
@@ -243,7 +269,8 @@ export function QuestionNotes({ questionId, onHasContentChange, autoEdit = false
           notesImageUrls: imageUrls 
         }),
       });
-      
+
+
       if (res.ok) {
         if (!silent) toast({ title: 'Synchronisé', description: 'Votre note a été synchronisée avec le serveur.' });
         return true;
@@ -345,6 +372,60 @@ export function QuestionNotes({ questionId, onHasContentChange, autoEdit = false
     await save(false);
     setIsEditing(false);
   };
+
+  // Notify parent when notes content changes
+  useEffect(() => {
+    if (onHasContentChange) {
+      onHasContentChange(value.trim().length > 0);
+    }
+  }, [value, onHasContentChange]);
+
+  // Explicitly trigger a state update in the task navigator
+  useEffect(() => {
+    if (onHasContentChange) {
+      onHasContentChange(value.trim().length > 0);
+    }
+  }, [value, onHasContentChange]);
+
+  // Force a re-render or state update in the task navigator
+  const notifyTaskNavigator = () => {
+    if (onHasContentChange) {
+      onHasContentChange(value.trim().length > 0);
+    }
+  };
+
+  // Call notifyTaskNavigator after saving the note
+  const handleSave = async () => {
+    setSaveState('saving');
+    try {
+      await syncToServer(value, images.map(img => img.url), false); // Provide content and image URLs
+      setSaveState('saved');
+      notifyTaskNavigator(); // Explicitly notify task navigator
+    } catch (error) {
+      setSaveState('error');
+      console.error('Failed to save note:', error);
+    }
+  };
+
+  // Trigger notifyTaskNavigator in useEffect to ensure updates
+  useEffect(() => {
+    notifyTaskNavigator();
+  }, [value]);
+
+  // Ensure input field remains visible when notes are cleared
+  const handleInputChange = (newValue: string) => {
+    setValue(newValue);
+    if (newValue.trim().length === 0) {
+      setIsEditing(true); // Force editing mode to stay active
+    }
+  };
+
+  // Ensure isEditing is always true when value is empty
+  useEffect(() => {
+    if (!isEditing && value.trim().length === 0) {
+      setIsEditing(true);
+    }
+  }, [value, isEditing]);
 
   const status = (
     <div className="flex items-center gap-2 text-xs">
@@ -461,7 +542,7 @@ export function QuestionNotes({ questionId, onHasContentChange, autoEdit = false
               <>
                 <RichTextInput
                   value={value}
-                  onChange={setValue}
+                  onChange={handleInputChange}
                   images={images}
                   onImagesChange={setImages}
                   placeholder={hasContent ? "Tapez votre note ici…" : "Ajouter une note..."}

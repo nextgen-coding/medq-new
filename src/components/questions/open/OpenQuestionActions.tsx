@@ -1,6 +1,6 @@
 
 import { Button } from '@/components/ui/button'; // updated to include user answer display
-import { ChevronLeft, ChevronRight, Keyboard, StickyNote, SendHorizontal, CheckCircle2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Keyboard, StickyNote, SendHorizontal, CheckCircle2, X } from 'lucide-react';
 
 interface OpenQuestionActionsProps {
   isSubmitted: boolean;

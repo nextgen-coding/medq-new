@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { SimpleTextDisplay } from '@/components/ui/simple-text-display';
+import { RichTextDisplay } from '@/components/ui/rich-text-display';
 import { HighlightableOptionText } from '../HighlightableOptionText';
 
 interface MCQOptionItemProps {
@@ -109,7 +109,7 @@ export function MCQOptionItem({
                 confirmMode={highlightConfirm}
               />
             ) : (
-              <SimpleTextDisplay text={option.text} />
+              <RichTextDisplay text={option.text} />
             )}
           </div>
           
@@ -138,7 +138,6 @@ export function MCQOptionItem({
                   )}
                 </button>
               </div>
-              
               {isExpanded && (
                 <div className="mt-3 text-base sm:text-lg pl-3 border-l-2 border-muted py-2 text-foreground leading-relaxed">
                   {enableHighlighting && questionId ? (
@@ -149,7 +148,7 @@ export function MCQOptionItem({
                       confirmMode={highlightConfirm}
                     />
                   ) : (
-                    <SimpleTextDisplay text={option.explanation || ''} />
+                    <RichTextDisplay text={option.explanation || ''} />
                   )}
                 </div>
               )}
