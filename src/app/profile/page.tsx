@@ -46,9 +46,9 @@ export default function ProfilePageRoute() {
       <ProfileCompletionGuard>
         <AppSidebarProvider>
           <div className="flex w-full min-h-screen bg-gray-50 dark:bg-gray-900">
+          <div className="flex w-full min-h-screen bg-gray-50 dark:bg-gray-900">
             <AppSidebar />
             <SidebarInset className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
-
               {/* Universal Header */}
               <UniversalHeader
                 title="Profil"

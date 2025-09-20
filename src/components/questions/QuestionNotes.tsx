@@ -230,7 +230,21 @@ export function QuestionNotes({ questionId, onHasContentChange, autoEdit = false
   };
 
   // Add validation and logging to prevent null values in syncToServer
+  // Add validation and logging to prevent null values in syncToServer
   const syncToServer = async (content: string, imageUrls: string[], silent = true) => {
+    if (!user?.id) {
+      console.warn('Skipping server sync: user is not logged in');
+      return false;
+    }
+
+    // Validate content and imageUrls
+    if (!content.trim() && imageUrls.length === 0) {
+      console.warn('Skipping server sync: notes content and image URLs are empty');
+      return false;
+    }
+
+    console.log('Syncing to server with content:', content, 'and image URLs:', imageUrls);
+
     if (!user?.id) {
       console.warn('Skipping server sync: user is not logged in');
       return false;
@@ -255,6 +269,7 @@ export function QuestionNotes({ questionId, onHasContentChange, autoEdit = false
           notesImageUrls: imageUrls 
         }),
       });
+
 
       if (res.ok) {
         if (!silent) toast({ title: 'Synchronisé', description: 'Votre note a été synchronisée avec le serveur.' });
@@ -366,6 +381,12 @@ export function QuestionNotes({ questionId, onHasContentChange, autoEdit = false
   }, [value, onHasContentChange]);
 
   // Explicitly trigger a state update in the task navigator
+  useEffect(() => {
+    if (onHasContentChange) {
+      onHasContentChange(value.trim().length > 0);
+    }
+  }, [value, onHasContentChange]);
+
   // Force a re-render or state update in the task navigator
   const notifyTaskNavigator = () => {
     if (onHasContentChange) {
@@ -385,6 +406,11 @@ export function QuestionNotes({ questionId, onHasContentChange, autoEdit = false
       console.error('Failed to save note:', error);
     }
   };
+
+  // Trigger notifyTaskNavigator in useEffect to ensure updates
+  useEffect(() => {
+    notifyTaskNavigator();
+  }, [value]);
 
   // Ensure input field remains visible when notes are cleared
   const handleInputChange = (newValue: string) => {
@@ -516,6 +542,7 @@ export function QuestionNotes({ questionId, onHasContentChange, autoEdit = false
               <>
                 <RichTextInput
                   value={value}
+                  onChange={handleInputChange}
                   onChange={handleInputChange}
                   images={images}
                   onImagesChange={setImages}
