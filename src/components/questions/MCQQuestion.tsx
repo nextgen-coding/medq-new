@@ -49,6 +49,7 @@ interface MCQQuestionProps {
   disableKeyboardHandlers?: boolean; // disable Enter/keyboard shortcuts (for clinical cases)
   allowEnterSubmit?: boolean; // when false, Enter won't submit/next; lets parent handle Enter
   isActive?: boolean; // when true, this instance accepts keyboard shortcuts
+  showNotesAfterSubmit?: boolean; // show notes area after submit (for task page)
 }
 
 export function MCQQuestion({ 
