@@ -69,6 +69,7 @@ export async function POST(request: NextRequest) {
       role: user.role,
       image: user.image,
       faculty: user.faculty,
+      profileCompleted: user.profileCompleted,
       emailVerified: user.emailVerified,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt
