@@ -7,12 +7,15 @@ import ZoomableImage from './ZoomableImage';
 
 export type TextHighlight = { start: number; end: number };
 
+import type { ImageData } from '@/components/ui/rich-text-display';
+
 interface HighlightableQuestionTextProps {
   questionId: string;
   text: string;
   className?: string;
   /** When true, show a confirmation bubble (Souligner) instead of immediate highlight */
   confirmMode?: boolean;
+  images?: ImageData[];
 }
 
 function mergeRanges(ranges: TextHighlight[]): TextHighlight[] {
@@ -31,143 +34,163 @@ function mergeRanges(ranges: TextHighlight[]): TextHighlight[] {
   return merged;
 }
 
-export const HighlightableQuestionText: React.FC<HighlightableQuestionTextProps> = ({ questionId, text, className, confirmMode = false }) => {
+export const HighlightableQuestionText: React.FC<HighlightableQuestionTextProps> = ({ questionId, text, className, confirmMode = false, images = [] }) => {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
   const storageKey = useMemo(() => `q-highlights:${user?.id ?? 'anon'}:${questionId}`, [user?.id, questionId]);
   const [highlights, setHighlights] = useState<TextHighlight[]>([]);
   const saveTimer = useRef<number | null>(null);
-  const initialLoadedRef = useRef(false);
   const [pending, setPending] = useState<TextHighlight | null>(null);
   const [bubble, setBubble] = useState<{ x: number; y: number } | null>(null);
+  const isSelectingRef = useRef(false);
 
-  // Check if text contains inline images
+  // Check if text contains inline images or raw image URLs
   const containsImages = hasInlineImages(text);
   const plainText = extractPlainText(text);
 
-  // Helper: split HTML into text and image nodes, track text offset
-  // Fallback types for html-react-parser
-  type DomText = { type: 'text'; data: string };
-  type DomElement = { type: 'tag'; name: string };
-  // Split text into segments (text and images), render images as components, apply highlights to text only
-  function renderWithHighlights(input: string) {
-    // Regex for [IMAGE:url|desc]
-    const legacyImageRegex = /\[IMAGE:([^|\]]+)\|([^\]]+)\]/g;
-    // Regex for raw image URLs
-    const imageUrlRegex = /https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?[^\s]*)?/gi;
+  // Helper: render text segment with highlights
+  const renderTextSegmentWithHighlights = useCallback((segment: string, segmentOffset: number, keyPrefix: string): React.ReactNode[] => {
+    if (!segment) return [];
+    const elements: React.ReactNode[] = [];
+    let lastIndex = 0;
+    const relevantHighlights = highlights.filter(h =>
+      (h.start < segmentOffset + segment.length && h.end > segmentOffset) ||
+      (h.start >= segmentOffset && h.start < segmentOffset + segment.length)
+    );
+    relevantHighlights.forEach((highlight, idx) => {
+      const localStart = Math.max(0, highlight.start - segmentOffset);
+      const localEnd = Math.min(segment.length, highlight.end - segmentOffset);
+      if (localStart > lastIndex) {
+        const beforeText = segment.slice(lastIndex, localStart);
+        elements.push(<span key={`${keyPrefix}-before-${idx}`}>{beforeText}</span>);
+      }
+      if (localEnd > localStart) {
+        const highlightedText = segment.slice(localStart, localEnd);
+        elements.push(
+          <span
+            key={`${keyPrefix}-highlight-${idx}`}
+            style={{
+              backgroundColor: user?.highlightColor || '#fde68a',
+              borderRadius: '4px',
+              padding: '0 2px',
+              transition: 'background-color 0.2s',
+              cursor: 'pointer'
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              setHighlights(prev => {
+                const newHighlights = prev.filter(h => !(h.start === highlight.start && h.end === highlight.end));
+                return mergeRanges(newHighlights);
+              });
+            }}
+            title="Cliquez pour supprimer le surlignage"
+          >
+            {highlightedText}
+          </span>
+        );
+      }
+      lastIndex = localEnd;
+    });
+    if (lastIndex < segment.length) {
+      const remainingText = segment.slice(lastIndex);
+      elements.push(<span key={`${keyPrefix}-remaining`}>{remainingText}</span>);
+    }
+    return elements;
+  }, [highlights, user?.highlightColor]);
+
+  // Render text with highlights and images, and render raw image URLs as images (preserving highlight for other text)
+  const renderHighlightedText = useCallback((): React.ReactNode => {
+    if (!text) return null;
+    const parts: React.ReactNode[] = [];
     let lastIndex = 0;
     let key = 0;
-    let offset = 0;
-    const parts: React.ReactNode[] = [];
+    let plainTextIndex = 0;
+    // Legacy images [IMAGE:url|desc]
+    const legacyImageRegex = /\[IMAGE:([^|]+)\|([^\]]+)\]/g;
     let match;
-
-    // Helper to render a text segment with highlights
-    function renderTextSegment(text: string, offsetBase: number) {
-      if (!text) return null;
-      const segments = [];
-      let cursor = 0;
-      const nodeEnd = offsetBase + text.length;
-      const nodeHighlights = mergeRanges(highlights)
-        .filter(r => r.end > offsetBase && r.start < nodeEnd)
-        .map(r => ({
-          start: Math.max(0, r.start - offsetBase),
-          end: Math.min(text.length, r.end - offsetBase)
-        }));
-      if (!nodeHighlights.length) {
-        offset += text.length;
-        return text;
-      }
-      nodeHighlights.forEach((hl, i) => {
-        if (cursor < hl.start) {
-          segments.push(<React.Fragment key={i + '-pre'}>{text.slice(cursor, hl.start)}</React.Fragment>);
-        }
-        segments.push(
-          <mark
-            key={i + '-hl'}
-            className="souligner-highlight"
-            style={{ background: user?.highlightColor || '#fde68a', color: '#222', borderRadius: '3px', padding: '0 2px', cursor: 'pointer' }}
-            onClick={e => { e.stopPropagation(); removeHighlightAt(highlights.findIndex(h => h.start <= offsetBase + hl.start && h.end >= offsetBase + hl.end)); }}
-            title="Cliquer pour retirer le surlignage"
-          >
-            {text.slice(hl.start, hl.end)}
-          </mark>
-        );
-        cursor = hl.end;
-      });
-      if (cursor < text.length) {
-        segments.push(<React.Fragment key="post">{text.slice(cursor)}</React.Fragment>);
-      }
-      offset += text.length;
-      return segments;
-    }
-
-    // Process legacy image placeholders
-    while ((match = legacyImageRegex.exec(input)) !== null) {
+    while ((match = legacyImageRegex.exec(text)) !== null) {
       const [fullMatch, imageUrl, imageDescription] = match;
       const matchStart = match.index;
       const matchEnd = matchStart + fullMatch.length;
-      // Add text before the image
       if (matchStart > lastIndex) {
-        const textBefore = input.substring(lastIndex, matchStart);
-        parts.push(<React.Fragment key={`text-${key}`}>{renderTextSegment(textBefore, offset)}</React.Fragment>);
-        key++;
+        const textBefore = text.substring(lastIndex, matchStart);
+        parts.push(...renderTextSegmentWithHighlights(textBefore, plainTextIndex, `text-${key++}`));
+        plainTextIndex += textBefore.length;
       }
-      offset += matchStart - lastIndex;
-      // Add the image (images count as 1 offset character for selection math)
       parts.push(
         <ZoomableImage
-          key={`image-${key}`}
+          key={`image-${key++}`}
           src={imageUrl.trim()}
           alt={imageDescription.trim()}
           thumbnailClassName="inline-block max-w-full h-auto my-2"
         />
       );
-      offset += 1; // treat image as 1 char for offset math
       lastIndex = matchEnd;
-      key++;
     }
-
-    // Add remaining text after last image
-    if (lastIndex < input.length) {
-      const remainingText = input.substring(lastIndex);
-      // Process raw image URLs in the remaining text
-      let urlLastIndex = 0;
-      let urlMatch;
-      while ((urlMatch = imageUrlRegex.exec(remainingText)) !== null) {
-        const [fullMatch] = urlMatch;
-        const urlMatchStart = urlMatch.index;
-        const urlMatchEnd = urlMatchStart + fullMatch.length;
-        if (urlMatchStart > urlLastIndex) {
-          const textBefore = remainingText.substring(urlLastIndex, urlMatchStart);
-          parts.push(<React.Fragment key={`text-url-${key}`}>{renderTextSegment(textBefore, offset)}</React.Fragment>);
-          key++;
-        }
-        offset += urlMatchStart - urlLastIndex;
-        parts.push(
-          <ZoomableImage
-            key={`raw-image-${key}`}
-            src={fullMatch.trim()}
-            alt="Image"
-            thumbnailClassName="inline-block max-w-full h-auto"
-          />
-        );
-        offset += 1; // treat image as 1 char for offset math
-        urlLastIndex = urlMatchEnd;
-        key++;
+    if (parts.length > 0) {
+      if (lastIndex < text.length) {
+        const remainingText = text.substring(lastIndex);
+        parts.push(...renderTextSegmentWithHighlights(remainingText, plainTextIndex, `text-${key++}`));
       }
-      // Add any remaining text
-      if (urlLastIndex < remainingText.length) {
-        const textAfter = remainingText.substring(urlLastIndex);
-        parts.push(<React.Fragment key={`text-remain-${key}`}>{renderTextSegment(textAfter, offset)}</React.Fragment>);
-        offset += textAfter.length;
-        key++;
-      }
+      return <>{parts}</>;
     }
-    return parts;
-  }
+    // New format images [IMAGE:id]
+    const newImageRegex = /\[IMAGE:([^\]]+)\]/g;
+    lastIndex = 0;
+    plainTextIndex = 0;
+    while ((match = newImageRegex.exec(text)) !== null) {
+      const [fullMatch, imageId] = match;
+      const matchStart = match.index;
+      const matchEnd = matchStart + fullMatch.length;
+      if (matchStart > lastIndex) {
+        const textBefore = text.substring(lastIndex, matchStart);
+        parts.push(...renderTextSegmentWithHighlights(textBefore, plainTextIndex, `text-${key++}`));
+        plainTextIndex += textBefore.length;
+      }
+      parts.push(
+        <div key={`image-${key++}`} className="inline-block px-2 py-1 bg-amber-50 border border-amber-200 text-amber-700 rounded text-xs">
+          <span className="text-amber-600">🖼️ Image</span>
+        </div>
+      );
+      lastIndex = matchEnd;
+    }
+    // Now handle raw image URLs (e.g. https://...png)
+    const imageUrlRegex = /https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp|bmp|svg)(\?[^\s]*)?/gi;
+    lastIndex = 0;
+    let textToProcess = text;
+    let urlMatch;
+    while ((urlMatch = imageUrlRegex.exec(textToProcess)) !== null) {
+      const [fullMatch] = urlMatch;
+      const matchStart = urlMatch.index;
+      const matchEnd = matchStart + fullMatch.length;
+      if (matchStart > lastIndex) {
+        const textBefore = textToProcess.substring(lastIndex, matchStart);
+        parts.push(...renderTextSegmentWithHighlights(textBefore, plainTextIndex, `text-${key++}`));
+        plainTextIndex += textBefore.length;
+      }
+      parts.push(
+        <ZoomableImage
+          key={`raw-image-${key++}`}
+          src={fullMatch.trim()}
+          alt="Image"
+          thumbnailClassName="inline-block max-w-full h-auto my-2"
+        />
+      );
+      lastIndex = matchEnd;
+    }
+    if (lastIndex < textToProcess.length) {
+      const remainingText = textToProcess.substring(lastIndex);
+      parts.push(...renderTextSegmentWithHighlights(remainingText, plainTextIndex, `text-${key++}`));
+    }
+    if (parts.length === 0) {
+      return <>{renderTextSegmentWithHighlights(text, 0, 'text-0')}</>;
+    }
+    return <>{parts}</>;
+  }, [text, highlights, user?.highlightColor, renderTextSegmentWithHighlights]);
 
+  const highlightedContent = useMemo(() => renderHighlightedText(), [renderHighlightedText]);
 
-  // Always load highlights from backend on mount and when user/question changes
+  // Load highlights from backend or localStorage
   useEffect(() => {
     let aborted = false;
     async function loadFromApi() {
@@ -178,19 +201,16 @@ export const HighlightableQuestionText: React.FC<HighlightableQuestionTextProps>
         const data = await res.json();
         if (aborted) return;
         if (data?.highlights && Array.isArray(data.highlights)) {
-          // Basic sanity clamp - use plain text length for validation
           const textLength = containsImages ? plainText.length : text.length;
           const sanitized = (data.highlights as TextHighlight[])
             .filter(r => typeof r?.start === 'number' && typeof r?.end === 'number')
             .map(r => ({ start: Math.max(0, Math.min(r.start, textLength)), end: Math.max(0, Math.min(r.end, textLength)) }))
             .filter(r => r.end > r.start);
-          // Only update highlights if different to avoid loop
           if (JSON.stringify(sanitized) !== JSON.stringify(highlights)) {
             setHighlights(sanitized);
             try { localStorage.setItem(storageKey, JSON.stringify(sanitized)); } catch {}
           }
         } else {
-          // fallback to localStorage if backend empty
           const raw = localStorage.getItem(storageKey);
           if (raw) {
             const parsed = JSON.parse(raw);
@@ -201,7 +221,6 @@ export const HighlightableQuestionText: React.FC<HighlightableQuestionTextProps>
           }
         }
       } catch {
-        // fallback to localStorage if fetch fails
         const raw = localStorage.getItem(storageKey);
         if (raw) {
           const parsed = JSON.parse(raw);
@@ -216,144 +235,181 @@ export const HighlightableQuestionText: React.FC<HighlightableQuestionTextProps>
     return () => { aborted = true; };
   }, [user?.id, questionId, plainText.length, storageKey, containsImages]);
 
-  // Listen to external change notifications (e.g., buttons applying/clearing highlights)
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent).detail as { questionId?: string } | undefined;
-      if (!detail || detail.questionId !== questionId) return;
-    };
-    window.addEventListener('question-highlight-changed', handler as EventListener);
-    return () => window.removeEventListener('question-highlight-changed', handler as EventListener);
-  }, [questionId]);
-
-  // Persist to storage and backend (debounced), then reload from backend to ensure sync
-  useEffect(() => {
-    try { localStorage.setItem(storageKey, JSON.stringify(highlights)); } catch {}
-    if (saveTimer.current) window.clearTimeout(saveTimer.current);
-    saveTimer.current = window.setTimeout(async () => {
-      if (user?.id) {
-        try {
-          await fetch('/api/user-question-state', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: user.id, questionId, highlights }),
-          });
-          // No reload after save to avoid infinite loop
-        } catch {}
-      }
-    }, 400) as unknown as number;
-    return () => { if (saveTimer.current) window.clearTimeout(saveTimer.current); };
-  }, [highlights, storageKey, user?.id, questionId]);
-
-  const addHighlight = useCallback((range: TextHighlight) => {
-    if (range.end <= range.start) return;
-    const clamped: TextHighlight = { start: Math.max(0, range.start), end: Math.min(text.length, range.end) };
-    setHighlights(prev => mergeRanges([...prev, clamped]));
-  }, [text.length]);
-
-  const removeHighlightAt = useCallback((index: number) => {
-    setHighlights(prev => prev.filter((_, i) => i !== index));
-  }, []);
-
-  const handleMouseUp = useCallback(() => {
-    const root = wrapperRef.current;
-    if (!root) return;
-    const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
-    const range = sel.getRangeAt(0);
-    if (!root.contains(range.commonAncestorContainer)) return;
-
-    const pre = document.createRange();
-    pre.selectNodeContents(root);
-    pre.setEnd(range.startContainer, range.startOffset);
-    const start = pre.toString().length;
-    const selectedText = range.toString();
-    const end = start + selectedText.length;
-    if (!confirmMode) {
-      addHighlight({ start, end });
-      sel.removeAllRanges();
-    } else {
-      const rect = range.getBoundingClientRect();
-      const rootRect = root.getBoundingClientRect();
-      const x = rect.left - rootRect.left + rect.width / 2;
-      const y = rect.top - rootRect.top;
-      setPending({ start, end });
-      setBubble({ x, y });
-    }
-  }, [addHighlight, confirmMode]);
-
-  const parts = useMemo(() => {
-    // If text contains images, we need to work with plain text for highlighting
-    // but preserve the rich text structure for display
-    const workingText = containsImages ? plainText : text;
-    
-    if (!highlights.length) return [{ text: workingText, highlighted: false, index: -1 }];
-    const merged = mergeRanges(highlights).filter(r => r.start < r.end);
-    const segments: Array<{ text: string; highlighted: boolean; index: number }> = [];
-    let cursor = 0;
-    merged.forEach((r, idx) => {
-      if (cursor < r.start) {
-        segments.push({ text: workingText.slice(cursor, r.start), highlighted: false, index: -1 });
-      }
-      segments.push({ text: workingText.slice(r.start, r.end), highlighted: true, index: idx });
-      cursor = r.end;
-    });
-    if (cursor < workingText.length) {
-      segments.push({ text: workingText.slice(cursor), highlighted: false, index: -1 });
-    }
-    return segments;
-  }, [text, plainText, highlights, containsImages]);
-
   // Dismiss bubble when clicking outside/escape/scroll (confirmMode only)
   useEffect(() => {
     if (!confirmMode) return;
-    const onDown = (e: MouseEvent) => {
-      const root = wrapperRef.current; if (!root) return;
-      const t = e.target as Node; if (root.contains(t)) return; setBubble(null); setPending(null);
+    const handleClickOutside = (e: MouseEvent) => {
+      if (bubble && wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setPending(null);
+        setBubble(null);
+      }
     };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { setBubble(null); setPending(null); const sel = window.getSelection(); sel?.removeAllRanges(); } };
-    const onScroll = () => { if (bubble) { setBubble(null); setPending(null); } };
-    document.addEventListener('mousedown', onDown);
-    window.addEventListener('keydown', onKey);
-    window.addEventListener('scroll', onScroll, true);
-    return () => { document.removeEventListener('mousedown', onDown); window.removeEventListener('keydown', onKey); window.removeEventListener('scroll', onScroll, true); };
-  }, [bubble, confirmMode]);
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setPending(null);
+        setBubble(null);
+      }
+    };
+    const handleScroll = () => {
+      setPending(null);
+      setBubble(null);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+    window.addEventListener('scroll', handleScroll, true);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+      window.removeEventListener('scroll', handleScroll, true);
+    };
+  }, [confirmMode, bubble]);
+
+  // Save highlights to backend and localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(highlights));
+    } catch (error) {
+      console.error('Error saving highlights to localStorage:', error);
+    }
+    if (saveTimer.current) {
+      window.clearTimeout(saveTimer.current);
+    }
+    saveTimer.current = window.setTimeout(async () => {
+      if (user?.id) {
+        try {
+          const res = await fetch(`/api/user-question-state?userId=${user.id}&questionId=${questionId}`);
+          const data = res.ok ? await res.json() : {};
+          const currentNotes = data.notes || '';
+          await fetch('/api/user-question-state', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: user.id, questionId, highlights, notes: currentNotes }),
+          });
+        } catch (error) {
+          console.error('Error syncing highlights and notes to server:', error);
+        }
+      }
+    }, 400) as unknown as number;
+    return () => {
+      if (saveTimer.current) {
+        window.clearTimeout(saveTimer.current);
+      }
+    };
+  }, [highlights, storageKey, user?.id, questionId]);
+
+  // Add highlight
+  const addHighlight = useCallback((range: TextHighlight) => {
+    if (confirmMode) {
+      setPending(range);
+    } else {
+      setHighlights(curr => mergeRanges([...curr, range]));
+    }
+  }, [confirmMode]);
+
+  // Handle mouse up for highlighting
+  const handleMouseUp = useCallback(() => {
+    if (!isSelectingRef.current) return;
+    isSelectingRef.current = false;
+    if (!wrapperRef.current) return;
+    setTimeout(() => {
+      if (!wrapperRef.current) return;
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0) return;
+      const range = selection.getRangeAt(0);
+      if (!wrapperRef.current.contains(range.commonAncestorContainer)) return;
+      const selectedText = range.toString();
+      if (!selectedText || selectedText.trim().length === 0) return;
+      const plainTextContent = plainText;
+      if (!plainTextContent) return;
+      const selectedTextTrimmed = selectedText.trim();
+      const plainTextIndex = plainTextContent.indexOf(selectedTextTrimmed);
+      if (plainTextIndex === -1) {
+        const words = selectedTextTrimmed.split(/\s+/);
+        if (words.length > 0) {
+          const firstWord = words[0];
+          const lastWord = words[words.length - 1];
+          const firstIndex = plainTextContent.indexOf(firstWord);
+          const lastIndex = plainTextContent.lastIndexOf(lastWord);
+          if (firstIndex !== -1 && lastIndex !== -1 && lastIndex > firstIndex) {
+            const startOffset = firstIndex;
+            const endOffset = lastIndex + lastWord.length;
+            const newHighlight = { start: startOffset, end: endOffset };
+            if (!confirmMode) {
+              addHighlight(newHighlight);
+              if (newHighlight.start >= 0 && newHighlight.end > newHighlight.start) {
+                selection.removeAllRanges();
+              }
+            } else {
+              setPending(newHighlight);
+              const rect = range.getBoundingClientRect();
+              const wrapperRect = wrapperRef.current.getBoundingClientRect();
+              setBubble({
+                x: rect.left - wrapperRect.left + (rect.width / 2),
+                y: rect.top - wrapperRect.top - 10
+              });
+            }
+            return;
+          }
+        }
+        return;
+      }
+      const startOffset = plainTextIndex;
+      const endOffset = plainTextIndex + selectedTextTrimmed.length;
+      const newHighlight = { start: startOffset, end: endOffset };
+      if (!confirmMode) {
+        addHighlight(newHighlight);
+        if (newHighlight.start >= 0 && newHighlight.end > newHighlight.start) {
+          selection.removeAllRanges();
+        }
+      } else {
+        setPending(newHighlight);
+        const rect = range.getBoundingClientRect();
+        const wrapperRect = wrapperRef.current.getBoundingClientRect();
+        setBubble({
+          x: rect.left - wrapperRect.left + (rect.width / 2),
+          y: rect.top - wrapperRect.top - 10
+        });
+      }
+    }, 10);
+  }, [addHighlight, confirmMode, plainText]);
+
+  // Handle mouse down for selection
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target && (target.tagName === 'SPAN' || target.tagName === 'P' || target.tagName === 'DIV' || target.textContent)) {
+      isSelectingRef.current = true;
+    }
+  }, []);
+
+  // Apply pending highlight on wrapper click (confirm mode)
+  const handleWrapperClick = useCallback((e: React.MouseEvent) => {
+    if (confirmMode && pending) {
+      e.stopPropagation();
+      setHighlights(curr => mergeRanges([...curr, pending]));
+      setPending(null);
+      setBubble(null);
+    }
+  }, [confirmMode, pending]);
 
   return (
     <div
       ref={wrapperRef}
-      className={[className, 'relative'].filter(Boolean).join(' ')}
+      className={`relative cursor-text select-text ${className}`}
+      onClick={handleWrapperClick}
+      onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
       onTouchEnd={handleMouseUp}
-      onContextMenu={(e) => e.preventDefault()}
-      role="textbox"
-      aria-label="Question text"
     >
-  {/* Robust: highlight text, render images inline, both work together */}
-  {renderWithHighlights(text)}
-  {confirmMode && bubble && pending && (
+      {highlightedContent}
+      {confirmMode && bubble && pending && (
         <div
-          data-hl-bubble="1"
           className="absolute z-50 -translate-x-1/2 -translate-y-full bg-white dark:bg-neutral-900 border rounded shadow px-2 py-1 flex items-center gap-2 text-xs"
           style={{ left: bubble.x, top: Math.max(0, bubble.y - 6) }}
         >
           <button
             className="px-2 py-0.5 rounded bg-lime-300 text-black hover:bg-lime-200 ring-1 ring-lime-400 shadow-[0_0_4px_rgba(163,230,53,0.8)]"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (pending) addHighlight(pending);
-              const sel = window.getSelection(); sel?.removeAllRanges();
-              setBubble(null); setPending(null);
-            }}
+            onClick={(e)=>{ e.stopPropagation(); setHighlights(curr=>mergeRanges([...curr, pending!])); setBubble(null); setPending(null); const sel=window.getSelection(); sel?.removeAllRanges(); }}
           >Souligner</button>
-          <button
-            className="px-2 py-0.5 rounded bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600"
-            onClick={(e) => {
-              e.stopPropagation();
-              const sel = window.getSelection(); sel?.removeAllRanges();
-              setBubble(null); setPending(null);
-            }}
-          >Annuler</button>
         </div>
       )}
     </div>

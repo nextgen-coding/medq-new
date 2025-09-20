@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { TrendingUp, Target, Calendar, Award } from 'lucide-react';
 
 interface UserStatsProps {
-  averageScore: number;
+  averageScore: number | null;
   totalQuestions: number;
   learningStreak: number;
   totalLectures: number;
@@ -25,7 +25,7 @@ export function UserStats({
   const stats = [
     {
       title: t('dashboard.stats.averageScore'),
-      value: `${averageScore.toFixed(1)}%`,
+      value: averageScore === null ? '—' : `${averageScore.toFixed(1)}%`,
       icon: TrendingUp,
       color: 'text-emerald-600 dark:text-emerald-400',
       bgColor: 'bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-950/50 dark:to-emerald-900/30',

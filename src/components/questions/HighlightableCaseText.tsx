@@ -63,25 +63,51 @@ export const HighlightableCaseText: React.FC<HighlightableCaseTextProps> = ({ le
   const [bubble, setBubble] = useState<{ x:number; y:number } | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
-  // Load from storage
+  // Load highlights from backend or localStorage
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(storageKey);
-      if (!raw) return setHighlights([]);
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) setHighlights(parsed);
-      else setHighlights([]);
-    } catch {
-      setHighlights([]);
+    let aborted = false;
+    async function loadFromApi() {
+      if (user?.id) {
+        try {
+          const res = await fetch(`/api/user-case-highlights?userId=${user.id}&lectureId=${lectureId}`);
+          if (!res.ok) throw new Error('No backend');
+          const data = await res.json();
+          if (aborted) return;
+          if (data?.highlights && Array.isArray(data.highlights)) {
+            setHighlights(data.highlights);
+            try { localStorage.setItem(storageKey, JSON.stringify(data.highlights)); } catch {}
+            return;
+          }
+        } catch {}
+      }
+      // fallback to localStorage
+      try {
+        const raw = localStorage.getItem(storageKey);
+        if (!raw) return setHighlights([]);
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) setHighlights(parsed);
+        else setHighlights([]);
+      } catch {
+        setHighlights([]);
+      }
     }
-  }, [storageKey]);
+    loadFromApi();
+    return () => { aborted = true; };
+  }, [user?.id, lectureId, storageKey]);
 
-  // Persist to storage
+  // Persist highlights to backend and localStorage
   useEffect(() => {
     try {
       localStorage.setItem(storageKey, JSON.stringify(mergeRanges(highlights)));
     } catch {}
-  }, [storageKey, highlights]);
+    if (user?.id) {
+      fetch('/api/user-case-highlights', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, lectureId, highlights: mergeRanges(highlights) }),
+      }).catch(()=>{});
+    }
+  }, [storageKey, highlights, user?.id, lectureId]);
 
   const commitHighlight = useCallback((range: CaseTextHighlight) => {
     if (range.end <= range.start) return;

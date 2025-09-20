@@ -14,7 +14,7 @@ import { ClinicalCaseQuestion } from '@/components/questions/ClinicalCaseQuestio
 import { QuestionNotes } from '@/components/questions/QuestionNotes'
 import { QuestionComments } from '@/components/questions/QuestionComments'
 import { Button } from '@/components/ui/button'
-import { ArrowLeft, PlusCircle, ListOrdered, Pin, PinOff, Flag, Pencil, Eye, EyeOff, Trash2, StickyNote, ChevronRight, BookOpen } from 'lucide-react'
+import { ArrowLeft, PlusCircle, ListOrdered, Pin, PinOff, Flag, Pencil, Eye, EyeOff, Trash2, StickyNote, ChevronRight, BookOpen, X } from 'lucide-react'
 import { GroupedQrocEditDialog } from '@/components/questions/edit/GroupedQrocEditDialog'
 import { useTranslation } from 'react-i18next'
 import { ClinicalCase, Question } from '@/types'
@@ -376,6 +376,18 @@ export default function LecturePageRoute() {
                       )}
                     </>
                   )}
+                  
+                  {/* Quit button - mobile only, positioned between Admin and Timer */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleBackToSpecialtyNested}
+                    className="sm:hidden whitespace-nowrap backdrop-blur-sm bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-xl shadow-md"
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    <span>Quitter</span>
+                  </Button>
+                  
                   <LectureTimer lectureId={lectureId} />
                 </div>
               </div>

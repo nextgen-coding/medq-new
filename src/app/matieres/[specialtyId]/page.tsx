@@ -88,10 +88,13 @@ export default function SpecialtyPageRoute() {
   const [selectedModes, setSelectedModes] = useState<Record<string, ModeKey>>({})
 
   // Group management state - DB backed
-  const [courseGroups, setCourseGroups] = useState<Record<string, string[]>>({})
+  type GroupInfo = { ids: string[]; coefficient: number }
+  const [courseGroups, setCourseGroups] = useState<Record<string, GroupInfo>>({})
   const [isGroupManagementOpen, setIsGroupManagementOpen] = useState(false)
   const [newGroupName, setNewGroupName] = useState('')
+  const [newGroupCoeff, setNewGroupCoeff] = useState<string>('1')
   const [editingGroup, setEditingGroup] = useState<string | null>(null)
+  const [editingCoeff, setEditingCoeff] = useState<Record<string, string>>({})
   const [selectedCourseIds, setSelectedCourseIds] = useState<Record<string, boolean>>({})
   // Comments modal state
   const [commentsLectureId, setCommentsLectureId] = useState<string | null>(null)
@@ -117,10 +120,15 @@ export default function SpecialtyPageRoute() {
         const response = await fetch(`/api/course-groups?userId=${user.id}&specialtyId=${specialtyId}`)
         if (response.ok) {
           const groups = await response.json()
-          const groupsMap: Record<string, string[]> = {}
+          const groupsMap: Record<string, GroupInfo> = {}
           groups.forEach((group: any) => {
             if (group.lectureGroups) {
-              groupsMap[group.name] = group.lectureGroups.map((lg: any) => lg.lectureId)
+              groupsMap[group.name] = {
+                ids: group.lectureGroups.map((lg: any) => lg.lectureId),
+                coefficient: typeof group.coefficient === 'number' ? group.coefficient : 1,
+              }
+            } else {
+              groupsMap[group.name] = { ids: [], coefficient: typeof group.coefficient === 'number' ? group.coefficient : 1 }
             }
           })
           setCourseGroups(groupsMap)
@@ -143,13 +151,14 @@ export default function SpecialtyPageRoute() {
       const response = await fetch('/api/course-groups', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newGroupName.trim(), userId: user.id, specialtyId }),
+        body: JSON.stringify({ name: newGroupName.trim(), userId: user.id, specialtyId, coefficient: parseFloat(newGroupCoeff) || 1 }),
       })
       if (response.ok) {
         const name = newGroupName.trim()
-        setCourseGroups(prev => ({ ...prev, [name]: [] }))
+        setCourseGroups(prev => ({ ...prev, [name]: { ids: [], coefficient: parseFloat(newGroupCoeff) || 1 } }))
         setExpandedGroups(prev => ({ ...prev, [name]: true }))
         setNewGroupName('')
+        setNewGroupCoeff('1')
         toast({ title: 'Groupe créé', description: `Le groupe de cours "${name}" a été créé.` })
       }
     } catch (error) {
@@ -216,10 +225,10 @@ export default function SpecialtyPageRoute() {
       // Update local
       setCourseGroups(prev => {
         const updated = { ...prev }
-        Object.keys(updated).forEach(gn => { updated[gn] = updated[gn].filter(id => id !== courseId) })
+        Object.keys(updated).forEach(gn => { updated[gn] = { ...updated[gn], ids: updated[gn].ids.filter(id => id !== courseId) } })
         if (newGroupName !== '__none__') {
-          if (!updated[newGroupName]) updated[newGroupName] = []
-          updated[newGroupName].push(courseId)
+          if (!updated[newGroupName]) updated[newGroupName] = { ids: [], coefficient: 1 }
+          updated[newGroupName] = { ...updated[newGroupName], ids: [...updated[newGroupName].ids, courseId] }
         }
         return updated
       })
@@ -250,9 +259,9 @@ export default function SpecialtyPageRoute() {
 
       setCourseGroups(prev => {
         const updated = { ...prev }
-        Object.keys(updated).forEach(gn => { updated[gn] = updated[gn].filter(id => !ids.includes(id)) })
-        if (!updated[targetGroupName]) updated[targetGroupName] = []
-        updated[targetGroupName] = [...updated[targetGroupName], ...ids]
+        Object.keys(updated).forEach(gn => { updated[gn] = { ...updated[gn], ids: updated[gn].ids.filter(id => !ids.includes(id)) } })
+        if (!updated[targetGroupName]) updated[targetGroupName] = { ids: [], coefficient: 1 }
+        updated[targetGroupName] = { ...updated[targetGroupName], ids: [...updated[targetGroupName].ids, ...ids] }
         return updated
       })
       setSelectedCourseIds({})
@@ -446,19 +455,19 @@ export default function SpecialtyPageRoute() {
 
   // Build groups -> lectures map from current data
   const groupedLectures = Object.keys(courseGroups).reduce((acc, groupName) => {
-    const ids = courseGroups[groupName]
+    const ids = courseGroups[groupName].ids
     const list = sortedLectures.filter(l => ids.includes(l.id))
     if (list.length > 0) acc[groupName] = list
     return acc
   }, {} as Record<string, typeof lectures>)
 
   // Ungrouped are those not in any group
-  const assignedLectureIds = Object.values(courseGroups).flat()
+  const assignedLectureIds = Object.values(courseGroups).flatMap(g => g.ids)
   const ungroupedLectures = sortedLectures.filter(l => !assignedLectureIds.includes(l.id))
 
   const getCourseGroup = (courseId: string): string => {
-    for (const [gn, ids] of Object.entries(courseGroups)) {
-      if (ids.includes(courseId)) return gn
+    for (const [gn, info] of Object.entries(courseGroups)) {
+      if (info.ids.includes(courseId)) return gn
     }
     return '__none__'
   }
@@ -486,10 +495,10 @@ export default function SpecialtyPageRoute() {
     <ProtectedRoute>
       <AppSidebarProvider>
         <AppSidebar />
-        <SidebarInset className="flex flex-col min-h-0 overflow-x-hidden">
+  <SidebarInset className="flex flex-col min-h-screen overflow-x-hidden">
           <UniversalHeader title={specialty.name} />
 
-          <div className="bg-gray-50 dark:bg-gray-900 p-4 sm:p-6 lg:p-8 min-w-0 overflow-x-hidden">
+          <div className="bg-gray-50 dark:bg-gray-900 p-4 sm:p-6 lg:p-8 min-w-0 overflow-x-hidden flex-1">
             <div className="max-w-7xl mx-auto space-y-6 min-w-0">
               {/* Breadcrumb */}
               <div className="flex items-center gap-4 min-w-0">
@@ -581,17 +590,55 @@ export default function SpecialtyPageRoute() {
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 min-w-0">
                           {Object.keys(courseGroups).map((groupName) => (
-                            <div key={groupName} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg min-w-0">
-                              <div className="flex items-center gap-2 min-w-0 flex-1">
-                                <Folder className="w-4 h-4 text-blue-600 flex-shrink-0" />
-                                <span className="font-medium truncate">{groupName}</span>
-                                <Badge variant="secondary" className="text-xs flex-shrink-0">{courseGroups[groupName].length}</Badge>
+                            <div key={groupName} className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg space-y-2">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <Folder className="w-4 h-4 text-blue-600" />
+                                  <span className="font-medium">{groupName}</span>
+                                  <Badge variant="secondary" className="text-xs">{courseGroups[groupName].ids.length}</Badge>
+                                  <Badge variant="outline" className="text-xs">Coeff: {courseGroups[groupName].coefficient}</Badge>
+                                </div>
+                                <Button variant="ghost" size="sm" onClick={() => deleteGroup(groupName)} className="h-8 w-8 p-0 text-red-600 hover:bg-red-50">
+                                  <Trash className="w-3 h-3" />
+                                </Button>
                               </div>
-                              <Button variant="ghost" size="sm" onClick={() => deleteGroup(groupName)} className="h-8 w-8 p-0 text-red-600 hover:bg-red-50 flex-shrink-0">
-                                <Trash className="w-3 h-3" />
-                              </Button>
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  className="h-8 w-24"
+                                  type="number"
+                                  step="0.1"
+                                  value={editingCoeff[groupName] ?? String(courseGroups[groupName].coefficient)}
+                                  onChange={(e)=> setEditingCoeff(prev=> ({...prev, [groupName]: e.target.value}))}
+                                />
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={async ()=>{
+                                    const coeff = parseFloat(editingCoeff[groupName] ?? String(courseGroups[groupName].coefficient))
+                                    if (isNaN(coeff)) return
+                                    try {
+                                      // find group id
+                                      const groupsResponse = await fetch(`/api/course-groups?userId=${user?.id}&specialtyId=${specialtyId}`)
+                                      const groups = groupsResponse.ok? await groupsResponse.json(): []
+                                      const target = groups.find((g:any)=> g.name===groupName)
+                                      if (!target) return
+                                      const r = await fetch(`/api/course-groups/${target.id}`, { method: 'PUT', headers: { 'Content-Type':'application/json' }, body: JSON.stringify({ coefficient: coeff }) })
+                                      if (r.ok){
+                                        setCourseGroups(prev=> ({...prev, [groupName]: { ...prev[groupName], coefficient: coeff }}))
+                                        toast({ title: 'Coefficient mis à jour', description: `${groupName}: ${coeff}` })
+                                      } else {
+                                        toast({ title: 'Erreur', description: 'Échec de mise à jour du coefficient', variant: 'destructive' })
+                                      }
+                                    } catch(e){ console.error(e) }
+                                  }}
+                                >Enregistrer</Button>
+                              </div>
                             </div>
                           ))}
+                        </div>
+                        <div className="flex items-center gap-2 mt-3">
+                          <span className="text-xs text-muted-foreground">Coeff. par défaut du nouveau groupe</span>
+                          <Input className="h-8 w-24" type="number" step="0.1" value={newGroupCoeff} onChange={(e)=> setNewGroupCoeff(e.target.value)} />
                         </div>
                       </div>
                     )}
@@ -659,29 +706,29 @@ export default function SpecialtyPageRoute() {
                     <Table className="min-w-full w-full">
                       <TableHeader>
                         <TableRow>
-                          {isAdmin && (
-                            <TableHead className="w-8">
-                              <Checkbox
-                                aria-label="Tout sélectionner"
-                                checked={(() => {
-                                  const ids = [...ungroupedLectures, ...Object.values(groupedLectures).flat()].map(l => l.id)
-                                  return ids.length > 0 && ids.every(id => selectedCourseIds[id])
-                                })()}
-                                onCheckedChange={(checked) => {
-                                  const allIds = [...ungroupedLectures, ...Object.values(groupedLectures).flat()].map(l => l.id)
-                                  const next: Record<string, boolean> = { ...selectedCourseIds }
-                                  allIds.forEach(id => { next[id] = !!checked })
-                                  setSelectedCourseIds(next)
-                                }}
-                              />
-                            </TableHead>
-                          )}
-                          <TableHead className="min-w-0">Cours</TableHead>
-                          {isAdmin && <TableHead className="hidden lg:table-cell min-w-0">Rapports</TableHead>}
-                          <TableHead className="hidden md:table-cell min-w-0">Note /20</TableHead>
-                          <TableHead className="min-w-0 w-20 sm:w-24 md:w-32 lg:w-40">Progression</TableHead>
-                          <TableHead className="hidden xl:table-cell min-w-0">Commentaires</TableHead>
-                          <TableHead className="min-w-0 w-16 sm:w-20 md:w-24">Action</TableHead>
+                            {isAdmin && (
+                              <TableHead className="w-8">{/* always show select on desktop */}
+                                <Checkbox
+                                  aria-label="Tout sélectionner"
+                                  checked={(() => {
+                                    const ids = [...ungroupedLectures, ...Object.values(groupedLectures).flat()].map(l => l.id)
+                                    return ids.length > 0 && ids.every(id => selectedCourseIds[id])
+                                  })()}
+                                  onCheckedChange={(checked) => {
+                                    const allIds = [...ungroupedLectures, ...Object.values(groupedLectures).flat()].map(l => l.id)
+                                    const next: Record<string, boolean> = { ...selectedCourseIds }
+                                    allIds.forEach(id => { next[id] = !!checked })
+                                    setSelectedCourseIds(next)
+                                  }}
+                                />
+                              </TableHead>
+                            )}
+                            <TableHead className="min-w-0">Cours</TableHead>
+                            {isAdmin && <TableHead className="hidden lg:table-cell min-w-0">Rapports</TableHead>}
+                            <TableHead className="hidden md:table-cell min-w-0">Note /20</TableHead>
+                            <TableHead className="min-w-0 w-20 sm:w-24 md:w-32 lg:w-40">Progression</TableHead>
+                            <TableHead className="hidden xl:table-cell min-w-0">Commentaires</TableHead>
+                            <TableHead className="min-w-0 w-16 sm:w-20 md:w-24">Action</TableHead>
                         </TableRow>
                       </TableHeader>
                     <TableBody>
@@ -722,8 +769,15 @@ export default function SpecialtyPageRoute() {
                             <div className="flex items-center gap-2">
                               <File className="w-4 h-4 text-gray-500 flex-shrink-0" />
                               <div className="min-w-0 flex-1">
-                                <div className="font-medium truncate">{lecture.title}</div>
-                                <div className="text-sm text-gray-500 truncate">{lecture.description}</div>
+                                {/* Mobile: truncate to half, desktop: full */}
+                                <div className="font-medium truncate">
+                                  <span className="block sm:hidden">{lecture.title.length > 16 ? lecture.title.slice(0, Math.ceil(lecture.title.length/2)) + '…' : lecture.title}</span>
+                                  <span className="hidden sm:block">{lecture.title}</span>
+                                </div>
+                                <div className="text-sm text-gray-500 truncate">
+                                  <span className="block sm:hidden">{lecture.description && lecture.description.length > 16 ? lecture.description.slice(0, Math.ceil(lecture.description.length/2)) + '…' : lecture.description}</span>
+                                  <span className="hidden sm:block">{lecture.description}</span>
+                                </div>
                               </div>
                             </div>
                           </TableCell>
@@ -745,9 +799,12 @@ export default function SpecialtyPageRoute() {
                             {(() => {
                               const note = lecture.culmonNote;
                               if (note == null || isNaN(note)) return <span className="text-xs text-gray-400">-</span>;
-                              // Plain, larger red text (no background, no border)
+                              const isGood = note > 10;
+                              const cls = isGood
+                                ? 'text-green-700 dark:text-green-400'
+                                : 'text-red-600 dark:text-red-400';
                               return (
-                                <span className="inline-flex items-center font-semibold tabular-nums text-red-600 dark:text-red-400 text-sm sm:text-base leading-none">
+                                <span className={`inline-flex items-center font-semibold tabular-nums text-sm sm:text-base leading-none ${cls}`}>
                                   {note.toFixed(2)}
                                 </span>
                               );
@@ -854,9 +911,16 @@ export default function SpecialtyPageRoute() {
                               <div className="flex items-center gap-2 pl-4 sm:pl-6">
                                 <File className="w-4 h-4 text-gray-500 flex-shrink-0" />
                                 <div className="min-w-0 flex-1">
-                                  <div className="font-medium truncate">{lecture.title}</div>
-                                  <div className="text-sm text-gray-500 truncate">{lecture.description}</div>
+                                  <div className="font-medium truncate">
+                                    <span className="block sm:hidden">{lecture.title.length > 16 ? lecture.title.slice(0, Math.ceil(lecture.title.length/2)) + '…' : lecture.title}</span>
+                                    <span className="hidden sm:block">{lecture.title}</span>
+                                  </div>
+                                  <div className="text-sm text-gray-500 truncate">
+                                    <span className="block sm:hidden">{lecture.description && lecture.description.length > 16 ? lecture.description.slice(0, Math.ceil(lecture.description.length/2)) + '…' : lecture.description}</span>
+                                    <span className="hidden sm:block">{lecture.description}</span>
+                                  </div>
                                 </div>
+
                               </div>
                             </TableCell>
                             {isAdmin && (
@@ -872,9 +936,12 @@ export default function SpecialtyPageRoute() {
                               {(() => {
                                 const note = (lecture as any).culmonNote;
                                 if (note == null || isNaN(note)) return <span className="text-xs text-gray-400">-</span>;
-                                // Plain, larger red text (no background, no border)
+                                const isGood = note > 10;
+                                const cls = isGood
+                                  ? 'text-green-700 dark:text-green-400'
+                                  : 'text-red-600 dark:text-red-400';
                                 return (
-                                  <span className="inline-flex items-center font-semibold tabular-nums text-red-600 dark:text-red-400 text-sm sm:text-base leading-none">
+                                  <span className={`inline-flex items-center font-semibold tabular-nums text-sm sm:text-base leading-none ${cls}`}>
                                     {note.toFixed(2)}
                                   </span>
                                 );

@@ -1,8 +1,8 @@
 
 import { useState } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { SimpleTextDisplay } from '@/components/ui/simple-text-display';
+import { RichTextDisplay } from '@/components/ui/rich-text-display';
 import { HighlightableOptionText } from '../HighlightableOptionText';
 
 interface MCQOptionItemProps {
@@ -109,7 +109,7 @@ export function MCQOptionItem({
                 confirmMode={highlightConfirm}
               />
             ) : (
-              <SimpleTextDisplay text={option.text} />
+              <RichTextDisplay text={option.text} />
             )}
           </div>
           
@@ -126,17 +126,18 @@ export function MCQOptionItem({
                   {isExpanded ? (
                     <>
                       <ChevronUp className="h-4 w-4 mr-1" />
-                      Masquer l'explication
+                      <span>Masquer l'explication IA</span>
+                      <Sparkles className="h-4 w-4 ml-1 text-blue-500" />
                     </>
                   ) : (
                     <>
                       <ChevronDown className="h-4 w-4 mr-1" />
-                      Afficher l'explication
+                      <span>Voir explication par IA</span>
+                      <Sparkles className="h-4 w-4 ml-1 text-blue-500" />
                     </>
                   )}
                 </button>
               </div>
-              
               {isExpanded && (
                 <div className="mt-3 text-base sm:text-lg pl-3 border-l-2 border-muted py-2 text-foreground leading-relaxed">
                   {enableHighlighting && questionId ? (
@@ -147,7 +148,7 @@ export function MCQOptionItem({
                       confirmMode={highlightConfirm}
                     />
                   ) : (
-                    <SimpleTextDisplay text={option.explanation || ''} />
+                    <RichTextDisplay text={option.explanation || ''} />
                   )}
                 </div>
               )}

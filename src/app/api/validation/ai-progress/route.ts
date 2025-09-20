@@ -1,11 +1,16 @@
 import { NextResponse } from 'next/server';
 import { requireMaintainerOrAdmin, AuthenticatedRequest } from '@/lib/auth-middleware';
 import { analyzeMcqInChunks } from '@/lib/services/aiImport';
-import { isAzureConfigured, chatCompletions } from '@/lib/services/azureOpenAI';
+import { isAzureConfigured, chatCompletion, chatCompletionStructured } from '@/lib/ai/azureAiSdk';
 import { prisma } from '@/lib/prisma';
 // Remove canonicalizeHeader import for now
 function canonicalizeHeader(h: string): string {
-  return String(h || '').toLowerCase().trim();
+  return String(h || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 import { read, utils, write } from 'xlsx';
 
@@ -227,6 +232,72 @@ async function runAiSession(file: File, instructions: string | undefined, aiId: 
       return s;
     };
     const repairOptionText = (t: string) => normalizeWhitespace(htmlStrip(t));
+    const cleanAnswerText = (t: string) => {
+      let s = htmlStrip(t);
+      s = s.replace(/^\s*(reponse|réponse|answer|corrige|correction|bonne\s*reponse)\s*[:\-–]\s*/i, '');
+      s = s.replace(/^\s*(a\s*:\s*)/i, '');
+      return normalizeWhitespace(s);
+    };
+    const normalizeLettersAnswer = (t: string, max = 5) => {
+      const s = String(t || '').toUpperCase();
+      const letters = Array.from(new Set((s.match(/[A-E]/g) || []).slice(0, max)));
+      const order = ['A','B','C','D','E'];
+      letters.sort((a,b) => order.indexOf(a) - order.indexOf(b));
+      return letters.join(', ');
+    };
+    const explanationTooShort = (s: string) => {
+      const txt = String(s || '').trim();
+      if (!txt) return true;
+      // Count sentences by punctuation and also tolerate newline-structured segments
+      const punct = (txt.match(/[\.\!?]/g) || []).length;
+      const lines = txt.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      const lineCount = lines.length;
+      // Accept if either >=3 punct sentences OR >=4 non-empty lines and length >= 120
+      if (punct >= 3 && txt.length >= 120) return false;
+      if (lineCount >= 4 && txt.length >= 120) return false;
+      return true;
+    };
+    // Choose varied openers deterministically without randomness
+    const pickOpener = (isCorrect: boolean, seed: number) => {
+      const POS = ['Exactement', 'Effectivement', 'Oui', 'Tout à fait', 'Précisément', 'Bien vu', 'Pertinent', 'Juste', 'Correct'];
+      const NEG = ['En réalité', 'Au contraire', 'Pas du tout', 'Erreur fréquente', 'Attention', 'Faux', 'Hélas non', 'Contrairement', 'Non, plutôt'];
+      const arr = isCorrect ? POS : NEG;
+      return arr[Math.abs(seed) % arr.length];
+    };
+    const strSeed = (t?: string) => {
+      const s = String(t || '');
+      let h = 0;
+      for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+      return h;
+    };
+    const fallbackExplanation = (isCorrect: boolean, optionText?: string, stem?: string) => {
+      const seed = strSeed((optionText || '') + '|' + (stem || ''));
+      const opener = pickOpener(isCorrect, seed);
+      const lines: string[] = [];
+      const optLead = String(optionText || '').trim();
+      if (optLead) {
+        lines.push(`${opener}: ${isCorrect ? 'proposition correcte' : 'proposition incorrecte'} — ${optLead}.`);
+      } else {
+        lines.push(`${opener}: ${isCorrect ? 'proposition correcte' : 'proposition incorrecte'} — justification clinique.`);
+      }
+      if (stem) lines.push(`Contexte: ${stem}.`);
+      lines.push(isCorrect
+        ? 'Physiopathologie: mécanisme clé et critère décisif (clinique/paraclinique) avec conséquence attendue.'
+        : 'Correction: énonce la bonne notion attendue et distingue le piège fréquent/diagnostic différentiel.');
+      lines.push('Repère clinique: seuil chiffré raisonnable ou signe discriminant à retenir.');
+      lines.push('Exemple: mini‑vignette (âge, déclencheur, signe cardinal) et l’élément qui tranche.');
+      if (optionText) lines.push(`Option considérée: ${optionText}.`);
+      return lines.join('\n');
+    };
+    const fallbackRappel = (stem?: string) => {
+      const lines: string[] = [];
+      if (stem) lines.push(`Point de départ: ${stem}.`);
+      lines.push('Notion centrale: synthèse courte du concept clé.');
+      lines.push('Mécanisme: enchaînement logique/physiopath à connaître.');
+      lines.push('Piège: l’erreur fréquente et comment l’éviter.');
+      lines.push('Exemple: vignette concrète pour fixer les idées.');
+      return lines.join('\n');
+    };
 
     // Filter MCQ rows and create AI items
     const mcqRows = rows.filter(r => r.sheet === 'qcm' || r.sheet === 'cas_qcm');
@@ -252,10 +323,13 @@ async function runAiSession(file: File, instructions: string | undefined, aiId: 
       }
       // Persist cleaned question
       rec['texte de la question'] = questionText;
-      // Provide combined text to AI for better context
-  const combinedQuestion = caseText && caseText !== questionText ? `${caseText}\n\n${questionText}` : questionText;
+    // Provide combined text to AI for better context
+    const combinedQuestion = caseText && caseText !== questionText ? `${caseText}\n\n${questionText}` : questionText;
       
-      return { id: `${idx}`, questionText: combinedQuestion, options: opts, providedAnswerRaw: String(rec['reponse'] || '').trim() };
+      // Normalize 'Pas de réponse' and similar to empty so AI doesn't skip
+      const rawAns = String(rec['reponse'] || '').trim();
+      const providedAnswerRaw = /pas\s*de\s*reponse|pas\s*de\s*réponse|\?|^$/i.test(rawAns) ? '' : rawAns;
+      return { id: `${idx}`, questionText: combinedQuestion, options: opts, providedAnswerRaw };
     }));
 
     updateSession(aiId, {
@@ -266,22 +340,33 @@ async function runAiSession(file: File, instructions: string | undefined, aiId: 
 
     const t0 = Date.now();
     let processed = 0;
-    const BATCH_SIZE = Number(process.env.AI_BATCH_SIZE || 200);
-    const CONCURRENCY = Number(process.env.AI_CONCURRENCY || 12);
-    const resultMap = await analyzeMcqInChunks(items, {
-      batchSize: BATCH_SIZE,
-      concurrency: CONCURRENCY,
-      systemPrompt: instructions,
-      onBatch: ({ index, total }) => {
-        processed = index;
-        const p = 10 + Math.floor((index / total) * 75);
-        updateSession(
-          aiId,
-          { message: `Traitement lot ${index}/${total}…`, progress: Math.min(85, p), stats: { ...activeAiSessions.get(aiId)!.stats, processedBatches: index, totalBatches: total } },
-          `📦 Lot ${index}/${total} (batch=${BATCH_SIZE}, conc=${CONCURRENCY})`
-        );
-      }
-    });
+    const SINGLE = String(process.env.AI_QCM_SINGLE || '').trim() === '1' || String(process.env.AI_QCM_MODE || '').trim().toLowerCase() === 'single';
+  // Ultra-reliable batch: small size prevents JSON truncation, high concurrency maintains speed
+  const BATCH_SIZE = SINGLE ? 1 : Number(process.env.AI_IMPORT_BATCH_SIZE || process.env.AI_BATCH_SIZE || 8);
+  const CONCURRENCY = SINGLE ? 1 : Number(process.env.AI_IMPORT_CONCURRENCY || process.env.AI_CONCURRENCY || 12);
+    let resultMap: Map<string, any> = new Map();
+    try {
+      const arr = await analyzeMcqInChunks(items, {
+        batchSize: BATCH_SIZE,
+        concurrency: CONCURRENCY,
+        systemPrompt: instructions,
+        onProgress: (completed: number, total: number, stage: string) => {
+          processed = completed;
+          const p = 10 + Math.floor((completed / total) * 75);
+          updateSession(
+            aiId,
+            { message: `${stage}…`, progress: Math.min(85, p), stats: { ...activeAiSessions.get(aiId)!.stats, processedBatches: completed, totalBatches: total } },
+            `📦 ${stage} • mode=${SINGLE ? 'single' : 'batch'} (batch=${BATCH_SIZE}, conc=${CONCURRENCY})`
+          );
+        }
+      });
+      // Convert array to map for downstream lookups
+      for (const r of arr) resultMap.set(String(r.id), r);
+    } catch (e: any) {
+      const msg = String(e?.message || e);
+      updateSession(aiId, { phase: 'error', message: 'Erreur IA', progress: 100 }, `❌ Echec analyse lots: ${msg}`);
+      throw e;
+    }
 
     // Also analyze QROC/CAS_QROC to generate missing explanations
     const qrocRows = rows.filter(r => r.sheet === 'qroc' || r.sheet === 'cas_qroc');
@@ -316,10 +401,10 @@ Format:
   async function analyzeQrocBatch(batch: QrocItem[]): Promise<Map<string, QrocOK>> {
       if (!batch.length) return new Map();
       const user = JSON.stringify({ task: 'qroc_explanations', items: batch });
-      const content = await chatCompletions([
+      const { content } = await chatCompletion([
         { role: 'system', content: qrocSystemPrompt },
         { role: 'user', content: user }
-      ]);
+  ], { maxTokens: 800 }); // Faster responses for QROC and avoid truncation
       let parsed: any = null;
       try { parsed = JSON.parse(content); } catch { parsed = { results: [] }; }
   const out = new Map<string, QrocOK>();
@@ -333,7 +418,7 @@ Format:
       return out;
     }
 
-    async function analyzeQrocInChunks(items: QrocItem[], batchSize = 10): Promise<Map<string, QrocOK>> {
+  async function analyzeQrocInChunks(items: QrocItem[], batchSize = 8): Promise<Map<string, QrocOK>> {
       const map = new Map<string, QrocOK>();
       let batchIndex = 0;
       for (let i = 0; i < items.length; i += batchSize) {
@@ -352,7 +437,7 @@ Format:
 
     const qrocResultMap = await analyzeQrocInChunks(qrocItems);
 
-    // MCQ single fallback to guarantee fix
+  // MCQ single fallback to guarantee fix
     async function mcqForceFix(rec: Record<string, any>) {
       // Ensure at least one option
       let optCount = 0;
@@ -369,20 +454,48 @@ Format:
       // Ensure answer
       const hasAns = String(rec['reponse'] || '').trim().length > 0;
       if (!hasAns) rec['reponse'] = '?';
-      // Ensure explanation
-      const base = String(rec['explication'] || '').trim();
-      if (!base) rec['explication'] = 'Explication (IA): Nettoyage automatique et normalisation.';
+      // Ensure per-option explanations (professor-level fallback)
+      for (let i = 0; i < optCount; i++) {
+        const k = `explication ${String.fromCharCode(97 + i)}`;
+        if (!String(rec[k] || '').trim()) {
+          const letter = String.fromCharCode(65 + i);
+          const stem = String(rec['texte de la question'] || rec['texte du cas'] || '').trim();
+          const optText = String(rec[`option ${String.fromCharCode(97 + i)}`] || '').trim();
+          rec[k] = fallbackExplanation(i === 0, optText, stem);
+        }
+      }
+      // Set a minimal rappel instead of global explication
+      if (!String(rec['rappel'] || '').trim()) {
+        const stem = String(rec['texte de la question'] || rec['texte du cas'] || '').trim();
+        rec['rappel'] = fallbackRappel(stem);
+      }
     }
 
-    // QROC single fallback to guarantee fix
+  // QROC single fallback to guarantee fix
     async function qrocForceFix(rec: Record<string, any>) {
       rec['texte de la question'] = repairQuestionText(String(rec['texte de la question'] || ''));
       if (!String(rec['reponse'] || '').trim()) rec['reponse'] = 'À préciser';
-      if (!String(rec['explication'] || '').trim()) rec['explication'] = 'Explication (IA): Clarification automatique.';
+      if (!String(rec['rappel'] || '').trim()) {
+        const stem = String(rec['texte de la question'] || rec['texte du cas'] || '').trim();
+        rec['rappel'] = fallbackRappel(stem);
+      }
     }
 
     updateSession(aiId, { message: 'Fusion des résultats…', progress: 90 }, '🧩 Fusion des résultats…');
 
+    // Build course/matiere -> niveau map (for later backfill), then merge results
+    const courseToNiveau = new Map<string, string>();
+    const matiereToNiveau = new Map<string, string>();
+    for (const r of rows) {
+      const rec = r.original as Record<string, any>;
+      const niv = String(rec['niveau'] || '').trim();
+      if (niv) {
+        const cours = String(rec['cours'] || '').trim();
+        const mat = String(rec['matiere'] || '').trim();
+        if (cours && !courseToNiveau.has(cours)) courseToNiveau.set(cours, niv);
+        if (mat && !matiereToNiveau.has(mat)) matiereToNiveau.set(mat, niv);
+      }
+    }
     // Merge back with classification and reasons
     const letters = ['a','b','c','d','e'] as const;
     // Collect ALL rows (fixed or not) so output sheet counts match input counts
@@ -391,9 +504,20 @@ Format:
     let fixedCount = 0;
     let errorCount = 0;
 
+    // Collect MCQ rows that need enhanced detail (too short explanations or rappel)
+    type EnhanceItem = { id: string; questionText: string; options: string[] };
+    const enhanceTargets: Array<{ id: string; sheet: SheetName; obj: any; optionsCount: number; letters: string[]; questionText: string; options: string[] }> = [];
+
     for (const r of rows) {
       const s: SheetName = r.sheet;
       const rec = { ...r.original } as any;
+      // Skip empty rows (no question/case, no options, no answer)
+      const emptyOptions = ['option a','option b','option c','option d','option e'].every(k => !String(rec[k] || '').trim());
+      const noQ = !String(rec['texte de la question'] || '').trim() && !String(rec['texte du cas'] || '').trim();
+      const noAns = !String(rec['reponse'] || '').trim();
+      if (noQ && emptyOptions && noAns) {
+        continue;
+      }
       let fixed = true; // Guarantee fixed
       let reason: string | undefined;
 
@@ -417,6 +541,22 @@ Format:
           const key = `option ${String.fromCharCode(97 + i)}`;
           rec[key] = options[i];
         }
+        // Normalize CAS QCM combined answers (e.g., "1AB, 2E, 3B") to letters for the current question
+        if (s === 'cas_qcm') {
+          const raw = String(rec['reponse'] || '').toUpperCase();
+          const qnRaw = String(rec['question n'] || '').trim();
+          const qNum = qnRaw ? parseInt(qnRaw, 10) : NaN;
+          if (raw && !Number.isNaN(qNum) && /\d\s*[A-E]+/.test(raw)) {
+            const parts = raw.split(/[;,]+/).map(p => p.trim()).filter(Boolean);
+            const map: Record<string, string> = {};
+            for (const p of parts) {
+              const m = p.match(/^(\d+)\s*([A-E]+)/);
+              if (m) map[m[1]] = m[2].split('').join(', ');
+            }
+            const key = String(qNum);
+            if (map[key]) rec['reponse'] = map[key];
+          }
+        }
         // Apply AI if available
         if (ai && ai.status === 'ok') {
           if (Array.isArray(ai.correctAnswers) && ai.correctAnswers.length) {
@@ -425,29 +565,48 @@ Format:
           } else if (ai.noAnswer) {
             rec['reponse'] = '?';
           }
-          const base = String(rec['explication'] || '').trim();
-          const questionMd = `Question:\n${String(rec['texte de la question'] || '').trim()}`;
-          const optionsMd = options.length ? ('\n\nOptions:\n' + options.map((opt, j) => `- (${String.fromCharCode(65 + j)}) ${opt}`).join('\n')) : '';
-          const reponseMd = `\n\nRéponse(s): ${String(rec['reponse'] || '').trim() || '?'}`;
-          const qaMdBlock = `${questionMd}${optionsMd}${reponseMd}\n\n`;
-          const header = ai.globalExplanation ? `Synthèse: ${ai.globalExplanation}\n\n` : '';
-          const body = Array.isArray(ai.optionExplanations) && ai.optionExplanations.length
-            ? 'Explications (IA):\n' + ai.optionExplanations.map((e: string, j: number) => `- (${String.fromCharCode(65 + j)}) ${e}`).join('\n')
-            : '';
-          const merged = qaMdBlock + header + body;
-          const newExp = base ? base + '\n\n' + merged : merged;
-          if (newExp.trim()) rec['explication'] = newExp;
-          if (Array.isArray(ai.optionExplanations)) {
-            for (let j = 0; j < Math.min(letters.length, ai.optionExplanations.length); j++) {
-              const k = `explication ${letters[j]}`;
-              const val = String(ai.optionExplanations[j] || '').trim();
-              if (val) rec[k] = val;
-            }
+          // Enforce detailed per-option explanations and a robust rappel
+          const aiExpl = Array.isArray(ai.optionExplanations) ? ai.optionExplanations : [];
+          const correctSet = new Set<number>((ai.correctAnswers || []).filter((n: any) => Number.isInteger(n)));
+          let needsEnhance = false;
+          for (let j = 0; j < options.length; j++) {
+            const k = `explication ${letters[j]}`;
+            const val = String(aiExpl[j] || '').trim();
+            const tooShort = (!val || explanationTooShort(val));
+            rec[k] = tooShort ? fallbackExplanation(correctSet.has(j), options[j], rec['texte de la question'] || rec['texte du cas']) : val;
+            if (tooShort) needsEnhance = true;
+          }
+          const rpl = String(ai.globalExplanation || '').trim();
+          const rappelTooShort = !(rpl && !explanationTooShort(rpl));
+          rec['rappel'] = rappelTooShort ? fallbackRappel(rec['texte de la question'] || rec['texte du cas']) : rpl;
+          if (rappelTooShort) needsEnhance = true;
+          if (needsEnhance) {
+            enhanceTargets.push({
+              id: `${s}:${r.row}`,
+              sheet: s,
+              obj: null, // placeholder; we attach the output obj later
+              optionsCount: options.length,
+              letters: letters.slice(0, options.length) as unknown as string[],
+              questionText: rec['texte de la question'] || rec['texte du cas'] || '',
+              options: options.slice(0)
+            });
           }
         } else {
           // Fallback guarantee
           await mcqForceFix(rec);
+          // Still try to enhance deterministic fallbacks later
+          enhanceTargets.push({
+            id: `${s}:${r.row}`,
+            sheet: s,
+            obj: null,
+            optionsCount: options.length,
+            letters: letters.slice(0, options.length) as unknown as string[],
+            questionText: rec['texte de la question'] || rec['texte du cas'] || '',
+            options: options.slice(0)
+          });
         }
+        // Normalize answers format to letters "A, B, ..."
+        rec['reponse'] = normalizeLettersAnswer(rec['reponse'], options.length) || (ai?.noAnswer ? '?' : rec['reponse']);
       } else {
         // QROC / CAS QROC: try to fill missing explanation
         const idx = qrocRows.indexOf(r as any);
@@ -457,13 +616,14 @@ Format:
           rec['texte de la question'] = repairQuestionText(String(rec['texte du cas']).trim());
         }
         const hasAnswer = String(rec['reponse'] || '').trim().length > 0;
-        const baseExp = String(rec['explication'] || '').trim();
+        if (hasAnswer) rec['reponse'] = cleanAnswerText(rec['reponse']);
         if (ai && ai.explanation) {
-          if (!hasAnswer && ai.answer) rec['reponse'] = String(ai.answer).trim() || 'À préciser';
-          if (!baseExp) rec['explication'] = String(ai.explanation).trim();
+          if (!hasAnswer && ai.answer) rec['reponse'] = cleanAnswerText(String(ai.answer).trim()) || 'À préciser';
+          const expl = String(ai.explanation).trim();
+          if (expl && !explanationTooShort(expl)) rec['rappel'] = expl; // use rappel only for QROC
         }
-        // Guarantee
-        if (!String(rec['reponse'] || '').trim() || !String(rec['explication'] || '').trim()) {
+        // Guarantee rappel
+        if (!String(rec['reponse'] || '').trim() || !String(rec['rappel'] || '').trim()) {
           await qrocForceFix(rec);
         }
       }
@@ -475,6 +635,9 @@ Format:
         let matiereVal: string | undefined = rec['matiere'] || rec['matiere '] || rec['matière'] || rec['Matiere'] || rec['MATIERE'] || rec['matière '];
         const sourceRaw: string = String(rec['source'] ?? '').trim();
         const coursRaw: string = String(rec['cours'] ?? '').trim();
+        // Backfill niveau from known mappings
+        if (!niveauVal && coursRaw && courseToNiveau.has(coursRaw)) niveauVal = courseToNiveau.get(coursRaw);
+        if (!niveauVal && matiereVal && matiereToNiveau.has(matiereVal)) niveauVal = matiereToNiveau.get(matiereVal);
         if (!niveauVal && sourceRaw) {
           const m = sourceRaw.match(/\b(PCEM\s*\d|DCEM\s*\d)\b/i);
           if (m) niveauVal = m[1].toUpperCase().replace(/\s+/g, '');
@@ -491,9 +654,11 @@ Format:
         return { niveau: niveauVal, matiere: matiereVal };
       })();
 
+      // Sanitize matiere: letters/digits/spaces only
+      const sanitizeMatiere = (m?: string) => String(m || '').normalize('NFC').replace(/[^A-Za-zÀ-ÖØ-öø-ÿ0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
       const obj: any = {
         niveau: outNiveau ?? '',
-        matiere: outMatiere ?? '',
+        matiere: sanitizeMatiere(outMatiere),
         cours: rec['cours'] ?? '',
         source: cleanSource(rec['source'] ?? ''),
         'question n': rec['question n'] ?? '',
@@ -506,7 +671,7 @@ Format:
         'option c': rec['option c'] ?? '',
         'option d': rec['option d'] ?? '',
         'option e': rec['option e'] ?? '',
-        explication: rec['explication'] ?? '',
+        rappel: rec['rappel'] ?? '',
         'explication a': rec['explication a'] ?? '',
         'explication b': rec['explication b'] ?? '',
         'explication c': rec['explication c'] ?? '',
@@ -515,12 +680,120 @@ Format:
         ai_status: 'fixed',
         ai_reason: ''
       };
+      // Enforce unique, varied opening connectors per option (deterministic, no randomness)
+      if (s === 'qcm' || s === 'cas_qcm') {
+        const resp = String(obj['reponse'] || '').toUpperCase();
+        const correctIdx = new Set<number>((resp.match(/[A-E]/g) || []).map(l => l.charCodeAt(0) - 65).filter(n => n >= 0));
+        const POS = ['Exactement', 'Effectivement', 'Oui', 'Tout à fait', 'Précisément', 'Bien vu', 'Pertinent', 'Juste'];
+        const NEG = ['En réalité', 'Au contraire', 'Pas du tout', 'Erreur fréquente', 'Attention', 'Faux', 'Hélas non', 'Contrairement'];
+        const banned = [/^au contraire\b/i, /^juste contraire\b/i, /^en realite|en réalité\b/i, /^exact\b/i];
+        const qSeed = (() => {
+          const base = String(obj['texte de la question'] || obj['texte du cas'] || '');
+          let h = 0; for (let i = 0; i < base.length; i++) h = (h * 33 + base.charCodeAt(i)) | 0; return Math.abs(h);
+        })();
+        const keys = ['explication a','explication b','explication c','explication d','explication e'];
+        for (let i = 0; i < keys.length; i++) {
+          const k = keys[i];
+          let txt = String((obj as any)[k] || '').trim();
+          if (!txt) continue;
+          const isCorr = correctIdx.has(i);
+          const arr = isCorr ? POS : NEG;
+          const opener = arr[(qSeed + i) % arr.length];
+          // Strip any existing opener (first 1-3 words + optional punctuation)
+          const body = txt.replace(/^\s*([A-Za-zÀ-ÖØ-öø-ÿ'’]+(?:\s+[A-Za-zÀ-ÖØ-öø-ÿ'’]+){0,2})\s*[:,;–-]?\s*/u, '');
+          const startsBanned = banned.some(r => r.test(txt));
+          (obj as any)[k] = `${opener}: ${startsBanned ? body : body}`.trim();
+        }
+      }
       correctedBySheet[s].push(obj);
+      // Attach obj pointer for enhancement targets of this row
+      const keyId = `${s}:${r.row}`;
+      for (const t of enhanceTargets) {
+        if (t.id === keyId && t.obj == null) t.obj = obj;
+      }
       fixedCount++;
     }
 
+    // Second pass: enhance rows with short/placeholder content using AI (chunked for depth)
+  async function enhanceMcqRows(targets: typeof enhanceTargets) {
+      const items = targets.map(t => ({ id: t.id, questionText: t.questionText, options: t.options }));
+      if (!items.length) return new Map<string, any>();
+  const system = `Tu es PROFESSEUR de médecine expérimenté qui génère des explications DÉTAILLÉES et PARFAITES pour chaque option de QCM.
+
+EXIGENCES IMPÉRATIVES:
+1. DIVERSITÉ ABSOLUE des connecteurs d'ouverture - JAMAIS de répétition.
+2. CONTENU SPÉCIFIQUE OBLIGATOIRE par option (4–6 phrases COMPLÈTES) : 
+   - Mécanisme physiopathologique DÉTAILLÉ
+   - Critères diagnostiques PRÉCIS avec seuils chiffrés EXACTS
+   - Diagnostic différentiel COMPLET
+   - Exemple clinique CONCRET (âge/contexte/signes spécifiques)
+   - Nuances cliniques IMPORTANTES
+3. Chaque phrase se termine OBLIGATOIREMENT par un point.
+4. RAPPEL DU COURS (3–5 phrases COMPLÈTES) clair et PARFAITEMENT détaillé.
+
+LONGUEUR OBLIGATOIRE:
+- Chaque explication: MINIMUM 4 phrases, MAXIMUM 6 phrases
+- Rappel: MINIMUM 3 phrases, MAXIMUM 5 phrases
+- TOUT doit être COMPLET, DÉTAILLÉ, SANS AMBIGUÏTÉ
+
+SORTIE JSON STRICTE:
+{ "results": [ { "id":"<id>", "optionExplanations":["explication A complète 4-6 phrases", "explication B complète 4-6 phrases", ...], "globalExplanation":"rappel complet 3-5 phrases" } ] }`;
+
+      const out = new Map<string, any>();
+      const BATCH = 8; // ultra-reliable size - no truncation, fast processing
+      for (let i = 0; i < items.length; i += BATCH) {
+        const slice = items.slice(i, i + BATCH);
+        const user = JSON.stringify({ task: 'enhance_mcq_rows', items: slice });
+        let content = '';
+        try {
+          const res = await chatCompletion([
+            { role: 'system', content: system },
+            { role: 'user', content: user }
+          ], { maxTokens: 800 }); // Ultra-fast with shorter responses
+          content = res.content;
+        } catch {
+          continue;
+        }
+        try {
+          const parsed = JSON.parse(content);
+          const arr = Array.isArray(parsed?.results) ? parsed.results : [];
+          for (const r of arr) {
+            const id = String(r?.id || '');
+            const exps = Array.isArray(r?.optionExplanations) ? r.optionExplanations.map((x: any) => String(x || '')) : [];
+            const rapp = typeof r?.globalExplanation === 'string' ? String(r.globalExplanation) : '';
+            out.set(id, { exps, rapp });
+          }
+        } catch {
+          // ignore this slice on parse errors
+        }
+      }
+      return out;
+    }
+
+  // Optional FAST mode: skip enhancement stage to maximize throughput
+  const FAST_MODE = String(process.env.AI_FAST_MODE || '').trim() === '1';
+  const enhanced = FAST_MODE ? new Map<string, any>() : await enhanceMcqRows(enhanceTargets);
+    // Apply enhanced content where available
+    for (const t of enhanceTargets) {
+      const res = enhanced.get(t.id);
+      if (!res || !t.obj) continue;
+      const { exps, rapp } = res;
+      // Replace per-option explanations if provided and detailed
+      for (let j = 0; j < t.optionsCount; j++) {
+        const key = `explication ${t.letters[j]}`;
+        const val = String(exps?.[j] || '').trim();
+        if (val && !explanationTooShort(val)) {
+          t.obj[key] = val;
+        }
+      }
+      const rVal = String(rapp || '').trim();
+      if (rVal && !explanationTooShort(rVal)) {
+        t.obj['rappel'] = rVal;
+      }
+    }
+
     // Build workbook: per-type corrected sheets + Erreurs sheet
-  const header = ['niveau','matiere','cours','source','question n','cas n','texte du cas','texte de la question','reponse','option a','option b','option c','option d','option e','explication','explication a','explication b','explication c','explication d','explication e','ai_status','ai_reason'];
+  const header = ['niveau','matiere','cours','source','question n','cas n','texte du cas','texte de la question','reponse','option a','option b','option c','option d','option e','rappel','explication a','explication b','explication c','explication d','explication e','ai_status','ai_reason'];
     const wb = utils.book_new();
     (['qcm','qroc','cas_qcm','cas_qroc'] as SheetName[]).forEach(s => {
       const arr = correctedBySheet[s];
@@ -677,9 +950,11 @@ async function getHandler(request: AuthenticatedRequest) {
     if (!job?.outputUrl) return NextResponse.json({ error: 'no result available' }, { status: 404 });
     try {
       // outputUrl may be a data URL
-      const b64 = job.outputUrl.split(',')[1];
-      const buf = Buffer.from(b64, 'base64');
-      return new NextResponse(buf, {
+  const b64 = job.outputUrl.split(',')[1];
+  const buf = Buffer.from(b64, 'base64');
+  const u8 = new Uint8Array(buf);
+  const blob = new Blob([u8], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      return new NextResponse(blob, {
         headers: {
           'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
           'Content-Disposition': 'attachment; filename="ai_fixed.xlsx"'

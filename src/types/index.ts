@@ -128,6 +128,8 @@ export type Option = {
   explanation?: string;
 };
 
+import type { ImageData } from '@/components/ui/rich-text-display';
+
 export type Question = {
   id: string;
   lectureId: string;
@@ -153,6 +155,7 @@ export type Question = {
   caseQuestionNumber?: number; // Question number within the case
   parent_question_id?: string; // Link to parent case question
   children?: Question[]; // For UI convenience when grouping
+  images?: ImageData[]; // Inline images for [IMAGE:id] support
 };
 
 // New type for grouped clinical cases

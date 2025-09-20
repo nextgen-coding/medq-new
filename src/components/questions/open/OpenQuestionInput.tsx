@@ -36,13 +36,10 @@ export function OpenQuestionInput({ answer, setAnswer, isSubmitted, onSubmit, on
   
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (isSubmitted) return; // textarea is typically disabled when submitted, but guard anyway
-    // Shift+Enter should insert a newline; plain Enter should submit (even if empty)
-    if (e.key === 'Enter' && !e.shiftKey) {
-      // Prevent newline insertion
+    // Default Enter inserts a newline. Support Ctrl/Cmd+Enter to submit.
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
-      if (onSubmit) {
-        onSubmit(); // Allow submission even with empty answer
-      }
+      onSubmit?.();
     }
   };
   

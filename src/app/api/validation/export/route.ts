@@ -13,8 +13,8 @@ export async function POST(request: NextRequest) {
     }
 
     const header = mode === 'good'
-      ? ['sheet', 'row', 'matiere', 'cours', 'question n', 'cas n', 'texte du cas', 'texte de la question', 'reponse', 'option a', 'option b', 'option c', 'option d', 'option e', 'explication', 'explication a', 'explication b', 'explication c', 'explication d', 'explication e', 'image', 'niveau', 'semestre']
-      : ['sheet', 'row', 'reason', 'matiere', 'cours', 'question n', 'cas n', 'texte du cas', 'texte de la question', 'reponse', 'option a', 'option b', 'option c', 'option d', 'option e', 'explication', 'image'];
+      ? ['sheet', 'row', 'matiere', 'cours', 'question n', 'cas n', 'texte du cas', 'texte de la question', 'reponse', 'option a', 'option b', 'option c', 'option d', 'option e', 'rappel', 'explication', 'explication a', 'explication b', 'explication c', 'explication d', 'explication e', 'image', 'niveau', 'semestre']
+      : ['sheet', 'row', 'reason', 'matiere', 'cours', 'question n', 'cas n', 'texte du cas', 'texte de la question', 'reponse', 'option a', 'option b', 'option c', 'option d', 'option e', 'rappel', 'explication', 'image'];
 
     const dataObjects = rows.map((r: any) => {
       const rec = mode === 'good' ? r.data : r.original;
@@ -38,6 +38,7 @@ export async function POST(request: NextRequest) {
         'option c': rec?.['option c'] ?? '',
         'option d': rec?.['option d'] ?? '',
         'option e': rec?.['option e'] ?? '',
+        rappel: rec?.['rappel'] ?? '',
         explication: rec?.['explication'] ?? '',
         'explication a': rec?.['explication a'] ?? '',
         'explication b': rec?.['explication b'] ?? '',

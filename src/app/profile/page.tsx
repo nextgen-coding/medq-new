@@ -189,9 +189,9 @@ export default function ProfilePageRoute() {
     <ProtectedRoute>
       <ProfileCompletionGuard>
         <AppSidebarProvider>
-          <div className="flex w-full bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-900">
+          <div className="flex w-full min-h-screen bg-gray-50 dark:bg-gray-900">
             <AppSidebar />
-            <SidebarInset className="flex flex-col min-h-0">
+            <SidebarInset className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900">
               {/* Universal Header */}
               <UniversalHeader
                 title="Profil"
@@ -217,8 +217,9 @@ export default function ProfilePageRoute() {
                   </div>
 
                   <div className="grid gap-8 lg:grid-cols-3 pb-8">
-                    {/* Profile Overview Card */}
-                    <div className="lg:col-span-1">
+                    {/* Left Column: Profile Overview + Subscription */}
+                    <div className="lg:col-span-1 flex flex-col gap-8">
+                      {/* Profile Overview Card */}
                       <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-xl hover:shadow-2xl transition-all duration-300">
                         <CardContent className="p-6">
                           <div className="text-center">
@@ -285,6 +286,63 @@ export default function ProfilePageRoute() {
                           </div>
                         </CardContent>
                       </Card>
+
+                      {/* Subscription Card */}
+                      <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-xl hover:shadow-2xl transition-all duration-300">
+                        <CardHeader className="pb-4">
+                          <CardTitle className="text-xl font-semibold text-gray-900 dark:text-white flex items-center">
+                            <Crown className="h-5 w-5 mr-2 text-yellow-600 dark:text-yellow-400" />
+                            Abonnement
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="grid gap-6 md:grid-cols-3">
+                            <div className="space-y-2">
+                              <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Plan actuel</Label>
+                              <div className="text-xl font-bold text-gray-900 dark:text-white">
+                                {user?.hasActiveSubscription ? 'Pro Annuel' : 'Gratuit'}
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Statut</Label>
+                              <div className="flex items-center space-x-2">
+                                <div className={`w-3 h-3 rounded-full ${user?.hasActiveSubscription ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                                <Badge className={`font-medium ${
+                                  user?.hasActiveSubscription
+                                    ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white'
+                                    : 'bg-gradient-to-r from-gray-500 to-gray-600 text-white'
+                                }`}>
+                                  {user?.hasActiveSubscription ? 'Actif' : 'Inactif'}
+                                </Badge>
+                              </div>
+                            </div>
+                            {user?.hasActiveSubscription && user?.subscriptionExpiresAt && (
+                              <div className="space-y-2">
+                                <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Expiration</Label>
+                                <div className="flex items-center space-x-2">
+                                  <Calendar className="h-4 w-4 text-gray-400" />
+                                  <span className="text-gray-900 dark:text-white font-medium">
+                                    {new Date(user.subscriptionExpiresAt).toLocaleDateString('fr-FR', {
+                                      year: 'numeric',
+                                      month: 'short',
+                                      day: 'numeric'
+                                    })}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          {!user?.hasActiveSubscription && (
+                            <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                              <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105">
+                                <Crown className="h-4 w-4 mr-2" />
+                                Passer au Plan Pro
+                              </Button>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+
                     </div>
 
                     {/* Main Content Cards */}
@@ -550,64 +608,6 @@ export default function ProfilePageRoute() {
                         </CardContent>
                       </Card>
 
-                      {/* Subscription Card */}
-                      <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-xl hover:shadow-2xl transition-all duration-300">
-                        <CardHeader className="pb-4">
-                          <CardTitle className="text-xl font-semibold text-gray-900 dark:text-white flex items-center">
-                            <Crown className="h-5 w-5 mr-2 text-yellow-600 dark:text-yellow-400" />
-                            Abonnement
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="grid gap-6 md:grid-cols-3">
-                            <div className="space-y-2">
-                              <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Plan actuel</Label>
-                              <div className="text-xl font-bold text-gray-900 dark:text-white">
-                                {user?.hasActiveSubscription ? 'Pro Annuel' : 'Gratuit'}
-                              </div>
-                            </div>
-
-                            <div className="space-y-2">
-                              <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Statut</Label>
-                              <div className="flex items-center space-x-2">
-                                <div className={`w-3 h-3 rounded-full ${user?.hasActiveSubscription ? 'bg-green-500' : 'bg-gray-400'}`}></div>
-                                <Badge className={`font-medium ${
-                                  user?.hasActiveSubscription
-                                    ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white'
-                                    : 'bg-gradient-to-r from-gray-500 to-gray-600 text-white'
-                                }`}>
-                                  {user?.hasActiveSubscription ? 'Actif' : 'Inactif'}
-                                </Badge>
-                              </div>
-                            </div>
-
-                            {user?.hasActiveSubscription && user?.subscriptionExpiresAt && (
-                              <div className="space-y-2">
-                                <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Expiration</Label>
-                                <div className="flex items-center space-x-2">
-                                  <Calendar className="h-4 w-4 text-gray-400" />
-                                  <span className="text-gray-900 dark:text-white font-medium">
-                                    {new Date(user.subscriptionExpiresAt).toLocaleDateString('fr-FR', {
-                                      year: 'numeric',
-                                      month: 'short',
-                                      day: 'numeric'
-                                    })}
-                                  </span>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-
-                          {!user?.hasActiveSubscription && (
-                            <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-                              <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105">
-                                <Crown className="h-4 w-4 mr-2" />
-                                Passer au Plan Pro
-                              </Button>
-                            </div>
-                          )}
-                        </CardContent>
-                      </Card>
                     </div>
                   </div>
                 </div>

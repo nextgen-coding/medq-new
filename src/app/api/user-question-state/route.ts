@@ -109,6 +109,9 @@ export async function POST(req: Request) {
 			   const result = await prisma.$transaction(async (tx) => {
 				   const existing = await tx.$queryRaw<Array<any>>`SELECT id FROM question_user_data WHERE user_id = ${userId}::uuid AND question_id = ${questionId}::uuid LIMIT 1`;
                
+				   // Add logging to confirm notes field processing
+				   console.log('Inserting/Updating notes field:', { notes });
+
 				   if (existing.length === 0) {
 					   // Check if notes_image_urls column exists before including it
 					   const hasImagesCol = await tx.$queryRaw<Array<any>>`SELECT 1 FROM information_schema.columns WHERE table_name='question_user_data' AND column_name='notes_image_urls' LIMIT 1`;

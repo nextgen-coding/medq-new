@@ -144,12 +144,16 @@
 @layer base {
   * { @apply border-border; }
 
-  html, body {
+
+  html, body, #__next {
     margin: 0;
     padding: 0;
+    min-height: 100vh;
+    height: 100%;
+    width: 100%;
   }
 
-  body { @apply bg-background text-foreground; }
+  body { @apply bg-background text-foreground min-h-screen h-full w-full; }
 
   /* Allow normal page scrolling (previously globally disabled). For pages that must lock scroll (e.g. full-screen viewers), wrap content in an element with the .no-page-scroll class below instead of disabling it globally. */
 }

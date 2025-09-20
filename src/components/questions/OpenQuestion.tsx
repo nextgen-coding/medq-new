@@ -457,11 +457,16 @@ export function OpenQuestion({
 
   // Compute expected reference answer (memoized)
   const expectedReference = useMemo(() => {
+    // In revision mode, use userAnswer if available (when isAnswered is true but not submitted)
+    if (isAnswered && !submitted && userAnswer) {
+      return userAnswer;
+    }
+    
     const correctArr: string[] = (question as any).correctAnswers || (question as any).correct_answers || [];
     const expectedFromArray = Array.isArray(correctArr) && correctArr.length > 0 ? correctArr.filter(Boolean).join(' / ') : '';
     const expected = expectedFromArray || (question as any).course_reminder || (question as any).courseReminder || question.explanation || (question as any).correctAnswer || '';
     return expected || '';
-  }, [question]);
+  }, [question, isAnswered, submitted, userAnswer]);
 
   // Admin function to toggle question visibility
   const handleToggleVisibility = async () => {
@@ -584,16 +589,22 @@ export function OpenQuestion({
         // simple (non-clinical) QROC: immediate results, individual submit enabled
         const isSimpleQroc = !hideImmediateResults && !disableIndividualSubmit;
         // Can show reference answer under same rules as original logic
-        const correctArr: string[] = (question as any).correctAnswers || (question as any).correct_answers || [];
-        const expectedFromArray = Array.isArray(correctArr) && correctArr.length > 0 ? correctArr.filter(Boolean).join(' / ') : '';
-        const expected = expectedFromArray || (question as any).course_reminder || (question as any).courseReminder || question.explanation || (question as any).correctAnswer || '';
-        const expectedReferenceInline = expected || '';
+        // In revision mode, use userAnswer if available (when isAnswered is true but not submitted)
+        let expectedReferenceInline = '';
+        if (isAnswered && !submitted && userAnswer) {
+          expectedReferenceInline = userAnswer;
+        } else {
+          const correctArr: string[] = (question as any).correctAnswers || (question as any).correct_answers || [];
+          const expectedFromArray = Array.isArray(correctArr) && correctArr.length > 0 ? correctArr.filter(Boolean).join(' / ') : '';
+          const expected = expectedFromArray || (question as any).course_reminder || (question as any).courseReminder || question.explanation || (question as any).correctAnswer || '';
+          expectedReferenceInline = expected || '';
+        }
         const canShowReferenceInline = submitted && expectedReferenceInline && (!hideImmediateResults || (showSelfAssessment && showDeferredSelfAssessment) || assessmentCompleted);
 
         if (!(submitted && isSimpleQroc)) return null;
 
         return (
-          <div className="rounded-xl border border-gray-200 dark:border-gray-700 p-3 sm:p-4 space-y-2">
+          <div className="p-0 sm:p-0 space-y-1">
             {/* Inline compact question text inside the same container */}
             <div className="inline-block">
               <HighlightableQuestionText
@@ -601,12 +612,13 @@ export function OpenQuestion({
                 text={question.text}
                 className="mt-0 text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100 leading-relaxed break-words whitespace-pre-wrap inline"
                 confirmMode={highlightConfirm}
+                images={question.images}
               />
             </div>
 
-            {/* Reference answer (green card) */}
+            {/* Reference answer (green block, keep styling) */}
             {canShowReferenceInline && (
-              <div className="mt-1">
+              <div className="mt-0.5">
                 <div className="rounded-xl border border-emerald-300/60 dark:border-emerald-600/70 bg-emerald-50/80 dark:bg-emerald-900/50 px-6 py-2 shadow-sm">
                   <div className="mb-2">
                     <h3 className="text-base md:text-lg font-bold tracking-tight text-emerald-800 dark:text-emerald-50">Réponse</h3>
@@ -618,7 +630,7 @@ export function OpenQuestion({
               </div>
             )}
 
-            {/* Self assessment buttons */}
+            {/* Self assessment buttons (no surrounding white box) */}
             {showSelfAssessment && (!hideImmediateResults || showDeferredSelfAssessment) && (
               <div ref={selfAssessmentRef}>
                 <OpenQuestionSelfAssessment
@@ -682,7 +694,22 @@ export function OpenQuestion({
       
   {/* Media is now displayed inside the "Rappel du cours" section on the page */}
 
-    {(!submitted || keepInputAfterSubmit) && (
+    {/* Show correct answer directly in revision mode */}
+    {hideActions && isAnswered && userAnswer && (
+      <div className="mt-4">
+        <div className="rounded-xl border border-emerald-300/60 dark:border-emerald-600/70 bg-emerald-50/80 dark:bg-emerald-900/50 px-6 py-3 shadow-sm">
+          <div className="mb-2">
+            <h3 className="text-base md:text-lg font-bold tracking-tight text-emerald-800 dark:text-emerald-50">Réponse correcte</h3>
+          </div>
+          <div className="prose prose-sm md:prose-base dark:prose-invert max-w-none leading-relaxed text-emerald-800 dark:text-emerald-50">
+            <RichTextDisplay text={userAnswer} enableImageZoom={true} />
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Show input field only when not in revision mode */}
+    {(!submitted || keepInputAfterSubmit) && !hideActions && (
         <OpenQuestionInput
           answer={answer}
           setAnswer={setAnswer}
@@ -702,7 +729,7 @@ export function OpenQuestion({
     const canShowReference = submitted && expectedReference && (!hideImmediateResults || (showSelfAssessment && showDeferredSelfAssessment) || assessmentCompleted);
     if (!canShowReference) return null;
     return (
-      <div className="mt-1">
+      <div className="mt-0.5">
         <div className="rounded-xl border border-emerald-300/60 dark:border-emerald-600/70 bg-emerald-50/80 dark:bg-emerald-900/50 px-6 py-2 shadow-sm">
           <div className="mb-2">
             <h3 className="text-base md:text-lg font-bold tracking-tight text-emerald-800 dark:text-emerald-50">Réponse</h3>
@@ -794,16 +821,16 @@ export function OpenQuestion({
     );
   })()}
 
-  {/* Notes - always render for content detection, but show/hide based on showNotesArea */}
-  {!hideNotes && (
-        <div ref={notesRef} className={showNotesArea ? "" : "hidden"}>
-          <QuestionNotes 
-            questionId={question.id} 
-            onHasContentChange={setNotesHasContent}
-            autoEdit={showNotesArea && !notesHasContent} // Auto-edit when manually opened and empty
-          />
-        </div>
-      )}
+  // Only render notes if not a clinical case sub-question (i.e., not in a clinical case context)
+  {!hideNotes && question.text !== '' && !disableIndividualSubmit && !hideImmediateResults && (
+    <div ref={notesRef} className={showNotesArea ? "" : "hidden"}>
+      <QuestionNotes
+        questionId={question.id}
+        onHasContentChange={setNotesHasContent}
+        autoEdit={showNotesArea && !notesHasContent}
+      />
+    </div>
+  )}
   {/* Comments (after submission) */}
   {submitted && !hideComments && <QuestionComments questionId={question.id} />}
       
