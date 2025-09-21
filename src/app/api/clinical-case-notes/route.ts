@@ -40,7 +40,7 @@ export async function GET(req: Request) {
 			`;
 		}
 		console.log('GET clinical-case-notes - Found rows:', rows);
-		console.log('GET clinical-case-notes - Returning:', rows[0] ?? null);
+		// console.log('GET clinical-case-notes - Returning:', rows[0] ?? null);
 		return NextResponse.json(rows[0] ?? null);
 	} catch (e) {
 		console.error('GET clinical-case-notes error', e);
