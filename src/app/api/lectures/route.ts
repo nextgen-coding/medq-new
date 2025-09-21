@@ -23,6 +23,7 @@ async function getHandler(request: AuthenticatedRequest) {
         id: true, 
         role: true, 
     niveauId: true,
+    semesterId: true,
       }
     });
 
@@ -40,22 +41,33 @@ async function getHandler(request: AuthenticatedRequest) {
       where.specialtyId = specialtyId;
     }
 
-    // If user is not admin and has a niveau, filter by specialty niveau
-    if (user.role !== 'admin' && user.niveauId) {
-      where.specialty = {
-        niveauId: user.niveauId
-      };
+    // Non-admins: enforce filters by user's niveau and semester (if set)
+    if (user.role !== 'admin') {
+      const specialtyFilter: any = { ...(where.specialty || {}) };
+      if (user.niveauId) {
+        specialtyFilter.niveauId = user.niveauId;
+      }
+      if (user.semesterId) {
+        // Allow content in user's semester or globally applicable (null semester)
+        specialtyFilter.OR = [
+          { semesterId: user.semesterId },
+          { semesterId: null },
+        ];
+      }
+      if (Object.keys(specialtyFilter).length > 0) {
+        where.specialty = specialtyFilter;
+      }
     }
 
-    // Optional semester filter
-    if (semesterParam) {
+    // Optional semester filter applies only for admins; non-admins are governed by their profile
+    if (user.role === 'admin' && semesterParam) {
       where.specialty = where.specialty || {};
       if (semesterParam === 'none') {
         where.specialty.semesterId = null;
       } else if (semesterParam !== 'all') {
         where.specialty.semesterId = semesterParam;
       }
-  }
+    }
 
     const lectures = await prisma.lecture.findMany({
       where,

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ChevronLeft, ChevronRight, CheckCircle, Circle, XCircle, MinusCircle, Stethoscope, EyeOff, StickyNote, Pin, Flag, Pencil, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Drawer, DrawerContent, DrawerTrigger } from '@/components/ui/drawer';
+// Replaced Vaul Drawer (infinite update loop on some setups) with a simple custom sheet
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganizer } from '@/contexts/OrganizerContext';
@@ -320,30 +320,40 @@ export function QuestionControlPanel({
   */
 
 
-  // Only show on mobile devices using a drawer
+  // Only show on mobile devices using a lightweight custom sheet (no portal)
   const MobileDrawer = () => (
-    <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
-      <DrawerTrigger asChild>
-        <Button 
-          variant="outline" 
-          className="fixed bottom-6 right-6 lg:hidden z-50 gap-2 shadow-xl backdrop-blur-sm bg-white/90 dark:bg-gray-900/90 border border-gray-200/60 dark:border-gray-700/60 hover:bg-blue-50 dark:hover:bg-blue-900/50 hover:border-blue-300 dark:hover:border-blue-600 rounded-xl"
-        >
-          <span className="font-medium">{t('questions.questions')}</span>
-          <span className="text-xs bg-blue-600 dark:bg-blue-700 text-white rounded-full px-2 py-0.5 font-medium">
-            {questions.length}
-          </span>
-        </Button>
-      </DrawerTrigger>
-      <DrawerContent className="h-[80vh] backdrop-blur-sm bg-white/95 dark:bg-gray-900/95 border-t border-gray-200/60 dark:border-gray-700/60">
-        <div className="p-6">
-          <h3 className="font-bold text-xl text-gray-900 dark:text-gray-100 mb-6">{t('questions.questions')}</h3>
-          <ScrollArea ref={scrollAreaRef} className="h-[calc(80vh-180px)]">
-            {renderQuestionsList()}
-          </ScrollArea>
-          {renderNavigationButtons()}
+    <>
+      <Button
+        onClick={() => setIsDrawerOpen(true)}
+        variant="outline"
+        className="fixed bottom-6 right-6 lg:hidden z-50 gap-2 shadow-xl backdrop-blur-sm bg-white/90 dark:bg-gray-900/90 border border-gray-200/60 dark:border-gray-700/60 hover:bg-blue-50 dark:hover:bg-blue-900/50 hover:border-blue-300 dark:hover:border-blue-600 rounded-xl"
+      >
+        <span className="font-medium">{t('questions.questions')}</span>
+        <span className="text-xs bg-blue-600 dark:bg-blue-700 text-white rounded-full px-2 py-0.5 font-medium">
+          {questions.length}
+        </span>
+      </Button>
+      {isDrawerOpen && (
+        <div className="lg:hidden">
+          <div
+            className="fixed inset-0 z-50 bg-black/60"
+            onClick={() => setIsDrawerOpen(false)}
+          />
+          <div className="fixed inset-x-0 bottom-0 z-[60] h-[80vh] rounded-t-2xl border bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm shadow-2xl">
+            <div className="p-6">
+              <div className="flex items-start justify-between mb-4">
+                <h3 className="font-bold text-xl text-gray-900 dark:text-gray-100">{t('questions.questions')}</h3>
+                <Button variant="ghost" size="sm" onClick={() => setIsDrawerOpen(false)}>Fermer</Button>
+              </div>
+              <ScrollArea ref={scrollAreaRef} className="h-[calc(80vh-180px)]">
+                {renderQuestionsList()}
+              </ScrollArea>
+              {renderNavigationButtons()}
+            </div>
+          </div>
         </div>
-      </DrawerContent>
-    </Drawer>
+      )}
+    </>
   );
 
   // Desktop panel

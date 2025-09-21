@@ -23,14 +23,19 @@ async function getHandler(request: AuthenticatedRequest) {
 
     const whereClause: any = {};
     if (user.role !== 'admin') {
-      // Non-admins:
-      // - Show all specialties in the user's niveau (any semester)
-      // - PLUS any specialty that has no semester (global/common)
-      const orConditions: any[] = [];
-      if (user.niveauId) orConditions.push({ niveauId: user.niveauId });
-      orConditions.push({ semesterId: null });
-      whereClause.OR = orConditions;
-      // Ignore external semester filter for non-admins
+      // Non-admins: restrict by BOTH niveau and semester (if set)
+      // - Always require matching niveau
+      // - If the user has a semester, allow specialties in that semester OR with no semester (common)
+      if (user.niveauId) {
+        whereClause.niveauId = user.niveauId;
+      }
+      if (user.semesterId) {
+        whereClause.OR = [
+          { semesterId: user.semesterId },
+          { semesterId: null },
+        ];
+      }
+      // If user has no semester set, we don't constrain by semester (shows all semesters within their niveau)
     } else {
       // Admins may optionally filter by niveau and/or semester via query params
       if (niveauParam && niveauParam !== 'all') {

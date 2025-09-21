@@ -27,7 +27,8 @@ async function getHandler(
       select: { 
         id: true, 
         role: true, 
-        niveauId: true
+        niveauId: true,
+        semesterId: true,
       }
     });
 
@@ -39,10 +40,21 @@ async function getHandler(
     }
 
     // Build the where clause for the lecture using Prisma type
-    const whereClause: Prisma.LectureWhereInput =
-      user.role !== 'admin' && user.niveauId
-        ? { id: lectureId, specialty: { niveauId: user.niveauId } }
-        : { id: lectureId };
+    // Non-admins: constrain access by niveau and semester (or common null semester)
+    let whereClause: Prisma.LectureWhereInput = { id: lectureId };
+    if (user.role !== 'admin') {
+      const specFilter: any = {};
+      if (user.niveauId) specFilter.niveauId = user.niveauId;
+      if (user.semesterId) {
+        specFilter.OR = [
+          { semesterId: user.semesterId },
+          { semesterId: null },
+        ];
+      }
+      if (Object.keys(specFilter).length > 0) {
+        whereClause = { id: lectureId, specialty: specFilter };
+      }
+    }
 
     if (includeQuestions) {
       // Optimized query: fetch lecture with questions in a single request

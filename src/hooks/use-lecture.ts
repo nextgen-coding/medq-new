@@ -34,10 +34,109 @@ export function useLecture(lectureId: string | undefined, mode?: string | null) 
 
   // Create filtered questions based on mode
   const questions = useMemo(() => {
-    if (mode === 'pinned') {
-      return allQuestions.filter(q => pinnedQuestionIds.includes(q.id));
+    if (mode !== 'pinned') return allQuestions;
+    if (!pinnedQuestionIds.length) return [];
+
+    // In pinned mode: if any question from a multi-group (by caseNumber or caseText, or clinical case) is pinned,
+    // include the entire group so it renders as Multi QCM/QROC/Clinical like the normal UI.
+    const byId = new Map<string, Question>();
+    for (const q of allQuestions) byId.set(q.id, q);
+
+    const norm = (s?: string | null) => (s || '').trim();
+    const includeIds = new Set<string>();
+
+    // Build quick lookup maps for grouping
+    const mcqByNumber = new Map<number, Question[]>();
+    const qrocByNumber = new Map<number, Question[]>();
+    const clinicByNumber = new Map<number, Question[]>();
+    const mcqByText = new Map<string, Question[]>();
+    const qrocByText = new Map<string, Question[]>();
+    const clinicByText = new Map<string, Question[]>();
+
+    for (const q of allQuestions) {
+      const t = q.type as any;
+      const baseType = t === 'clinic_mcq' ? 'clinic_mcq' : t === 'clinic_croq' ? 'clinic_croq' : t === 'mcq' ? 'mcq' : t === 'qroc' || t === 'open' ? 'qroc' : t;
+      const num = (q as any).caseNumber as number | undefined;
+      const text = norm((q as any).caseText);
+
+      if (baseType === 'clinic_mcq' || baseType === 'clinic_croq') {
+        if (typeof num === 'number') {
+          const arr = clinicByNumber.get(num) || [];
+          arr.push(q);
+          clinicByNumber.set(num, arr);
+        }
+        if (text) {
+          const arr = clinicByText.get(text) || [];
+          arr.push(q);
+          clinicByText.set(text, arr);
+        }
+      } else if (baseType === 'mcq') {
+        if (typeof num === 'number') {
+          const arr = mcqByNumber.get(num) || [];
+          arr.push(q);
+          mcqByNumber.set(num, arr);
+        }
+        if (text) {
+          const arr = mcqByText.get(text) || [];
+          arr.push(q);
+          mcqByText.set(text, arr);
+        }
+      } else if (baseType === 'qroc') {
+        if (typeof num === 'number') {
+          const arr = qrocByNumber.get(num) || [];
+          arr.push(q);
+          qrocByNumber.set(num, arr);
+        }
+        if (text) {
+          const arr = qrocByText.get(text) || [];
+          arr.push(q);
+          qrocByText.set(text, arr);
+        }
+      }
     }
-    return allQuestions;
+
+    const addGroupSiblings = (q: Question) => {
+      const t = q.type as any;
+      const baseClinic = t === 'clinic_mcq' || t === 'clinic_croq';
+      const baseMcq = t === 'mcq';
+      const baseQroc = t === 'qroc' || t === 'open';
+      const num = (q as any).caseNumber as number | undefined;
+      const text = norm((q as any).caseText);
+
+      includeIds.add(q.id);
+
+      if (baseClinic) {
+        if (typeof num === 'number') {
+          (clinicByNumber.get(num) || []).forEach(sib => includeIds.add(sib.id));
+        }
+        if (text) {
+          (clinicByText.get(text) || []).forEach(sib => includeIds.add(sib.id));
+        }
+      } else if (baseMcq) {
+        if (typeof num === 'number') {
+          (mcqByNumber.get(num) || []).forEach(sib => includeIds.add(sib.id));
+        }
+        if (text) {
+          (mcqByText.get(text) || []).forEach(sib => includeIds.add(sib.id));
+        }
+      } else if (baseQroc) {
+        if (typeof num === 'number') {
+          (qrocByNumber.get(num) || []).forEach(sib => includeIds.add(sib.id));
+        }
+        if (text) {
+          (qrocByText.get(text) || []).forEach(sib => includeIds.add(sib.id));
+        }
+      }
+    };
+
+    // Seed from pinned IDs
+    for (const pid of pinnedQuestionIds) {
+      const q = byId.get(pid);
+      if (q) addGroupSiblings(q);
+    }
+
+    // Return allQuestions restricted to included IDs
+    return allQuestions.filter(q => includeIds.has(q.id));
   }, [allQuestions, pinnedQuestionIds, mode]);
 
   // Group questions and organize by sections with niveau-specific rules

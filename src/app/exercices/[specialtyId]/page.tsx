@@ -384,7 +384,7 @@ export default function SpecialtyPageRoute() {
   // Per-lecture mode helpers
   const getLectureMode = (lectureId: string): ModeKey => selectedModes[lectureId] || 'study'
   const getModeLabel = (mode: ModeKey) => mode === 'study' ? 'Étude' : mode === 'revision' ? 'Révision' : 'Épinglé'
-  const getModePath = (mode: ModeKey) => mode === 'study' ? '' : mode === 'revision' ? '/revision' : '/pinned-test'
+  const getModePath = (mode: ModeKey) => mode === 'study' ? '' : mode === 'revision' ? '/revision' : '/pinned'
   const setLectureMode = (lectureId: string, mode: ModeKey) => setSelectedModes(prev => ({ ...prev, [lectureId]: mode }))
   const goToLectureMode = (lectureId: string) => {
     const mode = getLectureMode(lectureId)

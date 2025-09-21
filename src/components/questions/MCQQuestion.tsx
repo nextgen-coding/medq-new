@@ -50,6 +50,7 @@ interface MCQQuestionProps {
   allowEnterSubmit?: boolean; // when false, Enter won't submit/next; lets parent handle Enter
   isActive?: boolean; // when true, this instance accepts keyboard shortcuts
   showNotesAfterSubmit?: boolean; // show notes area after submit (for task page)
+  onFocus?: () => void; // callback when any part of the question receives focus
 }
 
 export function MCQQuestion({ 
@@ -74,7 +75,8 @@ export function MCQQuestion({
   enableOptionHighlighting = false,
   disableKeyboardHandlers = false,
   allowEnterSubmit = true,
-  isActive = false
+  isActive = false,
+  onFocus
 }: MCQQuestionProps) {
   const [selectedOptionIds, setSelectedOptionIds] = useState<string[]>([]);
   const [submitted, setSubmitted] = useState(false);
@@ -612,6 +614,7 @@ export function MCQQuestion({
       exit={{ opacity: 0, y: -20 }}
       transition={{ duration: 0.4 }}
       className="space-y-6 w-full max-w-full"
+      onFocus={onFocus}
     >
       
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">

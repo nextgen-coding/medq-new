@@ -1,7 +1,7 @@
 'use client'
 
 import { useParams, useSearchParams, useRouter } from 'next/navigation'
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import { useLecture } from '@/hooks/use-lecture'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { LectureTimer } from '@/components/lectures/LectureTimer'
@@ -90,6 +90,23 @@ export default function CoursPageRoute() {
     handleQuestionUpdate,
   } = useLecture(lectureId, mode);
 
+  // Stabilize clinical-case transformation so child effects don't see a new object each render
+  const normalizedClinicalCase = useMemo(() => {
+    const q = (typeof currentQuestion === 'object' && currentQuestion) as any;
+    if (q && 'caseNumber' in q && Array.isArray(q.questions)) {
+      const needsNormalize = q.questions.some((s: any) => s?.type === 'mcq' || s?.type === 'qroc' || s?.type === 'open');
+      if (!needsNormalize) return q as ClinicalCase;
+      const mapped = q.questions.map((s: any) => {
+        if (s.type === 'mcq') return { ...s, type: 'clinic_mcq' };
+        if (s.type === 'qroc' || s.type === 'open') return { ...s, type: 'clinic_croq' };
+        return s;
+      });
+      // Return a new object only when needed; keep reference stable otherwise
+      return { ...q, questions: mapped } as ClinicalCase;
+    }
+    return null;
+  }, [currentQuestion]);
+
   // Optional: keep simple top anchor scroll without animations
   const contentTopRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -98,20 +115,36 @@ export default function CoursPageRoute() {
     }
   }, [currentQuestionIndex]);
 
-  // Update pinned state when current question changes
+  // Global Enter shortcut in revision mode: advance to next only for single questions.
   useEffect(() => {
-    if (currentQuestion) {
-      if ('questions' in currentQuestion) {
-        // For clinical cases, check if any subquestion is pinned
-        const clinicalCase = currentQuestion as ClinicalCase;
-        const isAnyPinned = clinicalCase.questions.some(q => pinnedQuestionIds.includes(q.id));
-        setIsPinned(isAnyPinned);
-      } else {
-        // Regular question
-        const questionId = (currentQuestion as Question).id;
-        setIsPinned(pinnedQuestionIds.includes(questionId));
-      }
+    if (mode !== 'revision') return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Enter') return;
+      const target = e.target as HTMLElement | null;
+      const typing = !!target && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT' || (target as any).isContentEditable);
+      if (typing) return; // don't hijack typing
+      if (!questions || questions.length === 0) return;
+      // If current is a grouped/clinical block, let the inner handler manage Enter for sub-navigation
+      if (currentQuestion && 'questions' in (currentQuestion as any)) return;
+      e.preventDefault();
+      handleNext();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [mode, handleNext, currentQuestionIndex, questions?.length]);
+
+  // Sync pinned UI state with data without causing update loops
+  useEffect(() => {
+    if (!currentQuestion) return;
+    let computed = false;
+    if ('questions' in currentQuestion) {
+      const clinicalCase = currentQuestion as ClinicalCase;
+      computed = clinicalCase.questions.some(q => pinnedQuestionIds.includes(q.id));
+    } else {
+      const questionId = (currentQuestion as Question).id;
+      computed = pinnedQuestionIds.includes(questionId);
     }
+    setIsPinned(prev => (prev !== computed ? computed : prev));
   }, [currentQuestion, pinnedQuestionIds]);
 
   if (!lectureId) {
@@ -175,6 +208,27 @@ export default function CoursPageRoute() {
               lectureTitle={lecture ? lecture.title : ''}
               lectureId={lectureId}
             />
+          </div>
+        </div>
+      </ProtectedRoute>
+    );
+  }
+
+  // Pinned mode empty state
+  if (!isLoading && mode === 'pinned' && (!questions || questions.length === 0)) {
+    return (
+      <ProtectedRoute>
+        <div className="min-h-screen bg-gradient-to-br from-blue-50/50 via-white to-blue-50/50 dark:from-blue-950/20 dark:via-gray-900 dark:to-blue-950/20">
+          <div className="container mx-auto px-4 py-12">
+            <div className="flex items-center justify-center min-h-[50vh]">
+              <div className="text-center max-w-md mx-auto">
+                <div className="backdrop-blur-sm bg-white/90 dark:bg-gray-800/90 border border-gray-200/60 dark:border-gray-700/60 rounded-2xl p-8 shadow-lg">
+                  <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">Aucune question épinglée</h1>
+                  <p className="text-gray-600 dark:text-gray-400 mb-6">Épinglez des questions depuis les autres modes pour les revoir ici.</p>
+                  <Button onClick={() => router.push(`/matieres/${specialtyId}`)} className="bg-blue-600 hover:bg-blue-700 text-white">Retour</Button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </ProtectedRoute>
@@ -499,31 +553,13 @@ export default function CoursPageRoute() {
   };
 
   const renderCurrentQuestion = () => {
-    console.log('renderCurrentQuestion called:', {
-      currentQuestion: currentQuestion,
-      currentQuestionIndex,
-      questionsLength: questions.length
-    });
-    
     if (!currentQuestion) {
-      console.log('No current question - returning null');
       return null;
     }
 
     // Use original ClinicalCaseQuestion UI for clinical/grouped cases
-    if ('caseNumber' in currentQuestion && 'questions' in currentQuestion) {
-      let clinicalCase = currentQuestion as ClinicalCase;
-      // Normalize sub-question types to legacy 'clinic_mcq' / 'clinic_croq' expected by ClinicalCaseQuestion
-      if (clinicalCase.questions.some(q => q.type === 'mcq' || q.type === 'qroc')) {
-        clinicalCase = {
-          ...clinicalCase,
-          questions: clinicalCase.questions.map(q => {
-            if (q.type === 'mcq') return { ...q, type: 'clinic_mcq' } as any;
-            if (q.type === 'qroc' || (q.type as any) === 'open') return { ...q, type: 'clinic_croq' } as any;
-            return q;
-          })
-        } as ClinicalCase;
-      }
+    if (normalizedClinicalCase) {
+      const clinicalCase = normalizedClinicalCase;
       return (
         <ClinicalCaseQuestion
           key={`case-${clinicalCase.caseNumber}`}
@@ -533,39 +569,41 @@ export default function CoursPageRoute() {
           lectureId={lectureId}
           lectureTitle={lecture?.title}
           specialtyName={lecture?.specialty?.name}
-          displayMode={(clinicalCase.questions.every(q=> q.type==='clinic_croq') ? 'multi_qroc' : clinicalCase.questions.every(q=> q.type==='clinic_mcq') ? 'multi_qcm' : 'clinical') as any}
-          isAnswered={clinicalCase.questions.every(q=> answers[q.id] !== undefined)}
+          displayMode={(clinicalCase.questions.every((q: any)=> q.type==='clinic_croq') ? 'multi_qroc' : clinicalCase.questions.every((q: any)=> q.type==='clinic_mcq') ? 'multi_qcm' : 'clinical') as any}
+          isAnswered={clinicalCase.questions.every((q: any)=> answers[q.id] !== undefined)}
           answerResult={(() => {
-            const resVals = clinicalCase.questions.map(q => answerResults[q.id]).filter(r => r !== undefined);
+            const resVals = clinicalCase.questions.map((q: any) => answerResults[q.id]).filter((r: any) => r !== undefined);
             if (!resVals.length) return undefined;
-            if (resVals.every(r => r === true)) return true;
-            if (resVals.some(r => r === true || r === 'partial')) return 'partial';
+            if (resVals.every((r: any) => r === true)) return true;
+            if (resVals.some((r: any) => r === true || r === 'partial')) return 'partial';
             return false;
           })() as any}
           userAnswers={answers}
           answerResults={answerResults}
           onAnswerUpdate={(qid, ans, res) => handleAnswerSubmit(qid, ans as any, res as any)}
+          revisionMode={mode === 'revision'}
         />
       );
     }
 
   // Regular question handling
   const revisionMode = mode === 'revision';
-  const isAnswered = revisionMode ? true : (answers[currentQuestion.id] !== undefined);
-  const answerResult = revisionMode ? true : answerResults[currentQuestion.id];
+  const simpleQuestion = currentQuestion as Question;
+  const isAnswered = revisionMode ? true : (answers[simpleQuestion.id] !== undefined);
+  const answerResult = revisionMode ? true : answerResults[simpleQuestion.id];
   const userAnswer = revisionMode
-    ? (currentQuestion.type === 'mcq'
-      ? (currentQuestion.correct_answers || currentQuestion.correctAnswers || [])
-      : ((currentQuestion as any).correctAnswers || (currentQuestion as any).correct_answers || (currentQuestion as any).course_reminder || (currentQuestion as any).explanation || ''))
-    : answers[currentQuestion.id];
+    ? (simpleQuestion.type === 'mcq'
+      ? (simpleQuestion.correct_answers || simpleQuestion.correctAnswers || [])
+      : ((simpleQuestion as any).correctAnswers || (simpleQuestion as any).correct_answers || (simpleQuestion as any).course_reminder || (simpleQuestion as any).explanation || ''))
+    : answers[simpleQuestion.id];
     
 
     
-  if (currentQuestion.type === 'mcq') {
+  if (simpleQuestion.type === 'mcq') {
       return (
         <MCQQuestion
-          key={currentQuestion.id}
-          question={currentQuestion}
+          key={simpleQuestion.id}
+          question={simpleQuestion}
           onSubmit={handleMCQSubmit}
           onNext={handleNext}
           lectureId={lectureId}
@@ -580,15 +618,17 @@ export default function CoursPageRoute() {
           enableOptionHighlighting={true}
           hideActions={revisionMode}
           showNotesAfterSubmit={isAnswered}
-          // Ensure keyboard shortcuts (digits/letters, Enter) are active on this route
-          isActive={true}
+          // In revision mode, disable inner keyboard handling so only page-level Enter advances
+          allowEnterSubmit={!revisionMode}
+          disableKeyboardHandlers={revisionMode}
+          isActive={!revisionMode}
         />
       );
     } else {
       return (
         <OpenQuestion
-          key={currentQuestion.id}
-          question={currentQuestion}
+          key={simpleQuestion.id}
+          question={simpleQuestion}
           onSubmit={handleOpenSubmit}
           onNext={handleNext}
           lectureId={lectureId}
@@ -603,6 +643,8 @@ export default function CoursPageRoute() {
           enableAnswerHighlighting={true}
           hideActions={revisionMode}
           showNotesAfterSubmit={isAnswered}
+          // Disable internal Enter handlers so page-level Enter is the single source of truth
+          disableEnterHandlers={revisionMode}
         />
       );
     }
@@ -619,7 +661,15 @@ export default function CoursPageRoute() {
             <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 pb-10 lg:pb-0">
               <div className="flex-1 space-y-4 sm:space-y-6 min-w-0 w-full max-w-full">
               {currentQuestion && (
-                <div className="space-y-2">
+                <div
+                  className={[
+                    "space-y-2",
+                    // Make header sticky for multi-question/grouped items (multi QCM/QROC/clinical)
+                    ('questions' in (currentQuestion as any))
+                      ? "sticky top-0 z-30 bg-white/90 dark:bg-gray-900/80 backdrop-blur-sm border-b border-gray-200/60 dark:border-gray-700/60 py-2"
+                      : ""
+                  ].join(' ')}
+                >
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-4">
                     <div className="flex flex-col">
                       <h1 className="text-base md:text-lg font-semibold leading-tight text-gray-900 dark:text-gray-100">
@@ -892,6 +942,15 @@ export default function CoursPageRoute() {
               <div ref={contentTopRef} className="space-y-4 sm:space-y-6">
                 {currentQuestion && renderCurrentQuestion()}
               </div>
+
+              {/* In revision, show persistent Next only for single questions (not grouped/clinical) */}
+              {mode === 'revision' && currentQuestion && !('questions' in (currentQuestion as any)) && (
+                <div className="mt-4 sm:mt-6 flex justify-end">
+                  <Button onClick={handleNext} className="bg-blue-600 hover:bg-blue-700 text-white">
+                    Suivant
+                  </Button>
+                </div>
+              )}
             </div>
 
             {isLargeScreen && (

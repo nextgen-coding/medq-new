@@ -213,6 +213,20 @@ function updateProgress(importId: string, progress: number, message: string, log
   });
 }
 
+// Tunables for large imports (env-overridable)
+const TX_MAX_WAIT = Number(process.env.IMPORT_TX_MAX_WAIT_MS ?? 20_000);
+const TX_TIMEOUT = Number(process.env.IMPORT_TX_TIMEOUT_MS ?? 180_000);
+const CREATE_MANY_CHUNK = Number(process.env.IMPORT_CREATE_MANY_CHUNK ?? 1_000);
+const DUP_TEXT_CHUNK = Number(process.env.IMPORT_DUP_TEXT_CHUNK ?? 500);
+
+// Small utility to chunk an array
+function chunkArray<T>(arr: T[], size: number): T[][] {
+  if (size <= 0) return [arr];
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
 async function processFile(file: File, importId: string) {
   try {
   updateProgress(importId, 5, 'Reading Excel file...', undefined, 'validating');
@@ -363,9 +377,10 @@ async function processFile(file: File, importId: string) {
   const rawHeader = (jsonData[0] as string[]).map(h => String(h ?? ''));
   const header = rawHeader.map(canonicalizeHeader);
 
-  // Skip header row
-  const dataRows = jsonData.slice(1);
-      importStats.total += dataRows.length;
+  // Skip header row and filter out completely empty rows so they are never counted or logged
+  const rawRows = jsonData.slice(1);
+  const dataRows = rawRows.filter((row) => Array.isArray(row) && (row as unknown[]).some(cell => String(cell ?? '').trim() !== ''));
+    importStats.total += dataRows.length;
 
   updateProgress(importId, 25, `Found ${dataRows.length} rows in ${sheetName}...`);
 
@@ -387,14 +402,7 @@ async function processFile(file: File, importId: string) {
           header.forEach((h, idx) => {
             rowData[h] = String((row as unknown[])[idx] ?? '').trim();
           });
-
-          // Skip fully empty rows (do not count as failures)
-          const isCompletelyEmpty = (row as unknown[]).every(cell => String(cell ?? '').trim() === '');
-          if (isCompletelyEmpty) {
-            importStats.total--; // adjust total to exclude this blank row
-            updateProgress(importId, progress, `Skipping empty row ${i + 1} in ${sheetName}...`);
-            continue;
-          }
+          // Empty rows already filtered out above. No logging or counting for them.
 
           // Build basic fields with forward-fill: use last seen values if cells are empty
           let specialtyName = rowData['matiere'] || lastSpecialtyName;
@@ -715,9 +723,9 @@ async function processFile(file: File, importId: string) {
       return;
     }
 
-    // DB duplicate detection for existing lectures
-    updateProgress(importId, 70, 'Checking duplicates in database...');
-    // 1) Resolve existing specialties/lectures
+  // DB duplicate detection for existing lectures
+  updateProgress(importId, 70, 'Checking duplicates in database...');
+  // 1) Resolve existing specialties/lectures
     const specialtyList = Array.from(specialtyNamesSet);
     const titlesBySpec: Record<string, string[]> = {};
     for (const [spec, titlesSet] of lectureTitlesBySpecialty.entries()) {
@@ -749,14 +757,17 @@ async function processFile(file: File, importId: string) {
     let existingCandidates: Array<{
       id: string; lectureId: string; type: string; text: string; correctAnswers: any; courseReminder: string | null; number: number | null; session: string | null; caseNumber: number | null; caseText: string | null; caseQuestionNumber: number | null;
     }> = [];
-    if (lectureIds.length > 0) {
-      existingCandidates = await prisma.question.findMany({
-        where: {
-          lectureId: { in: lectureIds },
-          text: { in: Array.from(new Set(lectureIds.flatMap(id => Array.from(byLectureIdTexts.get(id) || [])))) }
-        },
-        select: { id: true, lectureId: true, type: true, text: true, correctAnswers: true, courseReminder: true, number: true, session: true, caseNumber: true, caseText: true, caseQuestionNumber: true }
-      });
+    // Batch per lecture to avoid huge IN lists and leverage potential index on (lectureId, text)
+    for (const lecId of lectureIds) {
+      const texts = Array.from(byLectureIdTexts.get(lecId) || []);
+      if (!texts.length) continue;
+      for (const textChunk of chunkArray(texts, DUP_TEXT_CHUNK)) {
+        const partial = await prisma.question.findMany({
+          where: { lectureId: lecId, text: { in: textChunk } },
+          select: { id: true, lectureId: true, type: true, text: true, correctAnswers: true, courseReminder: true, number: true, session: true, caseNumber: true, caseText: true, caseQuestionNumber: true }
+        });
+        if (partial.length) existingCandidates.push(...partial);
+      }
     }
     const eqArr = (a?: any[] | null, b?: any[] | null) => {
       const aa = Array.isArray(a) ? a.map(x => String(x)) : [];
@@ -792,7 +803,7 @@ async function processFile(file: File, importId: string) {
     // Transactional import: create missing entities and then all questions
     let createdSpecCount = 0;
     let createdLectureCount = 0;
-    await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx) => {
       // Ensure niveaux
       const niveauNameToId = new Map<string, string>();
       // Start with existing
@@ -892,17 +903,27 @@ async function processFile(file: File, importId: string) {
         byLectureRecords.get(lecId)!.push(rec);
       }
 
-      // Insert per lecture with createMany
+      // Insert per lecture with createMany, chunked to reduce payload and lock times
       let processed = 0;
       const total = plannedRows.length;
       for (const [lecId, rows] of byLectureRecords.entries()) {
-        await tx.question.createMany({ data: rows });
-        processed += rows.length;
-        const base = 80;
-        const pct = base + Math.floor((processed / total) * 19);
-        updateProgress(importId, pct, `Imported ${processed}/${total}...`);
+        if (rows.length <= CREATE_MANY_CHUNK) {
+          await tx.question.createMany({ data: rows });
+          processed += rows.length;
+          const base = 80;
+          const pct = base + Math.floor((processed / total) * 19);
+          updateProgress(importId, pct, `Imported ${processed}/${total}...`);
+          continue;
+        }
+        for (const chunk of chunkArray(rows, CREATE_MANY_CHUNK)) {
+          await tx.question.createMany({ data: chunk });
+          processed += chunk.length;
+          const base = 80;
+          const pct = base + Math.floor((processed / total) * 19);
+          updateProgress(importId, pct, `Imported ${processed}/${total}...`);
+        }
       }
-    });
+    }, { maxWait: TX_MAX_WAIT, timeout: TX_TIMEOUT });
 
     // Update final stats and session
     importStats.imported = plannedRows.length;

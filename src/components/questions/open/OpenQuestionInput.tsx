@@ -9,18 +9,25 @@ interface OpenQuestionInputProps {
   isSubmitted: boolean;
   onSubmit?: () => void; // optional submit handler for Enter key
   onBlur?: (answer: string) => void; // callback when leaving input field
+  autoFocusEnabled?: boolean; // when false, do not autofocus textarea on mount
+  disableEnterKey?: boolean; // when true, don't handle Enter locally
 }
 
-export function OpenQuestionInput({ answer, setAnswer, isSubmitted, onSubmit, onBlur }: OpenQuestionInputProps) {
+export function OpenQuestionInput({ answer, setAnswer, isSubmitted, onSubmit, onBlur, autoFocusEnabled = true, disableEnterKey = false }: OpenQuestionInputProps) {
   const { t } = useTranslation();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   
-  // Auto-focus on the textarea when component mounts and not submitted
+  // Auto-focus on the textarea when component mounts and not submitted (if enabled)
   useEffect(() => {
-    if (!isSubmitted && textareaRef.current) {
-      textareaRef.current.focus();
+    if (autoFocusEnabled && !isSubmitted && textareaRef.current) {
+      // Use requestAnimationFrame to ensure DOM is ready and avoid focus conflicts
+      requestAnimationFrame(() => {
+        if (textareaRef.current && !isSubmitted) {
+          textareaRef.current.focus();
+        }
+      });
     }
-  }, [isSubmitted]);
+  }, [isSubmitted, autoFocusEnabled]);
   
   const handleAnswerChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
     if (isSubmitted) return;
@@ -36,6 +43,12 @@ export function OpenQuestionInput({ answer, setAnswer, isSubmitted, onSubmit, on
   
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (isSubmitted) return; // textarea is typically disabled when submitted, but guard anyway
+    
+    // In grouped mode, completely defer Enter handling to parent
+    if (disableEnterKey && e.key === 'Enter') {
+      return; // let event bubble up to parent handlers
+    }
+    
     // Submit on Enter; allow Shift+Enter to insert a newline
     if (e.key === 'Enter') {
       if (e.shiftKey) {

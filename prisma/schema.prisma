@@ -262,6 +262,7 @@ model Question {
   @@index([number], map: "idx_questions_number")
   @@index([caseNumber, caseQuestionNumber], map: "idx_questions_case")
   @@index([parentQuestionId], map: "idx_questions_parent")
+  @@index([lectureId, text], map: "idx_questions_lecture_text")
   @@map("questions")
 }
 

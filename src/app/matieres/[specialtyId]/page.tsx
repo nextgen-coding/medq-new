@@ -24,18 +24,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { 
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import {
   DropdownMenu,
+  DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from '@/components/ui/dropdown-menu'
 import {
   Select,
   SelectContent,
@@ -43,6 +37,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { 
   Search, 
   Filter, 
@@ -484,7 +479,7 @@ export default function SpecialtyPageRoute() {
   // Per-lecture mode helpers
   const getLectureMode = (lectureId: string): ModeKey => selectedModes[lectureId] || 'study'
   const getModeLabel = (mode: ModeKey) => mode === 'study' ? 'Étude' : mode === 'revision' ? 'Révision' : 'Épinglé'
-  const getModePath = (mode: ModeKey) => mode === 'study' ? '' : mode === 'revision' ? '/revision' : '/pinned-test'
+  const getModePath = (mode: ModeKey) => mode === 'study' ? '' : mode === 'revision' ? '/revision' : '/pinned'
   const setLectureMode = (lectureId: string, mode: ModeKey) => setSelectedModes(prev => ({ ...prev, [lectureId]: mode }))
   const goToLectureMode = (lectureId: string) => {
     const mode = getLectureMode(lectureId)
@@ -699,39 +694,111 @@ export default function SpecialtyPageRoute() {
                 </div>
               </div>
 
-              {/* Lectures table */}
+              {/* Lectures table or Empty State */}
               <Card className="bg-white dark:bg-gray-800 shadow-sm min-w-0">
+                {sortedLectures.length === 0 ? (
+                  <CardContent className="p-8">
+                    <div className="max-w-3xl mx-auto text-center space-y-3">
+                      <div className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Aucun cours à afficher</div>
+                      {(() => {
+                        const totalHeader = specialty.progress?.totalLectures || 0;
+                        const filtersActive = (selectedFilter !== 'all') || (searchQuery.trim().length > 0);
+                        if (filtersActive) {
+                          return (
+                            <>
+                              <p className="text-gray-600 dark:text-gray-400">
+                                Aucun cours ne correspond aux filtres ou à votre recherche.
+                              </p>
+                              <div className="flex flex-col sm:flex-row items-center justify-center gap-2 pt-2">
+                                <Button variant="outline" onClick={() => { setSelectedFilter('all'); setSearchQuery(''); setSortOption('default'); setSortDirection('asc'); }}>
+                                  Réinitialiser les filtres
+                                </Button>
+                                <Button variant="ghost" onClick={() => router.refresh?.()}>Actualiser</Button>
+                              </div>
+                            </>
+                          );
+                        }
+                        if (totalHeader > 0 && lectures.length === 0) {
+                          return (
+                            <>
+                              <p className="text-gray-600 dark:text-gray-400">
+                                Incohérence détectée : cette matière indique {totalHeader} cours, mais aucun cours n'est actuellement accessible.
+                              </p>
+                              <p className="text-gray-600 dark:text-gray-400">
+                                Cela peut provenir d'une synchronisation en retard, de droits d'accès, ou d'un problème côté matière.
+                              </p>
+                              <div className="flex flex-col sm:flex-row items-center justify-center gap-2 pt-2">
+                                <Button variant="outline" onClick={() => router.refresh?.()}>Réessayer</Button>
+                                <Button variant="ghost" onClick={() => router.push('/matieres')}>Retour aux matières</Button>
+                              </div>
+                            </>
+                          );
+                        }
+                        if (lectures.length === 0) {
+                          return (
+                            <>
+                              <p className="text-gray-600 dark:text-gray-400">
+                                Cette matière ne contient pas encore de cours.
+                              </p>
+                              {isAdmin ? (
+                                <div className="flex items-center justify-center gap-2 pt-2">
+                                  <Button onClick={() => setIsEditDialogOpen(true)}>Modifier la matière</Button>
+                                  <Button variant="outline" onClick={() => router.push('/admin/import')}>Importer des questions</Button>
+                                </div>
+                              ) : (
+                                <div className="pt-2">
+                                  <Button variant="ghost" onClick={() => router.push('/matieres')}>Retour aux matières</Button>
+                                </div>
+                              )}
+                            </>
+                          );
+                        }
+                        // Fallback generic message
+                        return (
+                          <>
+                            <p className="text-gray-600 dark:text-gray-400">
+                              Aucun cours n'est disponible pour le moment.
+                            </p>
+                            <div className="pt-2">
+                              <Button variant="ghost" onClick={() => router.push('/matieres')}>Retour aux matières</Button>
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </CardContent>
+                ) : (
                 <CardContent className="p-0 min-w-0">
                   <div className="overflow-x-auto w-full min-w-0 -mx-2 px-2 sm:mx-0 sm:px-0">
                     <Table className="min-w-full w-full">
                       <TableHeader>
                         <TableRow>
-                            {isAdmin && (
-                              <TableHead className="w-8">{/* always show select on desktop */}
-                                <Checkbox
-                                  aria-label="Tout sélectionner"
-                                  checked={(() => {
-                                    const ids = [...ungroupedLectures, ...Object.values(groupedLectures).flat()].map(l => l.id)
-                                    return ids.length > 0 && ids.every(id => selectedCourseIds[id])
-                                  })()}
-                                  onCheckedChange={(checked) => {
-                                    const allIds = [...ungroupedLectures, ...Object.values(groupedLectures).flat()].map(l => l.id)
-                                    const next: Record<string, boolean> = { ...selectedCourseIds }
-                                    allIds.forEach(id => { next[id] = !!checked })
-                                    setSelectedCourseIds(next)
-                                  }}
-                                />
-                              </TableHead>
-                            )}
-                            <TableHead className="min-w-0">Cours</TableHead>
-                            {isAdmin && <TableHead className="hidden lg:table-cell min-w-0">Rapports</TableHead>}
-                            <TableHead className="hidden md:table-cell min-w-0">Note /20</TableHead>
-                            <TableHead className="min-w-0 w-20 sm:w-24 md:w-32 lg:w-40">Progression</TableHead>
-                            <TableHead className="hidden xl:table-cell min-w-0">Commentaires</TableHead>
-                            <TableHead className="min-w-0 w-16 sm:w-20 md:w-24">Action</TableHead>
+                          {isAdmin && (
+                            <TableHead className="w-8">
+                              <Checkbox
+                                aria-label="Tout sélectionner"
+                                checked={(() => {
+                                  const ids = [...ungroupedLectures, ...Object.values(groupedLectures).flat()].map(l => l.id)
+                                  return ids.length > 0 && ids.every(id => selectedCourseIds[id])
+                                })()}
+                                onCheckedChange={(checked) => {
+                                  const allIds = [...ungroupedLectures, ...Object.values(groupedLectures).flat()].map(l => l.id)
+                                  const next: Record<string, boolean> = { ...selectedCourseIds }
+                                  allIds.forEach(id => { next[id] = !!checked })
+                                  setSelectedCourseIds(next)
+                                }}
+                              />
+                            </TableHead>
+                          )}
+                          <TableHead className="min-w-0">Cours</TableHead>
+                          {isAdmin && <TableHead className="hidden lg:table-cell min-w-0">Rapports</TableHead>}
+                          <TableHead className="hidden md:table-cell min-w-0">Note /20</TableHead>
+                          <TableHead className="min-w-0 w-20 sm:w-24 md:w-32 lg:w-40">Progression</TableHead>
+                          <TableHead className="hidden xl:table-cell min-w-0">Commentaires</TableHead>
+                          <TableHead className="min-w-0 w-16 sm:w-20 md:w-24">Action</TableHead>
                         </TableRow>
                       </TableHeader>
-                    <TableBody>
+                      <TableBody>
                       {isAdmin && Object.values(selectedCourseIds).some(v => v) && (
                         <TableRow className="bg-blue-50/40 dark:bg-blue-900/10">
                           <TableCell colSpan={isAdmin ? 6 : 5} className="p-4 min-w-0">
@@ -768,9 +835,14 @@ export default function SpecialtyPageRoute() {
                           <TableCell>
                             <div className="flex items-center gap-2">
                               <File className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                              <div className="min-w-0 flex-1">
+                              <button
+                                type="button"
+                                onClick={() => goToLectureMode(lecture.id)}
+                                title="Ouvrir le cours dans le mode sélectionné"
+                                className="min-w-0 flex-1 text-left"
+                              >
                                 {/* Mobile: truncate to half, desktop: full */}
-                                <div className="font-medium truncate">
+                                <div className="font-medium truncate text-sky-700 hover:underline dark:text-sky-300">
                                   <span className="block sm:hidden">{lecture.title.length > 16 ? lecture.title.slice(0, Math.ceil(lecture.title.length/2)) + '…' : lecture.title}</span>
                                   <span className="hidden sm:block">{lecture.title}</span>
                                 </div>
@@ -778,7 +850,7 @@ export default function SpecialtyPageRoute() {
                                   <span className="block sm:hidden">{lecture.description && lecture.description.length > 16 ? lecture.description.slice(0, Math.ceil(lecture.description.length/2)) + '…' : lecture.description}</span>
                                   <span className="hidden sm:block">{lecture.description}</span>
                                 </div>
-                              </div>
+                              </button>
                             </div>
                           </TableCell>
                           {isAdmin && (
@@ -910,8 +982,13 @@ export default function SpecialtyPageRoute() {
                             <TableCell>
                               <div className="flex items-center gap-2 pl-4 sm:pl-6">
                                 <File className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                                <div className="min-w-0 flex-1">
-                                  <div className="font-medium truncate">
+                                <button
+                                  type="button"
+                                  onClick={() => goToLectureMode(lecture.id)}
+                                  title="Ouvrir le cours dans le mode sélectionné"
+                                  className="min-w-0 flex-1 text-left"
+                                >
+                                  <div className="font-medium truncate text-sky-700 hover:underline dark:text-sky-300">
                                     <span className="block sm:hidden">{lecture.title.length > 16 ? lecture.title.slice(0, Math.ceil(lecture.title.length/2)) + '…' : lecture.title}</span>
                                     <span className="hidden sm:block">{lecture.title}</span>
                                   </div>
@@ -919,8 +996,7 @@ export default function SpecialtyPageRoute() {
                                     <span className="block sm:hidden">{lecture.description && lecture.description.length > 16 ? lecture.description.slice(0, Math.ceil(lecture.description.length/2)) + '…' : lecture.description}</span>
                                     <span className="hidden sm:block">{lecture.description}</span>
                                   </div>
-                                </div>
-
+                                </button>
                               </div>
                             </TableCell>
                             {isAdmin && (
@@ -1046,6 +1122,7 @@ export default function SpecialtyPageRoute() {
                   </Table>
                   </div>
                 </CardContent>
+                )}
               </Card>
             </div>
           </div>
