@@ -892,12 +892,17 @@ export default function SpecialtyPageRoute() {
                           {/* Grouped rows */}
                           {Object.entries(groupedLectures).map(([groupName, glist]) => [
                             <TableRow key={`group-${groupName}`} className="bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-700/50">
-                              <TableCell colSpan={isAdmin ? 6 : 5} className="p-4 min-w-0">
-                                <Button variant="ghost" onClick={() => setExpandedGroups(prev => ({ ...prev, [groupName]: !prev[groupName] }))} className="flex items-center gap-2 p-0 h-auto font-medium text-gray-900 dark:text-gray-100 min-w-0 w-full">
+                              <TableCell colSpan={7} className="!p-0 min-w-0 align-middle border-0">
+                                <Button
+                                  variant="ghost"
+                                  onClick={() => setExpandedGroups(prev => ({ ...prev, [groupName]: !prev[groupName] }))}
+                                  className="w-full flex items-center gap-2 h-full p-3 font-medium text-gray-900 dark:text-gray-100 min-w-0 justify-start text-left rounded-none focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                  style={{ boxShadow: 'none' }}
+                                >
                                   <Folder className="w-4 h-4 text-blue-600 flex-shrink-0" />
                                   {expandedGroups[groupName] ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                                  <span className="truncate flex-1 min-w-0">{groupName}</span>
-                                  <Badge variant="secondary" className="ml-2 flex-shrink-0">{glist.length} cours</Badge>
+                                  <span className="truncate flex-1 min-w-0 text-base font-semibold">{groupName}</span>
+                                  <Badge variant="secondary" className="ml-2 flex-shrink-0 px-2 py-0.5 text-xs font-semibold">{glist.length} cours</Badge>
                                 </Button>
                               </TableCell>
                             </TableRow>,
