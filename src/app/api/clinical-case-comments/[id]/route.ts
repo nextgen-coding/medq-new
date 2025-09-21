@@ -14,9 +14,9 @@ const fullSelect = {
 };
 
 // PUT /api/clinical-case-comments/[id]
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const { content, imageUrls } = await request.json();
 
     if (!id) return NextResponse.json({ error: 'Comment ID is required' }, { status: 400 });
@@ -56,9 +56,9 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 }
 
 // DELETE /api/clinical-case-comments/[id]
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { id } = params;
+    const { id } = await params;
     if (!id) return NextResponse.json({ error: 'Comment ID is required' }, { status: 400 });
 
     // @ts-ignore
