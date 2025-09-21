@@ -11,13 +11,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Badge } from '@/components/ui/badge';
-import { LogOut, Settings, User, Heart, Stethoscope, Menu, Bell, Moon, Sun, X } from 'lucide-react';
+import { LogOut, Settings, User, Heart, Stethoscope, Menu, Moon, Sun, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { useSidebar } from '@/components/ui/sidebar';
-import { NotificationsDialog } from '@/components/notifications/NotificationsDialog';
-import { useState, useEffect, useCallback } from 'react';
 
 export function AppHeader() {
   const { user, isAdmin, logout } = useAuth();
@@ -25,10 +22,6 @@ export function AppHeader() {
   const router = useRouter();
   const { t } = useTranslation();
   const { setOpen, setOpenMobile, isMobile, open, openMobile } = useSidebar();
-  const [notificationCount, setNotificationCount] = useState(0);
-  const [recentNotifications, setRecentNotifications] = useState<any[]>([]);
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
-  const [focusedNotificationId, setFocusedNotificationId] = useState<string | undefined>();
 
   const handleSignOut = async () => {
     try {
@@ -48,71 +41,6 @@ export function AppHeader() {
     }
   };
 
-  const formatTime = (d: string | Date) => {
-    const date = typeof d === 'string' ? new Date(d) : d;
-    const diff = (Date.now() - date.getTime()) / 1000;
-    if (diff < 60) return `${Math.floor(diff)}s`;
-    if (diff < 3600) return `${Math.floor(diff/60)}m`;
-    if (diff < 86400) return `${Math.floor(diff/3600)}h`;
-    return date.toLocaleDateString();
-  };
-
-  const stripAdmin = (s: string) => s?.replace(/^\[ADMIN\]\s*/i, '') ?? s;
-
-  const reloadNotifications = useCallback(async () => {
-    try {
-      if (!user) {
-        setNotificationCount(0);
-        setRecentNotifications([]);
-        return;
-      }
-      const res = await fetch('/api/notifications?limit=5', { credentials: 'include' });
-      if (!res.ok) return;
-      const json = await res.json();
-      const list = (json.notifications || []).map((n: any) => ({
-        id: n.id,
-        title: stripAdmin(n.title),
-        time: n.createdAt ? formatTime(n.createdAt) : '',
-        read: !!n.isRead,
-      }));
-      setRecentNotifications(list);
-      setNotificationCount(list.filter((n: any) => !n.read).length);
-    } catch {
-      // ignore transient failures
-    }
-  }, [user]);
-
-  useEffect(() => {
-    let isMounted = true;
-    const load = async () => {
-      try {
-        if (!user) {
-          if (isMounted) {
-            setNotificationCount(0);
-            setRecentNotifications([]);
-          }
-          return;
-        }
-        const res = await fetch('/api/notifications?limit=5', { credentials: 'include' });
-        if (!res.ok) return;
-        const json = await res.json();
-        const list = (json.notifications || []).map((n: any) => ({
-          id: n.id,
-          title: stripAdmin(n.title),
-          time: n.createdAt ? formatTime(n.createdAt) : '',
-          read: !!n.isRead,
-        }));
-        if (isMounted) {
-          setRecentNotifications(list);
-          setNotificationCount(list.filter((n: any) => !n.read).length);
-        }
-      } catch {
-        // ignore transient failures
-      }
-    };
-    load();
-    return () => { isMounted = false; };
-  }, [user]);
 
   return (
     <header className="border-b border-border/40 bg-gradient-to-r from-background via-background to-muted/20 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80 sticky top-0 z-40 shadow-sm">
@@ -137,53 +65,6 @@ export function AppHeader() {
         <div className="ml-auto flex items-center gap-1 sm:gap-2">
           {user && (
             <>
-              {/* Notifications */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="relative shrink-0">
-                    <Bell className="h-4 w-4 sm:h-5 sm:w-5" />
-                    {notificationCount > 0 && (
-                      <Badge
-                        variant="destructive"
-                        className="absolute -top-1 -right-1 h-4 w-4 sm:h-5 sm:w-5 flex items-center justify-center p-0 text-xs"
-                      >
-                        {notificationCount}
-                      </Badge>
-                    )}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-72 sm:w-80 lg:w-96">
-                  <DropdownMenuLabel className="text-base font-semibold">Notifications</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {recentNotifications.length > 0 ? (
-                    recentNotifications.map((n) => (
-                      <DropdownMenuItem key={n.id} className="p-4 cursor-pointer" onClick={() => {
-                        setFocusedNotificationId(n.id);
-                        setNotificationsOpen(true);
-                      }}>
-                        <div className="flex flex-col space-y-1 w-full min-w-0">
-                          <p className="text-sm font-medium truncate">{n.title}</p>
-                          <p className="text-xs text-muted-foreground">{n.time}</p>
-                        </div>
-                      </DropdownMenuItem>
-                    ))
-                  ) : (
-                    <div className="p-4 text-sm text-muted-foreground text-center">No new notifications</div>
-                  )}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem className="p-0">
-                    <div
-                      className="w-full p-3 text-center bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors rounded-b-lg cursor-pointer"
-                      onClick={() => setNotificationsOpen(true)}
-                    >
-                      <span className="text-blue-600 dark:text-blue-400 font-medium text-sm">
-                        View all notifications
-                      </span>
-                    </div>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
               {/* Theme Toggle (tooltip removed to avoid ref loops) */}
               <Button
                 variant="ghost"
@@ -227,17 +108,6 @@ export function AppHeader() {
           )}
         </div>
       </div>
-
-      {/* Notifications Dialog */}
-      <NotificationsDialog
-        open={notificationsOpen}
-        onOpenChange={(open) => {
-          setNotificationsOpen(open);
-          if (!open) setFocusedNotificationId(undefined);
-        }}
-        onNotificationsUpdated={reloadNotifications}
-        focusNotificationId={focusedNotificationId}
-      />
     </header>
   );
 }

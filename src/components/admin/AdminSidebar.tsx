@@ -71,6 +71,7 @@ export function AdminSidebar() {
     { label: 'Validation', icon: CheckCircle, href: '/admin/validation', description: 'Système de validation IA' },
     { label: t('admin.importQuestions', { defaultValue: 'Importation' }), icon: Upload, href: '/admin/import', description: 'Importer des questions QROC' },
     { label: 'Notifications', icon: Bell, href: '/admin/notifications', description: 'Envoyer des notifications ciblées aux utilisateurs' },
+    { label: 'Mes Notifications', icon: Brain, href: '/admin/inbox', description: 'Voir les notifications reçues' },
     { label: t('admin.reports', { defaultValue: 'Rapports' }), icon: AlertTriangle, href: '/admin/reports', description: 'Voir les signalements' },
     { label: t('admin.users', { defaultValue: 'Utilisateurs' }), icon: Users, href: '/admin/users', description: 'Gérer les utilisateurs' },
     studentPanelItem
