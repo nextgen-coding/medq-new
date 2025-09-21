@@ -66,6 +66,8 @@ model User {
   aiValidationJobs              AiValidationJob[]
   // Clinical case notes relation
   clinicalCaseNotes             ClinicalCaseNotes[]
+  // Clinical case comments relation
+  clinicalCaseComments          ClinicalCaseComment[]
 
   @@map("profiles")
 }
@@ -305,6 +307,29 @@ model ClinicalCaseNotes {
   @@index([userId], map: "idx_clinical_case_notes_user")
   @@index([questionId], map: "idx_clinical_case_notes_question")
   @@map("clinical_case_notes")
+}
+
+// Separate table for clinical case comments that don't reference the questions table
+// Used for text-based question IDs like "clinical-case-1", "group-qroc-2", etc.
+model ClinicalCaseComment {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  questionId String   @map("question_id") // Text-based ID like "clinical-case-1"
+  userId     String   @map("user_id") @db.Uuid
+  content    String
+  isAnonymous Boolean @default(false) @map("is_anonymous")
+  // Image attachments (uploaded via UploadThing) – store direct URLs
+  imageUrls  String[] @map("image_urls") @default([])
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parentCommentId String? @map("parent_comment_id") @db.Uuid
+  parent    ClinicalCaseComment? @relation("ClinicalCaseCommentToClinicalCaseComment", fields: [parentCommentId], references: [id])
+  replies   ClinicalCaseComment[] @relation("ClinicalCaseCommentToClinicalCaseComment")
+
+  @@index([questionId], map: "idx_clinical_case_comments_question")
+  @@index([userId], map: "idx_clinical_case_comments_user")
+  @@index([parentCommentId], map: "idx_clinical_case_comments_parent")
+  @@map("clinical_case_comments")
 }
 
 model QuestionComment {

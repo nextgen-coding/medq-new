@@ -10,7 +10,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog';
 import { RichTextInput } from '@/components/ui/rich-text-input';
 
-interface QuestionCommentsProps { questionId: string; }
+interface QuestionCommentsProps {
+  questionId: string;
+  commentType?: 'regular' | 'clinical-case';
+}
 
 type QComment = {
   id: string;
@@ -24,7 +27,7 @@ type QComment = {
   imageUrls?: string[];
 };
 
-export function QuestionComments({ questionId }: QuestionCommentsProps) {
+export function QuestionComments({ questionId, commentType = 'regular' }: QuestionCommentsProps) {
   const { user } = useAuth();
   const ownerId = user?.id;
   const isAdmin = user?.role === 'admin';
@@ -36,7 +39,6 @@ export function QuestionComments({ questionId }: QuestionCommentsProps) {
   const [postAnonymous, setPostAnonymous] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
-  const [editImages, setEditImages] = useState<any[]>([]); // Images for editing
   const [replyParentId, setReplyParentId] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
   const [replyImages, setReplyImages] = useState<any[]>([]); // Images for replies
@@ -98,16 +100,17 @@ export function QuestionComments({ questionId }: QuestionCommentsProps) {
   };  const load = useMemo(() => async () => {
     try {
       setLoading(true);
-      const res = await fetch(`/api/question-comments?questionId=${questionId}`);
+      const apiEndpoint = commentType === 'clinical-case' ? '/api/clinical-case-comments' : '/api/question-comments';
+      const res = await fetch(`${apiEndpoint}?questionId=${questionId}`);
       if (!res.ok) throw new Error('Failed');
-  const data: QComment[] = await res.json();
-  // Sanitize any stored control chars in loaded comments
-  const sanitized = (data || []).map(c => ({ ...c, content: stripControlChars(c.content || '') }));
-  setComments(sanitized);
+      const data: QComment[] = await res.json();
+      // Sanitize any stored control chars in loaded comments
+      const sanitized = (data || []).map(c => ({ ...c, content: stripControlChars(c.content || '') }));
+      setComments(sanitized);
     } catch {
       // silent
     } finally { setLoading(false); }
-  }, [questionId]);
+  }, [questionId, commentType]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -170,17 +173,18 @@ export function QuestionComments({ questionId }: QuestionCommentsProps) {
     
     try {
       setSubmitting(true);
-      const res = await fetch('/api/question-comments', { 
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify({ 
-          questionId, 
-          userId: ownerId, 
-          content, 
-          isAnonymous: postAnonymous, 
-          parentCommentId: parentId, 
-          imageUrls: imgs 
-        }) 
+      const apiEndpoint = commentType === 'clinical-case' ? '/api/clinical-case-comments' : '/api/question-comments';
+      const res = await fetch(apiEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          questionId,
+          userId: ownerId,
+          content,
+          isAnonymous: postAnonymous,
+          parentCommentId: parentId,
+          imageUrls: imgs
+        })
       });
       
       if (!res.ok) throw new Error('Failed');
@@ -204,47 +208,45 @@ export function QuestionComments({ questionId }: QuestionCommentsProps) {
     }
   };
 
-  const beginEdit = (c: QComment) => { 
-    setEditingId(c.id); 
-  setEditText(normalizeLTR(displayText(c.content)));
-    setEditImages(c.imageUrls?.map(url => ({ id: `edit-${Date.now()}-${Math.random()}`, url, description: 'Image' })) || []);
+  const beginEdit = (c: QComment) => {
+    setEditingId(c.id);
+    setEditText(normalizeLTR(displayText(c.content)));
   };
-  const cancelEdit = () => { 
-    setEditingId(null); 
-    setEditText(''); 
-    setEditImages([]);
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditText('');
   };
   
   const saveEdit = async (id: string) => {
-  if (!displayText(editText).trim() && editImages.length === 0) return;
+    if (!displayText(editText).trim()) return;
     try {
-      const imageUrls = editImages.map(img => img.url);
-      const res = await fetch(`/api/question-comments/${id}`, { 
-        method: 'PUT', 
-        headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify({ 
+      const apiEndpoint = commentType === 'clinical-case' ? '/api/clinical-case-comments' : '/api/question-comments';
+      const res = await fetch(`${apiEndpoint}/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           content: displayText(editText).trim(),
-          imageUrls: imageUrls
-        }) 
+          imageUrls: [] // Keep existing images, don't modify them in edit mode
+        })
       });
       if (!res.ok) throw new Error('Failed');
-  const updated: QComment = await res.json();
-  updated.content = stripControlChars(updated.content || '');
-  setComments(prev => updateNode(prev, id, () => updated));
+      const updated: QComment = await res.json();
+      updated.content = stripControlChars(updated.content || '');
+      setComments(prev => updateNode(prev, id, () => updated));
       cancelEdit();
-    } catch { 
-      toast({ title: 'Erreur', description: 'Échec de la mise à jour du commentaire', variant: 'destructive' }); 
+    } catch {
+      toast({ title: 'Erreur', description: 'Échec de la mise à jour du commentaire', variant: 'destructive' });
     }
   };
 
   const remove = async (id: string) => {
-    if (!confirm('Delete this comment?')) return;
     try {
-      const res = await fetch(`/api/question-comments/${id}`, { method: 'DELETE' });
+      const apiEndpoint = commentType === 'clinical-case' ? '/api/clinical-case-comments' : '/api/question-comments';
+      const res = await fetch(`${apiEndpoint}/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Failed');
       setComments(prev => removeNode(prev, id));
-    } catch { 
-      toast({ title: 'Erreur', description: 'Échec de la suppression du commentaire', variant: 'destructive' }); 
+    } catch {
+      toast({ title: 'Erreur', description: 'Échec de la suppression du commentaire', variant: 'destructive' });
     }
   };
 
@@ -552,42 +554,20 @@ export function QuestionComments({ questionId }: QuestionCommentsProps) {
                 )}
               </div>
             ) : (
-              <div 
-                className="bg-gray-100 dark:bg-gray-800 rounded-2xl px-4 py-3" 
-                onClick={(e) => {
-                  e.stopPropagation();
-                }}
-                onFocus={(e) => {
-                  e.stopPropagation();
-                }}
-                onInput={(e) => {
-                  e.stopPropagation();
-                }}
-                onKeyDown={(e) => {
-                  e.stopPropagation();
-                }}
-                style={{ isolation: 'isolate', contain: 'layout style paint', zIndex: 1000 }}
-              >
-                <div className="edit-comment-container edit-input-isolation-layer" data-comment-id={comment.id}>
-                  <RichTextInput
-                    value={editText}
-                    onChange={(v) => {
-                      setEditText(normalizeLTR(v));
-                    }}
-                    images={editImages}
-                    onImagesChange={setEditImages}
-                    placeholder="Modifier votre commentaire..."
-                    useInlineImages={true}
-                    hidePreview={true}
-                    hideInstructions={true}
-                    className="bg-transparent border-none"
-                  />
-                </div>
+              <div className="bg-gray-100 dark:bg-gray-800 rounded-2xl px-4 py-3">
+                <textarea
+                  value={editText}
+                  onChange={(e) => setEditText(normalizeLTR(e.target.value))}
+                  placeholder="Modifier votre commentaire..."
+                  className="w-full bg-transparent border-none outline-none resize-none text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400"
+                  rows={3}
+                  autoFocus
+                />
                 <div className="flex gap-2 mt-2">
                   <Button size="sm" variant="outline" onClick={cancelEdit}>
                     Annuler
                   </Button>
-                  <Button size="sm" disabled={!editText.trim() && editImages.length === 0} onClick={() => saveEdit(comment.id)}>
+                  <Button size="sm" disabled={!editText.trim()} onClick={() => saveEdit(comment.id)}>
                     Sauvegarder
                   </Button>
                 </div>

@@ -946,7 +946,10 @@ export function ClinicalCaseQuestion({
                 />
               </div>
               {isCaseComplete && (
-                <QuestionComments questionId={displayMode === 'multi_qroc' ? `group-qroc-${clinicalCase.caseNumber}` : displayMode === 'multi_qcm' ? `group-qcm-${clinicalCase.caseNumber}` : `clinical-case-${clinicalCase.caseNumber}`} />
+                <QuestionComments
+                  questionId={displayMode === 'multi_qroc' ? `group-qroc-${clinicalCase.caseNumber}` : displayMode === 'multi_qcm' ? `group-qcm-${clinicalCase.caseNumber}` : `clinical-case-${clinicalCase.caseNumber}`}
+                  commentType="clinical-case"
+                />
               )}
             </div>)}
           </div>
