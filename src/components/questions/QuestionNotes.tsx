@@ -37,7 +37,6 @@ export function QuestionNotes({ questionId, onHasContentChange, autoEdit = false
   const syncDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
   // Debug logging for props
-  console.log('QuestionNotes - Props:', { questionId, questionType, autoEdit });
 
   // Generate localStorage key for this question and user
   const localStorageKey = useMemo(() => {
