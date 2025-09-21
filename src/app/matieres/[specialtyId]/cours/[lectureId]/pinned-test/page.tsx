@@ -507,10 +507,7 @@ export default function QuestionsEpingleesTestPage() {
                             {lecture?.specialty?.name ? `${lecture.specialty.name}${lecture?.title ? ' • ' : ''}` : ''}{lecture?.title || ''}
                           </span>
                         )}
-                        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 mt-1">
-                          <Star className="w-4 h-4 text-yellow-500" />
-                          <span>Question épinglée • {currentQuestionIndex + 1} sur {questions.length}</span>
-                        </div>
+                        {/* Removed pinned question meta data */}
                       </div>
                       <div className="flex items-center gap-2 flex-wrap justify-end">
                         {/* Pin button for current question */}

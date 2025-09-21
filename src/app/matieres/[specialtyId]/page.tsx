@@ -281,107 +281,111 @@ export default function SpecialtyPageRoute() {
     return (
       <ProtectedRoute>
         <AppSidebarProvider>
-          <AppSidebar />
-          <SidebarInset className="flex flex-col min-h-0">
-            <UniversalHeader title="Chargement..." hideSeparator />
-            <div className="bg-gray-50 dark:bg-gray-900 p-4 lg:p-6 overflow-hidden">
-              <div className="max-w-7xl mx-auto h-full flex flex-col gap-6">
-                {/* HEADER CARD */}
-                <div className="rounded-2xl border border-gray-200/60 dark:border-gray-800 bg-white/70 dark:bg-gray-800/60 backdrop-blur-sm p-5 lg:p-6 flex flex-col gap-6 animate-fade-in">
-                  <div className="flex flex-col lg:flex-row lg:items-start gap-4">
-                    <div className="flex-1 space-y-4">
-                      <div className="h-7 w-48 sm:w-64 rounded-md bg-gray-200 dark:bg-gray-700 animate-pulse" />
-                      <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 gap-4">
-                        {[...Array(3)].map((_,i)=>(
-                          <div key={i} className="h-16 rounded-xl bg-gray-200 dark:bg-gray-700 animate-pulse" />
+          <div className="flex w-full h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden">
+            <AppSidebar />
+            <SidebarInset className="flex flex-col h-full bg-gray-50 dark:bg-gray-900">
+              <UniversalHeader title="Chargement..." hideSeparator />
+              <main className="flex-1 min-h-0 overflow-y-auto">
+                <div className="bg-gray-50 dark:bg-gray-900 p-4 lg:p-6 min-w-0 overflow-x-hidden flex-1">
+                  <div className="max-w-7xl mx-auto h-full flex flex-col gap-6">
+                    {/* HEADER CARD */}
+                    <div className="rounded-2xl border border-gray-200/60 dark:border-gray-800 bg-white/70 dark:bg-gray-800/60 backdrop-blur-sm p-5 lg:p-6 flex flex-col gap-6 animate-fade-in">
+                      <div className="flex flex-col lg:flex-row lg:items-start gap-4">
+                        <div className="flex-1 space-y-4">
+                          <div className="h-7 w-48 sm:w-64 rounded-md bg-gray-200 dark:bg-gray-700 animate-pulse" />
+                          <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 gap-4">
+                            {[...Array(3)].map((_,i)=>(
+                              <div key={i} className="h-16 rounded-xl bg-gray-200 dark:bg-gray-700 animate-pulse" />
+                            ))}
+                          </div>
+                        </div>
+                        <div className="h-8 w-24 rounded-lg bg-gray-200 dark:bg-gray-700 animate-pulse self-start" />
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-xs text-gray-400 dark:text-gray-500">
+                          <span>Progression globale</span>
+                          <span className="h-3 w-8 rounded bg-gray-200 dark:bg-gray-700 animate-pulse" />
+                        </div>
+                        <div className="h-2 w-full rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700 relative">
+                          <div className="absolute inset-y-0 left-0 w-1/4 bg-gray-300 dark:bg-gray-600 animate-pulse" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* GROUP MANAGEMENT BAR */}
+                    <div className="rounded-2xl border border-gray-200/60 dark:border-gray-800 bg-white/60 dark:bg-gray-800/50 backdrop-blur-sm px-4 sm:px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-4 animate-pulse">
+                      <div className="h-5 w-56 sm:w-72 bg-gray-200 dark:bg-gray-700 rounded" />
+                      <div className="sm:ml-auto flex gap-3">
+                        <div className="h-9 w-32 sm:w-40 bg-gray-200 dark:bg-gray-700 rounded" />
+                      </div>
+                    </div>
+
+                    {/* SEARCH + FILTERS ROW */}
+                    <div className="flex flex-col md:flex-row gap-3 animate-pulse">
+                      <div className="h-11 flex-1 min-w-[240px] rounded-xl bg-white/70 dark:bg-gray-800/60 border border-gray-200/60 dark:border-gray-800" />
+                      <div className="flex gap-3 md:ml-auto">
+                        <div className="h-11 w-28 sm:w-32 rounded-xl bg-white/70 dark:bg-gray-800/60 border border-gray-200/60 dark:border-gray-800" />
+                        <div className="h-11 w-28 sm:w-32 rounded-xl bg-white/70 dark:bg-gray-800/60 border border-gray-200/60 dark:border-gray-800" />
+                      </div>
+                    </div>
+
+                    {/* TABLE SKELETON */}
+                    <div className="flex-1 rounded-2xl border border-gray-200/60 dark:border-gray-800 bg-white/70 dark:bg-gray-800/60 backdrop-blur-sm flex flex-col overflow-hidden">
+                      {/* Column headers */}
+                      <div className="hidden md:grid grid-cols-12 gap-4 px-4 lg:px-6 py-3 border-b border-gray-200 dark:border-gray-700 text-xs font-medium text-gray-500 dark:text-gray-400">
+                        <div className="col-span-4 h-4 bg-gray-200/70 dark:bg-gray-700/70 rounded" />
+                        <div className="col-span-1 h-4 bg-gray-200/70 dark:bg-gray-700/70 rounded" />
+                        <div className="col-span-1 h-4 bg-gray-200/70 dark:bg-gray-700/70 rounded" />
+                        <div className="col-span-2 h-4 bg-gray-200/70 dark:bg-gray-700/70 rounded" />
+                        <div className="col-span-2 h-4 bg-gray-200/70 dark:bg-gray-700/70 rounded" />
+                        <div className="col-span-2 h-4 bg-gray-200/70 dark:bg-gray-700/70 rounded" />
+                      </div>
+                      <div className="flex-1 overflow-y-auto custom-scroll-thin divide-y divide-gray-100 dark:divide-gray-800">
+                        {[...Array(12)].map((_, i) => (
+                          <div key={i} className="grid grid-cols-12 items-center gap-3 sm:gap-4 px-4 lg:px-6 py-4 animate-pulse">
+                            {/* Course / title */}
+                            <div className="col-span-12 md:col-span-4 flex items-start gap-3">
+                              <div className="w-4 h-4 rounded-full border-2 border-gray-300 dark:border-gray-600 mt-1" />
+                              <div className="flex-1 space-y-2">
+                                <div className="h-4 w-40 sm:w-48 bg-gray-200 dark:bg-gray-700 rounded" />
+                                <div className="h-3 w-32 sm:w-40 bg-gray-100 dark:bg-gray-600 rounded" />
+                              </div>
+                            </div>
+                            {/* Reports (hide on small) */}
+                            <div className="hidden md:flex col-span-1 items-center gap-2">
+                              <div className="w-4 h-4 bg-gray-200 dark:bg-gray-700 rounded" />
+                              <div className="h-4 w-5 bg-gray-200 dark:bg-gray-700 rounded" />
+                            </div>
+                            {/* Note */}
+                            <div className="hidden md:flex col-span-1">
+                              <div className="h-6 w-12 rounded-full bg-gray-200 dark:bg-gray-700" />
+                            </div>
+                            {/* Progress */}
+                            <div className="col-span-8 md:col-span-2 space-y-2">
+                              <div className="h-4 w-10 bg-gray-200 dark:bg-gray-700 rounded" />
+                              <div className="h-2 w-full rounded-full bg-gray-100 dark:bg-gray-600 overflow-hidden relative">
+                                <div className="absolute inset-y-0 left-0 w-1/3 bg-gray-300 dark:bg-gray-500" />
+                              </div>
+                            </div>
+                            {/* Comments */}
+                            <div className="hidden md:flex col-span-2 items-center gap-3">
+                              <div className="h-9 w-9 rounded-full bg-gray-200 dark:bg-gray-700" />
+                              <div className="h-4 w-4 bg-gray-200 dark:bg-gray-700 rounded" />
+                            </div>
+                            {/* Action */}
+                            <div className="col-span-4 md:col-span-2 flex items-center gap-2 sm:gap-3 justify-end">
+                              <div className="h-8 w-20 sm:w-24 rounded-md bg-sky-200/50 dark:bg-sky-700/40" />
+                              <div className="h-8 w-8 rounded-md bg-gray-200 dark:bg-gray-700" />
+                            </div>
+                          </div>
                         ))}
                       </div>
                     </div>
-                    <div className="h-8 w-24 rounded-lg bg-gray-200 dark:bg-gray-700 animate-pulse self-start" />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-xs text-gray-400 dark:text-gray-500">
-                      <span>Progression globale</span>
-                      <span className="h-3 w-8 rounded bg-gray-200 dark:bg-gray-700 animate-pulse" />
-                    </div>
-                    <div className="h-2 w-full rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700 relative">
-                      <div className="absolute inset-y-0 left-0 w-1/4 bg-gray-300 dark:bg-gray-600 animate-pulse" />
-                    </div>
                   </div>
                 </div>
-
-                {/* GROUP MANAGEMENT BAR */}
-                <div className="rounded-2xl border border-gray-200/60 dark:border-gray-800 bg-white/60 dark:bg-gray-800/50 backdrop-blur-sm px-4 sm:px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-4 animate-pulse">
-                  <div className="h-5 w-56 sm:w-72 bg-gray-200 dark:bg-gray-700 rounded" />
-                  <div className="sm:ml-auto flex gap-3">
-                    <div className="h-9 w-32 sm:w-40 bg-gray-200 dark:bg-gray-700 rounded" />
-                  </div>
-                </div>
-
-                {/* SEARCH + FILTERS ROW */}
-                <div className="flex flex-col md:flex-row gap-3 animate-pulse">
-                  <div className="h-11 flex-1 min-w-[240px] rounded-xl bg-white/70 dark:bg-gray-800/60 border border-gray-200/60 dark:border-gray-800" />
-                  <div className="flex gap-3 md:ml-auto">
-                    <div className="h-11 w-28 sm:w-32 rounded-xl bg-white/70 dark:bg-gray-800/60 border border-gray-200/60 dark:border-gray-800" />
-                    <div className="h-11 w-28 sm:w-32 rounded-xl bg-white/70 dark:bg-gray-800/60 border border-gray-200/60 dark:border-gray-800" />
-                  </div>
-                </div>
-
-                {/* TABLE SKELETON */}
-                <div className="flex-1 rounded-2xl border border-gray-200/60 dark:border-gray-800 bg-white/70 dark:bg-gray-800/60 backdrop-blur-sm flex flex-col overflow-hidden">
-                  {/* Column headers */}
-                  <div className="hidden md:grid grid-cols-12 gap-4 px-4 lg:px-6 py-3 border-b border-gray-200 dark:border-gray-700 text-xs font-medium text-gray-500 dark:text-gray-400">
-                    <div className="col-span-4 h-4 bg-gray-200/70 dark:bg-gray-700/70 rounded" />
-                    <div className="col-span-1 h-4 bg-gray-200/70 dark:bg-gray-700/70 rounded" />
-                    <div className="col-span-1 h-4 bg-gray-200/70 dark:bg-gray-700/70 rounded" />
-                    <div className="col-span-2 h-4 bg-gray-200/70 dark:bg-gray-700/70 rounded" />
-                    <div className="col-span-2 h-4 bg-gray-200/70 dark:bg-gray-700/70 rounded" />
-                    <div className="col-span-2 h-4 bg-gray-200/70 dark:bg-gray-700/70 rounded" />
-                  </div>
-                  <div className="flex-1 overflow-y-auto custom-scroll-thin divide-y divide-gray-100 dark:divide-gray-800">
-                    {[...Array(12)].map((_, i) => (
-                      <div key={i} className="grid grid-cols-12 items-center gap-3 sm:gap-4 px-4 lg:px-6 py-4 animate-pulse">
-                        {/* Course / title */}
-                        <div className="col-span-12 md:col-span-4 flex items-start gap-3">
-                          <div className="w-4 h-4 rounded-full border-2 border-gray-300 dark:border-gray-600 mt-1" />
-                          <div className="flex-1 space-y-2">
-                            <div className="h-4 w-40 sm:w-48 bg-gray-200 dark:bg-gray-700 rounded" />
-                            <div className="h-3 w-32 sm:w-40 bg-gray-100 dark:bg-gray-600 rounded" />
-                          </div>
-                        </div>
-                        {/* Reports (hide on small) */}
-                        <div className="hidden md:flex col-span-1 items-center gap-2">
-                          <div className="w-4 h-4 bg-gray-200 dark:bg-gray-700 rounded" />
-                          <div className="h-4 w-5 bg-gray-200 dark:bg-gray-700 rounded" />
-                        </div>
-                        {/* Note */}
-                        <div className="hidden md:flex col-span-1">
-                          <div className="h-6 w-12 rounded-full bg-gray-200 dark:bg-gray-700" />
-                        </div>
-                        {/* Progress */}
-                        <div className="col-span-8 md:col-span-2 space-y-2">
-                          <div className="h-4 w-10 bg-gray-200 dark:bg-gray-700 rounded" />
-                          <div className="h-2 w-full rounded-full bg-gray-100 dark:bg-gray-600 overflow-hidden relative">
-                            <div className="absolute inset-y-0 left-0 w-1/3 bg-gray-300 dark:bg-gray-500" />
-                          </div>
-                        </div>
-                        {/* Comments */}
-                        <div className="hidden md:flex col-span-2 items-center gap-3">
-                          <div className="h-9 w-9 rounded-full bg-gray-200 dark:bg-gray-700" />
-                          <div className="h-4 w-4 bg-gray-200 dark:bg-gray-700 rounded" />
-                        </div>
-                        {/* Action */}
-                        <div className="col-span-4 md:col-span-2 flex items-center gap-2 sm:gap-3 justify-end">
-                          <div className="h-8 w-20 sm:w-24 rounded-md bg-sky-200/50 dark:bg-sky-700/40" />
-                          <div className="h-8 w-8 rounded-md bg-gray-200 dark:bg-gray-700" />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </SidebarInset>
+              </main>
+            </SidebarInset>
+          </div>
         </AppSidebarProvider>
       </ProtectedRoute>
     )
