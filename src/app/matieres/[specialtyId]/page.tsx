@@ -1061,9 +1061,20 @@ export default function SpecialtyPageRoute() {
                 </div>
               </div>
             </main>
+            {/* Comments Dialog restored to correct place */}
+            <Dialog open={!!commentsLectureId} onOpenChange={open => { if (!open) setCommentsLectureId(null) }}>
+              <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
+                <DialogHeader>
+                  <DialogTitle>Commentaires du cours</DialogTitle>
+                </DialogHeader>
+                {commentsLectureId && (
+                  <LectureComments lectureId={commentsLectureId} />
+                )}
+              </DialogContent>
+            </Dialog>
           </SidebarInset>
         </div>
       </AppSidebarProvider>
     </ProtectedRoute>
   )
- }
+}
