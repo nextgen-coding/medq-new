@@ -19,6 +19,7 @@ interface OpenQuestionActionsProps {
   onResubmit?: () => void; // Allow resubmitting the question
   userAnswerText?: string; // User's submitted answer for display
   correctAnswer?: string; // Correct answer for display
+  currentAnswer?: string; // Current answer being typed (for validation)
 }
 
 export function OpenQuestionActions({
@@ -37,7 +38,8 @@ export function OpenQuestionActions({
   assessmentResult,
   onResubmit,
   userAnswerText,
-  correctAnswer
+  correctAnswer,
+  currentAnswer = ''
 }: OpenQuestionActionsProps) {
   return (
     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mt-6">
@@ -65,7 +67,7 @@ export function OpenQuestionActions({
         {!hasSubmitted && (
           <Button
             onClick={onSubmit}
-            disabled={!canSubmit}
+            disabled={!canSubmit || !currentAnswer.trim()}
             className="flex items-center gap-1 w-full sm:w-auto"
           >
             <SendHorizontal className="h-4 w-4" />

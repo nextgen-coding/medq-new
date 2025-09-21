@@ -532,6 +532,42 @@ export function MCQQuestion({
     } catch {}
   };
 
+  const handleResubmit = () => {
+    console.log('🔄 handleResubmit called for MCQ question:', question.id);
+    console.log('Current state before resubmit:', {
+      selectedOptionIds,
+      submitted,
+      hasSubmitted,
+      isCorrect
+    });
+
+    // Reset all question state to allow resubmission
+    setSelectedOptionIds([]);
+    setSubmitted(false);
+    setIsCorrect(null);
+    setExpandedExplanations([]);
+    setHasSubmitted(false);
+    setIsSubmitting(false);
+    hasSubmittedRef.current = false;
+
+    // Reset notes area state
+    setShowNotesArea(false);
+    setNotesHasContent(false);
+    setNotesManuallyControlled(false);
+
+    console.log('✅ MCQ question state reset via resubmit');
+
+    // Scroll to question top
+    setTimeout(() => {
+      if (questionRef.current) {
+        questionRef.current.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start'
+        });
+      }
+    }, 100);
+  };
+
   // Keyboard shortcuts (robust): digits/numpad 1-9 or letters A-I to toggle, Backspace clear, Enter submit/next
   const rootRef = useRef<HTMLDivElement | null>(null);
   const shortcutHandler = useCallback((event: KeyboardEvent) => {
@@ -694,7 +730,7 @@ export function MCQQuestion({
 
       {!hideActions && (
         <div ref={resultsRef}>
-          <MCQActions 
+          <MCQActions
             isSubmitted={submitted}
             canSubmit={!hasSubmitted && !isSubmitting && selectedOptionIds.length > 0}
             isCorrect={isCorrect}
@@ -704,6 +740,7 @@ export function MCQQuestion({
             buttonRef={buttonRef}
             showNotesArea={showNotesArea}
             hideNotesButton={false} // Always show notes button so users can hide/show notes
+            onResubmit={handleResubmit}
             onToggleNotes={() => {
               setShowNotesArea(prev => !prev);
               setNotesManuallyControlled(true);

@@ -434,6 +434,17 @@ export function OpenQuestion({
     if (disableIndividualSubmit && hideImmediateResults) return;
     if (hasSubmittedRef.current) return; // Prevent double submission with immediate synchronous check
 
+    // Validate that answer is not empty for QROC questions
+    const trimmedAnswer = answer.trim();
+    if (!trimmedAnswer) {
+      toast({
+        title: "Réponse requise",
+        description: "Veuillez saisir une réponse avant de soumettre.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Store the user's answer before submitting
     setUserSubmittedAnswer(answer);
 
@@ -485,6 +496,17 @@ export function OpenQuestion({
   const handleSelfAssessment = async (rating: 'correct' | 'wrong' | 'partial') => {
     console.log('🎯 handleSelfAssessment called with rating:', rating);
     console.log('Current question ID:', question.id);
+
+    // Validate that answer is not empty before allowing self-assessment
+    const trimmedAnswer = answer.trim();
+    if (!trimmedAnswer) {
+      toast({
+        title: "Réponse requise",
+        description: "Veuillez saisir une réponse avant de procéder à l'auto-évaluation.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setAssessmentCompleted(true);
     setShowSelfAssessment(false);
@@ -715,6 +737,15 @@ export function OpenQuestion({
       if (showSelfAssessment && (!hideImmediateResults || showDeferredSelfAssessment)) {
         if (['1', '2', '3'].includes(event.key)) {
           event.preventDefault();
+          const trimmedAnswer = answer.trim();
+          if (!trimmedAnswer) {
+            toast({
+              title: "Réponse requise",
+              description: "Veuillez saisir une réponse avant de procéder à l'auto-évaluation.",
+              variant: "destructive",
+            });
+            return;
+          }
           const map: Record<string, 'correct' | 'partial' | 'wrong'> = {
             '1': 'correct',
             '2': 'partial',
@@ -729,9 +760,16 @@ export function OpenQuestion({
       if (!submitted && !isTyping && event.key === 'Enter' && !event.shiftKey) {
         if (disableIndividualSubmit && hideImmediateResults) return; // blocked in grouped mode
         event.preventDefault();
-        if (answer.trim()) {
-          handleSubmit();
+        const trimmedAnswer = answer.trim();
+        if (!trimmedAnswer) {
+          toast({
+            title: "Réponse requise",
+            description: "Veuillez saisir une réponse avant de soumettre.",
+            variant: "destructive",
+          });
+          return;
         }
+        handleSubmit();
         return;
       }
 
@@ -982,6 +1020,7 @@ export function OpenQuestion({
           onResubmit={handleResubmit}
           userAnswerText={userSubmittedAnswer}
           correctAnswer={expectedReference}
+          currentAnswer={answer}
           onToggleNotes={() => {
             setShowNotesArea(prev => !prev);
             setNotesManuallyControlled(true);
