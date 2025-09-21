@@ -310,11 +310,14 @@ export function ClinicalCaseQuestion({
     if (result !== undefined) {
       setQuestionResults(prev => ({ ...prev, [questionId]: result }));
     }
-    
+
     // Propagate to parent for global progress/state (works for MCQ and open)
     if (onAnswerUpdate) {
       try { onAnswerUpdate(questionId, answer, result); } catch {}
     }
+
+    // Don't auto-focus next question immediately - wait for Enter key to navigate
+    // This allows users to press 1/2 for QCM without jumping to QROC
   };
 
   const handleCompleteCase = () => {
@@ -341,14 +344,14 @@ export function ClinicalCaseQuestion({
     // Clear previous results AND answers so restart is clean (no pre-picked options)
     setQuestionResults({});
     setAnswers({});
-    // Scroll to first unanswered (or first question if all answered)
+    // Scroll to first unanswered (or first question if all answered) but don't focus input
     setTimeout(() => {
       const firstUnanswered = clinicalCase.questions.find(q => answers[q.id] === undefined);
       const targetId = firstUnanswered?.id || clinicalCase.questions[0]?.id;
       if (targetId) {
         const el = questionRefs.current[targetId];
         el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        setTimeout(() => focusFirstInput(targetId), 150);
+        // Don't auto-focus input - let user manually focus when ready
       }
     }, 50);
   };
@@ -429,7 +432,10 @@ export function ClinicalCaseQuestion({
           const el = questionRefs.current[targetQuestion.id];
           if (el) {
             el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            setTimeout(() => focusFirstInput(targetQuestion.id), 250);
+            // Focus the first input in the target question after scrolling
+            setTimeout(() => {
+              focusFirstInput(targetQuestion.id);
+            }, 500);
           }
         } else {
           // All questions answered, submit
@@ -478,16 +484,16 @@ export function ClinicalCaseQuestion({
           : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
       : 'bg-muted text-muted-foreground';
     // Check if this is a question that should use inline layout (compact design)
-    const isInlineLayout = (question.type as any) === 'clinic_croq' || 
-                          (displayMode === 'multi_qroc' && (question.type as any) === 'clinic_croq');
+    // Removed clinic_croq from inline layout so QROC questions show in boxes like MCQ questions
+    const isInlineLayout = displayMode === 'multi_qroc' && (question.type as any) === 'clinic_croq';
     
     return (
       <div
         key={question.id}
         ref={el => { questionRefs.current[question.id] = el; }}
         className={`${
-          // Remove white container around open questions during results to avoid extra box
-          (showResults && (question.type as any) === 'clinic_croq')
+          // Keep border for QROC questions even when completed, only remove for inline layout
+          (isInlineLayout && showResults)
             ? 'transition-all duration-200 rounded-none border-0 p-0 bg-transparent shadow-none'
             : 'border rounded-xl p-3 bg-card shadow-sm transition-all duration-200'
         } ${(isCurrentEvaluationTarget || isActiveAnswerTarget) ? 'ring-2 ring-blue-500 shadow-md' : ''}`}
@@ -496,10 +502,9 @@ export function ClinicalCaseQuestion({
         onClick={() => {
           if (!showResults) {
             setActiveIndex(index);
-            // Focus the container, then move focus to first input
+            // Focus the container only - don't auto-focus input
             setTimeout(() => {
               questionRefs.current[question.id]?.focus?.();
-              focusFirstInput(question.id);
             }, 50);
           }
         }}
@@ -515,7 +520,10 @@ export function ClinicalCaseQuestion({
                 const element = questionRefs.current[targetQuestion.id];
                 if (element) {
                   element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  setTimeout(() => focusFirstInput(targetQuestion.id), 300);
+                  // Focus the first input in the target question after scrolling
+                  setTimeout(() => {
+                    focusFirstInput(targetQuestion.id);
+                  }, 500);
                 }
               } else {
                 handleCompleteCase();
@@ -833,6 +841,7 @@ export function ClinicalCaseQuestion({
                     size="sm"
                     disabled={answeredQuestions !== clinicalCase.totalQuestions || isCaseComplete}
                     className={`font-semibold ${answeredQuestions === clinicalCase.totalQuestions && !isCaseComplete ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-600/50 text-white cursor-not-allowed'}`}
+                    data-submit-case
                   >Soumettre la réponse</Button>
                 )}
 

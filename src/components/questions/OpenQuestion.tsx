@@ -53,6 +53,7 @@ interface OpenQuestionProps {
   enableAnswerHighlighting?: boolean; // enable highlighting for user answers
   disableIndividualSubmit?: boolean; // when true (grouped clinical case), block per-question submit & reference reveal until parent submit
   showNotesAfterSubmit?: boolean; // force show notes area after question is submitted
+  isActive?: boolean; // whether this question is currently active/focused in clinical case
 }
 
 export function OpenQuestion({ 
@@ -81,6 +82,7 @@ export function OpenQuestion({
   enableAnswerHighlighting = false,
   disableIndividualSubmit = false,
   showNotesAfterSubmit = false,
+  isActive = false,
 }: OpenQuestionProps) {
   const [answer, setAnswer] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -956,8 +958,9 @@ export function OpenQuestion({
       
   {/* Media is now displayed inside the "Rappel du cours" section on the page */}
 
-    {/* Show correct answer directly in revision mode */}
-    {hideActions && isAnswered && userAnswer && (
+    {/* Show correct answer directly in revision mode - only when self-assessment is not showing it */}
+    {/* Hide for QROC questions in clinical cases to avoid duplicate display */}
+    {hideActions && isAnswered && userAnswer && !showSelfAssessment && !((question as any).type === 'clinic_croq') && (
       <div className="mt-4">
         <div className="rounded-xl border border-emerald-300/60 dark:border-emerald-600/70 bg-emerald-50/80 dark:bg-emerald-900/50 px-6 py-3 shadow-sm">
           <div className="mb-2">
@@ -979,9 +982,10 @@ export function OpenQuestion({
         <OpenQuestionInput
           answer={answer}
           setAnswer={setAnswer}
-      isSubmitted={submitted && !keepInputAfterSubmit}
+       isSubmitted={submitted && !keepInputAfterSubmit}
           onSubmit={handleSubmit}
           onBlur={handleBlur}
+          isActive={isActive}
         />
       )}
 

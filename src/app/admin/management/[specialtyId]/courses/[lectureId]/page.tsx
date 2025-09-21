@@ -144,7 +144,7 @@ export default function CourseManagementPage() {
         order++;
       }
       toast({ title: editingGroupCaseNumber? 'Multi QROC mis à jour' : 'Multi QROC créé', description:`${groupQrocSubs.length} sous-question(s)` });
-      resetGroupedQroc();
+      resetGroupedQroc(); resetGroupedQcm();
       setEditingGroupCaseNumber(null); setEditingGroupType(null); setOriginalGroupQuestionIds([]);
       loadQuestions();
     } catch(e){ console.error(e); toast({ title:'Erreur', description:'Création groupe QROC impossible', variant:'destructive'}); setGroupQrocSubmitting(false); }
@@ -261,7 +261,7 @@ export default function CourseManagementPage() {
                   <Input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Rechercher une question..." className="pl-10 pr-8 w-72 border-blue-200 focus:border-blue-400 focus:ring-blue-400/20" />
                   {search && <Button variant="ghost" size="sm" className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6 p-0 hover:bg-blue-100 dark:hover:bg-blue-950/30" onClick={()=>setSearch('')}><X className="h-3 w-3" /></Button>}
                 </div>
-                <Button onClick={()=>{ setOpenCreator(true); setEditingId(null); setCreationMode('single'); resetCaseBuilder(); resetGroupedQroc(); }} className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/25 px-6"><PlusCircle className="h-4 w-4 mr-2" />Nouvelle question</Button>
+                <Button onClick={()=>{ setOpenCreator(true); setEditingId(null); setCreationMode('single'); resetCaseBuilder(); resetGroupedQroc(); resetGroupedQcm(); setEditingGroupCaseNumber(null); setEditingGroupType(null); setOriginalGroupQuestionIds([]); }} className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-600/25 px-6"><PlusCircle className="h-4 w-4 mr-2" />Nouvelle question</Button>
               </div>
             </div>
 
@@ -274,7 +274,7 @@ export default function CourseManagementPage() {
                     {!editingId && (
                       <>
                         <Button size="sm" variant={creationMode==='single'? 'default':'outline'} onClick={()=>{ setCreationMode('single'); resetCaseBuilder(); resetGroupedQroc(); resetGroupedQcm(); }} className={creationMode==='single'? 'bg-blue-600 hover:bg-blue-700 text-white' : 'border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30'}>Question simple</Button>
-                        <Button size="sm" variant={creationMode==='clinical_case'? 'default':'outline'} onClick={()=>{ setCreationMode('clinical_case'); resetGroupedQroc(); resetGroupedQcm(); resetCaseBuilder(); }} className={`h-8 flex items-center gap-2 ${creationMode==='clinical_case'? 'bg-blue-600 hover:bg-blue-700 text-white' : 'border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30'}`}><FileText className="h-4 w-4" /> Cas clinique</Button>
+                        <Button size="sm" variant={creationMode==='clinical_case'? 'default':'outline'} onClick={()=>{ setCreationMode('clinical_case'); resetGroupedQroc(); resetGroupedQcm(); resetCaseBuilder(); setEditingGroupCaseNumber(null); setEditingGroupType(null); setOriginalGroupQuestionIds([]); }} className={`h-8 flex items-center gap-2 ${creationMode==='clinical_case'? 'bg-blue-600 hover:bg-blue-700 text-white' : 'border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30'}`}><FileText className="h-4 w-4" /> Cas clinique</Button>
                         <Button size="sm" variant={creationMode==='grouped_qroc'? 'default':'outline'} onClick={()=>{ setCreationMode('grouped_qroc'); resetCaseBuilder(); resetGroupedQcm(); resetGroupedQroc(); addGroupedQroc(); }} className={`h-8 flex items-center gap-2 ${creationMode==='grouped_qroc'? 'bg-blue-600 hover:bg-blue-700 text-white' : 'border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30'}`}><ListPlus className="h-4 w-4" /> Multi QROC</Button>
                         <Button size="sm" variant={creationMode==='grouped_qcm'? 'default':'outline'} onClick={()=>{ setCreationMode('grouped_qcm'); resetCaseBuilder(); resetGroupedQroc(); resetGroupedQcm(); addGroupedQcm(); }} className={`h-8 flex items-center gap-2 ${creationMode==='grouped_qcm'? 'bg-blue-600 hover:bg-blue-700 text-white' : 'border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30'}`}><ListPlus className="h-4 w-4" /> Multi QCM</Button>
                       </>
@@ -282,7 +282,7 @@ export default function CourseManagementPage() {
                     {editingId && <span className="text-lg font-semibold text-blue-900 dark:text-blue-100">Modifier la question</span>}
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="ghost" size="sm" onClick={()=>{ setOpenCreator(false); setEditingId(null); resetCaseBuilder(); resetGroupedQroc(); }} className="text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-950/30"> <X className="h-4 w-4" /> </Button>
+                    <Button variant="ghost" size="sm" onClick={()=>{ setOpenCreator(false); setEditingId(null); resetCaseBuilder(); resetGroupedQroc(); resetGroupedQcm(); setEditingGroupCaseNumber(null); setEditingGroupType(null); setOriginalGroupQuestionIds([]); }} className="text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-950/30"> <X className="h-4 w-4" /> </Button>
                   </div>
                 </div>
 
@@ -341,7 +341,7 @@ export default function CourseManagementPage() {
                       ))}
                     </div>
                     <div className="flex justify-end gap-3 pt-4 border-t border-blue-100">
-                      <Button variant="outline" size="sm" onClick={()=>{ resetCaseBuilder(); setOpenCreator(false); }} className="border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30">Annuler</Button>
+                      <Button variant="outline" size="sm" onClick={()=>{ resetCaseBuilder(); setOpenCreator(false); setEditingGroupCaseNumber(null); setEditingGroupType(null); setOriginalGroupQuestionIds([]); }} className="border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30">Annuler</Button>
                       <Button size="sm" disabled={caseSubmitting} onClick={submitClinicalCase} className="bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white shadow-md px-6">{caseSubmitting? (editingGroupCaseNumber? 'Mise à jour...' : 'Création...') : (editingGroupCaseNumber? 'Mettre à jour le cas' : 'Créer le cas clinique')}</Button>
                     </div>
                   </div>
@@ -380,7 +380,7 @@ export default function CourseManagementPage() {
                       ))}
                     </div>
                     <div className="flex justify-end gap-3 pt-4 border-t border-blue-100">
-                      <Button variant="outline" size="sm" onClick={()=>{ resetGroupedQroc(); setOpenCreator(false); }} className="border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30">Annuler</Button>
+                      <Button variant="outline" size="sm" onClick={()=>{ resetGroupedQroc(); setOpenCreator(false); setEditingGroupCaseNumber(null); setEditingGroupType(null); setOriginalGroupQuestionIds([]); }} className="border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30">Annuler</Button>
                       <Button size="sm" disabled={groupQrocSubmitting} onClick={submitGroupedQroc} className="bg-amber-600 hover:bg-amber-700 disabled:opacity-60 text-white shadow-md px-6">{groupQrocSubmitting? (editingGroupCaseNumber? 'Mise à jour...' : 'Création...') : (editingGroupCaseNumber? 'Mettre à jour le groupe' : 'Créer le Multi QROC')}</Button>
                     </div>
                   </div>
@@ -431,7 +431,7 @@ export default function CourseManagementPage() {
                       ))}
                     </div>
                     <div className="flex justify-end gap-3 pt-4 border-t border-blue-100">
-                      <Button variant="outline" size="sm" onClick={()=>{ resetGroupedQcm(); setOpenCreator(false); }} className="border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30">Annuler</Button>
+                      <Button variant="outline" size="sm" onClick={()=>{ resetGroupedQcm(); setOpenCreator(false); setEditingGroupCaseNumber(null); setEditingGroupType(null); setOriginalGroupQuestionIds([]); }} className="border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30">Annuler</Button>
                       <Button size="sm" disabled={groupQcmSubmitting} onClick={async()=>{
                         if (groupQcmSubmitting) return;
                         if (groupQcmSubs.length===0) { toast({ title:'Validation', description:'Ajoutez au moins une sous-question', variant:'destructive'}); return; }
