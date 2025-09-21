@@ -24,18 +24,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { 
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import {
   DropdownMenu,
+  DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from '@/components/ui/dropdown-menu'
 import {
   Select,
   SelectContent,
@@ -43,6 +37,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { 
   Search, 
   Filter, 
@@ -488,7 +483,7 @@ export default function SpecialtyPageRoute() {
   // Per-lecture mode helpers
   const getLectureMode = (lectureId: string): ModeKey => selectedModes[lectureId] || 'study'
   const getModeLabel = (mode: ModeKey) => mode === 'study' ? 'Étude' : mode === 'revision' ? 'Révision' : 'Épinglé'
-  const getModePath = (mode: ModeKey) => mode === 'study' ? '' : mode === 'revision' ? '/revision' : '/pinned-test'
+  const getModePath = (mode: ModeKey) => mode === 'study' ? '' : mode === 'revision' ? '/revision' : '/pinned'
   const setLectureMode = (lectureId: string, mode: ModeKey) => setSelectedModes(prev => ({ ...prev, [lectureId]: mode }))
   const goToLectureMode = (lectureId: string) => {
     const mode = getLectureMode(lectureId)
@@ -644,6 +639,7 @@ export default function SpecialtyPageRoute() {
                             <div className="flex items-center gap-2 mt-3">
                               <span className="text-xs text-muted-foreground">Coeff. par défaut du nouveau groupe</span>
                               <Input className="h-8 w-24" type="number" step="0.1" value={newGroupCoeff} onChange={(e)=> setNewGroupCoeff(e.target.value)} />
+
                             </div>
                           </div>
                         )}

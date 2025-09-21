@@ -188,7 +188,7 @@ export function SessionImportPanel() {
   const hasRows = rows.length > 0;
 
   return (
-    <Card>
+    <Card className="relative">
       <CardHeader>
         <CardTitle>Importer des sessions (examens)</CardTitle>
         <CardDescription>Colonnes attendues: name, pdfUrl, correctionUrl, niveau (opt), semestre (opt), specialty (opt)</CardDescription>

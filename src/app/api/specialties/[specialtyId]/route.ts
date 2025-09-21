@@ -19,9 +19,34 @@ async function getHandler(
 
     console.log('Fetching specialty:', specialtyId, 'for user:', userId);
 
+    // Load user to apply niveau/semester access rules for non-admins
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, role: true, niveauId: true, semesterId: true }
+    });
+
+    if (!user) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      );
+    }
+
     // Get specialty with lectures and questions
-    const specialty = await prisma.specialty.findUnique({
-      where: { id: specialtyId },
+    const whereClause: any = { id: specialtyId };
+    if (user.role !== 'admin') {
+      if (user.niveauId) whereClause.niveauId = user.niveauId;
+      if (user.semesterId) {
+        // Restrict to user's semester or common specialties (null)
+        whereClause.OR = [
+          { semesterId: user.semesterId },
+          { semesterId: null },
+        ];
+      }
+    }
+
+    const specialty = await prisma.specialty.findFirst({
+      where: whereClause,
       include: {
         niveau: {
           select: {

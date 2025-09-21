@@ -53,6 +53,9 @@ interface OpenQuestionProps {
   enableAnswerHighlighting?: boolean; // enable highlighting for user answers
   disableIndividualSubmit?: boolean; // when true (grouped clinical case), block per-question submit & reference reveal until parent submit
   showNotesAfterSubmit?: boolean; // force show notes area after question is submitted
+  disableEnterHandlers?: boolean; // when true, OpenQuestion won't handle Enter; parent handles it
+  onFocus?: () => void; // callback when any part of the question receives focus
+  autoFocus?: boolean; // control initial autofocus of textarea when active
 }
 
 export function OpenQuestion({ 
@@ -81,6 +84,9 @@ export function OpenQuestion({
   enableAnswerHighlighting = false,
   disableIndividualSubmit = false,
   showNotesAfterSubmit = false,
+  disableEnterHandlers = false,
+  onFocus,
+  autoFocus = true,
 }: OpenQuestionProps) {
   const [answer, setAnswer] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -177,6 +183,7 @@ export function OpenQuestion({
 
   // Keyboard shortcuts
   useEffect(() => {
+    if (disableEnterHandlers) return;
     const handleKeyDown = (event: KeyboardEvent) => {
       // Enter for next question (only when assessment is completed)
       if (event.key === 'Enter' && assessmentCompleted && !event.altKey && !event.shiftKey && !event.ctrlKey) {
@@ -187,7 +194,7 @@ export function OpenQuestion({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [assessmentCompleted, onNext]);
+  }, [assessmentCompleted, onNext, disableEnterHandlers]);
 
   // Pin/Unpin handlers for questions
   const handlePinQuestion = useCallback(async () => {
@@ -278,27 +285,33 @@ export function OpenQuestion({
     if (!(disableIndividualSubmit && hideImmediateResults && !submitted && onAnswerChange)) return;
     const trimmed = answer.trim();
     const parentValue = userAnswer ?? '';
-    // Avoid re-sending same value
+    // Avoid re-sending same value and debounce rapid changes
     if (lastPropagatedRef.current === answer) return;
-    if (trimmed.length > 0) {
-      if (parentValue !== answer) {
-        onAnswerChange(answer, true);
-        lastPropagatedRef.current = answer;
+    
+    // Debounce to prevent character-by-character flicker
+    const timeoutId = setTimeout(() => {
+      if (trimmed.length > 0) {
+        if (parentValue !== answer) {
+          onAnswerChange(answer, true);
+          lastPropagatedRef.current = answer;
+        }
+      } else {
+        if (parentValue !== '') {
+          onAnswerChange('', false);
+          lastPropagatedRef.current = '';
+        }
       }
-    } else {
-      if (parentValue !== '') {
-        onAnswerChange('', false);
-        lastPropagatedRef.current = '';
-      }
-    }
+    }, 100); // 100ms debounce
+    
+    return () => clearTimeout(timeoutId);
   }, [answer, userAnswer, disableIndividualSubmit, hideImmediateResults, submitted, onAnswerChange]);
 
   // Handle userAnswer changes separately to avoid reinitialization loops
   useEffect(() => {
-    if (userAnswer) {
+    if (userAnswer && userAnswer !== answer) {
       setAnswer(userAnswer);
     }
-  }, [userAnswer]);
+  }, [userAnswer]); // Remove answer dependency to prevent loops
 
 
 
@@ -355,17 +368,9 @@ export function OpenQuestion({
       // The actual result will be determined when "Show Results" is clicked
       onSubmit(answer, 'partial'); // Use 'partial' as default for clinic questions
     } else {
-      // For regular questions, show self-assessment
+      // For regular questions, show self-assessment; do not auto-scroll away from the question
       setShowSelfAssessment(true);
-      // Auto-scroll to question top to see the full question and results
-      setTimeout(() => {
-        if (questionRef.current) {
-          questionRef.current.scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'start' 
-          });
-        }
-      }, 100);
+      // Intentionally no scroll to "Rappel du cours"; keep the question and its answer visible in place
     }
 
     // Log activity immediately for open/QROC so it appears in daily chart even before self-assessment
@@ -522,6 +527,7 @@ export function OpenQuestion({
 
   // Keyboard shortcuts: Enter to submit (or next), 1/2/3 to rate during self-assessment
   useEffect(() => {
+    if (disableEnterHandlers) return;
     const handleKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement | null;
       const isTyping = !!target && (
@@ -566,7 +572,7 @@ export function OpenQuestion({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [showSelfAssessment, hideImmediateResults, showDeferredSelfAssessment, submitted, assessmentCompleted, answer]);
+  }, [showSelfAssessment, hideImmediateResults, showDeferredSelfAssessment, submitted, assessmentCompleted, answer, disableEnterHandlers]);
 
   return (
     <motion.div
@@ -576,6 +582,7 @@ export function OpenQuestion({
       exit={{ opacity: 0, y: -20 }}
       transition={{ duration: 0.4 }}
       className="space-y-2 w-full max-w-full"
+      onFocus={onFocus}
     >
   {/**
    * Simple QROC mode: compact single-container layout shown after submission
@@ -664,6 +671,7 @@ export function OpenQuestion({
                 text={question.text}
                 className="mt-0 text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100 leading-relaxed break-words whitespace-pre-wrap inline"
                 confirmMode={highlightConfirm}
+                images={question.images}
               />
             </div>
           )}
@@ -716,6 +724,8 @@ export function OpenQuestion({
       isSubmitted={submitted && !keepInputAfterSubmit}
           onSubmit={handleSubmit}
           onBlur={handleBlur}
+          autoFocusEnabled={autoFocus}
+          disableEnterKey={disableEnterHandlers}
         />
       )}
 
