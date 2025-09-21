@@ -90,10 +90,12 @@ export function OpenQuestion({
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
   const [hasSubmitted, setHasSubmitted] = useState(false); // Track if question has been submitted
   const [deferredAssessmentResult, setDeferredAssessmentResult] = useState<boolean | 'partial' | null>(null); // Track deferred self-assessment
+  const [userSubmittedAnswer, setUserSubmittedAnswer] = useState<string>(''); // Track the actual answer that was submitted
   const [isPinned, setIsPinned] = useState(false); // Track if question is pinned
   const [showNotesArea, setShowNotesArea] = useState(false); // Control showing notes/comments after click
   const [notesHasContent, setNotesHasContent] = useState(false); // track if notes have content
   const [notesManuallyControlled, setNotesManuallyControlled] = useState(false); // track if user manually opened/closed notes
+  const [isLoadingProgress, setIsLoadingProgress] = useState(true); // track if progress data is still loading
 
   // Auto-show notes when content is detected, but don't auto-hide when content is deleted
   useEffect(() => {
@@ -148,17 +150,24 @@ export function OpenQuestion({
   // External reset (e.g., grouped QROC re-answer)
   useEffect(() => {
     if (resetSignal !== undefined) {
+      console.log('🔄 Reset signal received:', resetSignal);
+      console.log('Resetting question state for question:', question.id);
+
       // If not preserving input, clear it; else keep content
       if (!keepInputAfterSubmit) {
         setAnswer('');
+        setUserSubmittedAnswer('');
       }
       setSubmitted(false);
       setShowSelfAssessment(false);
       setAssessmentCompleted(false);
       setHasSubmitted(false);
+      setDeferredAssessmentResult(null);
       hasSubmittedRef.current = false;
+
+      console.log('✅ Question state reset completed');
     }
-  }, [resetSignal]);
+  }, [resetSignal, keepInputAfterSubmit]);
 
   // Clear local override once parent prop reflects the new state
   useEffect(() => {
@@ -171,7 +180,7 @@ export function OpenQuestion({
   useEffect(() => {
     const loadPinnedStatus = async () => {
       if (!user?.id) return;
-      
+
       try {
         const response = await fetch(`/api/pinned-questions?userId=${user.id}`);
         if (response.ok) {
@@ -188,6 +197,70 @@ export function OpenQuestion({
       loadPinnedStatus();
     }
   }, [user?.id, question.id]);
+
+  // Load existing question state from database on mount
+  useEffect(() => {
+    const loadQuestionState = async () => {
+      if (!user?.id || !lectureId) return;
+
+      console.log('🔄 Loading question state for question:', question.id);
+      console.log('User ID:', user.id);
+      console.log('Lecture ID:', lectureId);
+
+      try {
+        // Use the progress API instead of user-question-state API
+        const response = await fetch(`/api/progress?userId=${user.id}&lectureId=${lectureId}`);
+        if (response.ok) {
+          const progressData = await response.json();
+          console.log('📥 Loaded progress data:', progressData);
+
+          // Find the specific question in the progress data
+          const questionProgress = progressData.find((item: any) => item.questionId === question.id);
+          console.log('📋 Question progress:', questionProgress);
+
+          if (questionProgress) {
+            // Convert progress score back to assessment result
+            let assessmentResult: boolean | 'partial' | null = null;
+            if (questionProgress.score === 1) {
+              assessmentResult = true; // correct
+            } else if (questionProgress.score === 0.5) {
+              assessmentResult = 'partial'; // partial
+            } else if (questionProgress.score === 0) {
+              assessmentResult = false; // wrong
+            }
+
+            console.log('📊 Converting progress score to assessment result:', {
+              score: questionProgress.score,
+              assessmentResult
+            });
+
+            if (assessmentResult !== null) {
+              setDeferredAssessmentResult(assessmentResult);
+              setAssessmentCompleted(true);
+              setSubmitted(true);
+              setHasSubmitted(true);
+              hasSubmittedRef.current = true;
+              console.log('✅ Successfully restored assessment state from progress:', assessmentResult);
+            }
+          } else {
+            console.log('❌ No progress found for question:', question.id);
+          }
+        } else {
+          console.error('❌ Failed to load progress:', response.status, response.statusText);
+        }
+      } catch (error) {
+        console.error('❌ Error loading question state:', error);
+      } finally {
+        setIsLoadingProgress(false);
+        console.log('🏁 Progress loading completed for question:', question.id);
+      }
+    };
+
+    if (user?.id && question.id && lectureId) {
+      loadQuestionState();
+    }
+  }, [user?.id, question.id, lectureId]);
+
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -314,6 +387,13 @@ export function OpenQuestion({
     }
   }, [userAnswer]);
 
+  // Update userSubmittedAnswer when userAnswer changes (for clinical cases)
+  useEffect(() => {
+    if (userAnswer && isAnswered) {
+      setUserSubmittedAnswer(userAnswer);
+    }
+  }, [userAnswer, isAnswered]);
+
 
 
   // Initialize / sync when parent indicates answered state changes.
@@ -353,15 +433,18 @@ export function OpenQuestion({
     // In grouped clinical case mode we disable individual submission until parent submits
     if (disableIndividualSubmit && hideImmediateResults) return;
     if (hasSubmittedRef.current) return; // Prevent double submission with immediate synchronous check
-    
+
+    // Store the user's answer before submitting
+    setUserSubmittedAnswer(answer);
+
     // Mark that this question is being submitted IMMEDIATELY
     hasSubmittedRef.current = true;
     setSubmitted(true);
     setHasSubmitted(true);
-    
+
     // Keep notes hidden by default - user can manually open if needed
-    
-    // For clinical case questions (hideImmediateResults = true), 
+
+    // For clinical case questions (hideImmediateResults = true),
     // call onSubmit immediately with a default result since self-assessment is hidden
     if (hideImmediateResults) {
       setAssessmentCompleted(true);
@@ -374,9 +457,9 @@ export function OpenQuestion({
       // Auto-scroll to question top to see the full question and results
       setTimeout(() => {
         if (questionRef.current) {
-          questionRef.current.scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'start' 
+          questionRef.current.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start'
           });
         }
       }, 100);
@@ -400,17 +483,24 @@ export function OpenQuestion({
   };
 
   const handleSelfAssessment = async (rating: 'correct' | 'wrong' | 'partial') => {
+    console.log('🎯 handleSelfAssessment called with rating:', rating);
+    console.log('Current question ID:', question.id);
+
     setAssessmentCompleted(true);
     setShowSelfAssessment(false);
-    
+
     // Store the rating as a string for proper handling in the navigator
     const resultValue = rating === 'correct' ? true : rating === 'partial' ? 'partial' : false;
-    
+
+    console.log('Setting assessment result:', resultValue);
+
+    // Always set the deferred assessment result for display purposes
+    setDeferredAssessmentResult(resultValue);
+
     // For deferred self-assessment (clinical cases), store the result and update the parent
     if (showDeferredSelfAssessment && onSelfAssessmentUpdate) {
-      setDeferredAssessmentResult(resultValue);
       onSelfAssessmentUpdate(question.id, resultValue);
-      
+
       // Track progress for deferred assessment
       if (lectureId) {
         trackQuestionProgress(lectureId, question.id, resultValue);
@@ -420,27 +510,49 @@ export function OpenQuestion({
       if (lectureId) {
         trackQuestionProgress(lectureId, question.id, resultValue);
       }
-      onSubmit(answer, resultValue);
+      onSubmit(userSubmittedAnswer || answer, resultValue);
     }
 
     // Persist attempt + score
     if (user?.id) {
+      const lastScore = resultValue === true ? 1 : resultValue === 'partial' ? 0.5 : 0;
+      console.log('💾 Saving question state:', {
+        userId: user.id,
+        questionId: question.id,
+        lastScore,
+        resultValue
+      });
+
       try {
-        await fetch('/api/user-question-state', {
+        const response = await fetch('/api/user-question-state', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             userId: user.id,
             questionId: question.id,
-            incrementAttempts: true,
-            lastScore: resultValue === true ? 1 : resultValue === 'partial' ? 0.5 : 0,
+            lastScore,
           }),
         });
+
+        if (!response.ok) {
+          console.error('❌ Failed to save question state:', response.status, response.statusText);
+        } else {
+          const savedData = await response.json();
+          console.log('✅ Successfully saved question state:', {
+            questionId: question.id,
+            lastScore,
+            resultValue,
+            savedData
+          });
+        }
+
         // Log a generic activity event (question attempt)
         logActivity('open_question_attempt', () => {
           window.dispatchEvent(new CustomEvent('activity-attempt'));
         });
-      } catch {}
+      } catch (error) {
+        console.error('Error saving question state:', error);
+      }
     }
   };
 
@@ -466,15 +578,70 @@ export function OpenQuestion({
     } catch {}
   };
 
+  const handleResubmit = () => {
+    console.log('🔄 handleResubmit called for question:', question.id);
+    console.log('Current state before resubmit:', {
+      deferredAssessmentResult,
+      assessmentCompleted,
+      submitted,
+      hasSubmitted
+    });
+
+    // Reset all question state to allow resubmission
+    setAnswer('');
+    setUserSubmittedAnswer('');
+    setSubmitted(false);
+    setShowSelfAssessment(false);
+    setAssessmentCompleted(false);
+    setHasSubmitted(false);
+    setDeferredAssessmentResult(null);
+    hasSubmittedRef.current = false;
+
+    // Reset notes area state
+    setShowNotesArea(false);
+    setNotesHasContent(false);
+    setNotesManuallyControlled(false);
+
+    console.log('✅ Question state reset via resubmit');
+
+    // Scroll to question top
+    setTimeout(() => {
+      if (questionRef.current) {
+        questionRef.current.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start'
+        });
+      }
+    }, 100);
+  };
+
+
   // Compute expected reference answer (memoized)
   const expectedReference = useMemo(() => {
     // In revision mode, use userAnswer if available (when isAnswered is true but not submitted)
     if (isAnswered && !submitted && userAnswer) {
       return userAnswer;
     }
-    
+
     const correctArr: string[] = (question as any).correctAnswers || (question as any).correct_answers || [];
-    const expectedFromArray = Array.isArray(correctArr) && correctArr.length > 0 ? correctArr.filter(Boolean).join(' / ') : '';
+
+    // For QROC questions, take the first element (single answer), for MCQ questions join with " / "
+    let expectedFromArray = '';
+    if (Array.isArray(correctArr) && correctArr.length > 0) {
+      const filteredArr = correctArr.filter(Boolean);
+      if (filteredArr.length > 0) {
+        // Check if this is a QROC question (type contains 'qroc' or 'open')
+        const questionType = (question as any).type;
+        if (questionType === 'qroc' || questionType === 'clinic_croq' || questionType === 'open') {
+          // For QROC questions, take the first element only
+          expectedFromArray = filteredArr[0];
+        } else {
+          // For MCQ questions, join all elements with " / "
+          expectedFromArray = filteredArr.join(' / ');
+        }
+      }
+    }
+
     const expected = expectedFromArray || (question as any).course_reminder || (question as any).courseReminder || question.explanation || (question as any).correctAnswer || '';
     return expected || '';
   }, [question, isAnswered, submitted, userAnswer]);
@@ -606,7 +773,24 @@ export function OpenQuestion({
           expectedReferenceInline = userAnswer;
         } else {
           const correctArr: string[] = (question as any).correctAnswers || (question as any).correct_answers || [];
-          const expectedFromArray = Array.isArray(correctArr) && correctArr.length > 0 ? correctArr.filter(Boolean).join(' / ') : '';
+
+          // For QROC questions, take the first element (single answer), for MCQ questions join with " / "
+          let expectedFromArray = '';
+          if (Array.isArray(correctArr) && correctArr.length > 0) {
+            const filteredArr = correctArr.filter(Boolean);
+            if (filteredArr.length > 0) {
+              // Check if this is a QROC question (type contains 'qroc' or 'open')
+              const questionType = (question as any).type;
+              if (questionType === 'qroc' || questionType === 'clinic_croq' || questionType === 'open') {
+                // For QROC questions, take the first element only
+                expectedFromArray = filteredArr[0];
+              } else {
+                // For MCQ questions, join all elements with " / "
+                expectedFromArray = filteredArr.join(' / ');
+              }
+            }
+          }
+
           const expected = expectedFromArray || (question as any).course_reminder || (question as any).courseReminder || question.explanation || (question as any).correctAnswer || '';
           expectedReferenceInline = expected || '';
         }
@@ -627,29 +811,59 @@ export function OpenQuestion({
               />
             </div>
 
-            {/* Reference answer inside same card */}
-            {canShowReferenceInline && (
-              <div className="rounded-md bg-emerald-50/80 dark:bg-emerald-900/40 px-4 sm:px-5 py-3">
-                <div className="mb-1.5">
-                  <h3 className="text-base md:text-lg font-semibold tracking-tight text-emerald-800 dark:text-emerald-50">Réponse</h3>
-                </div>
-                <div className="prose prose-sm md:prose-base dark:prose-invert max-w-none leading-relaxed text-emerald-800 dark:text-emerald-50">
-                  <RichTextDisplay text={expectedReferenceInline} enableImageZoom={true} />
-                </div>
-              </div>
-            )}
+            {/* Reference answer now shown inside self-assessment panel - removed duplicate */}
 
             {/* Self assessment within the card (flat variant) */}
             {showSelfAssessment && (!hideImmediateResults || showDeferredSelfAssessment) && (
               <div ref={selfAssessmentRef}>
                 <OpenQuestionSelfAssessment
                   onAssessment={handleSelfAssessment}
-                  userAnswerText={submitted ? answer : undefined}
+                  userAnswerText={userSubmittedAnswer}
                   questionId={question.id}
                   enableHighlighting={enableAnswerHighlighting}
                   highlightConfirm={highlightConfirm}
                   variant="flat"
+                  correctAnswer={expectedReference}
                 />
+              </div>
+            )}
+
+            {/* User Answer Display After Assessment - Colored based on result */}
+            {assessmentCompleted && userSubmittedAnswer && (
+              <div className="mt-4">
+                <div className={`rounded-lg border p-4 shadow-sm ${
+                  deferredAssessmentResult === true
+                    ? 'border-green-200/80 dark:border-green-700/60 bg-green-50/80 dark:bg-green-900/40'
+                    : deferredAssessmentResult === 'partial'
+                    ? 'border-yellow-200/80 dark:border-yellow-700/60 bg-yellow-50/80 dark:bg-yellow-900/40'
+                    : 'border-red-200/80 dark:border-red-700/60 bg-red-50/80 dark:bg-red-900/40'
+                }`}>
+                  <div className="mb-2 flex items-center">
+                    <div className={`w-3 h-3 rounded-full mr-2 ${
+                      deferredAssessmentResult === true
+                        ? 'bg-green-500'
+                        : deferredAssessmentResult === 'partial'
+                        ? 'bg-yellow-500'
+                        : 'bg-red-500'
+                    }`}></div>
+                    <h5 className={`text-sm font-semibold ${
+                      deferredAssessmentResult === true
+                        ? 'text-green-800 dark:text-green-200'
+                        : deferredAssessmentResult === 'partial'
+                        ? 'text-yellow-800 dark:text-yellow-200'
+                        : 'text-red-800 dark:text-red-200'
+                    }`}>Votre réponse</h5>
+                  </div>
+                  <div className={`prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed ${
+                    deferredAssessmentResult === true
+                      ? 'text-green-800 dark:text-green-200'
+                      : deferredAssessmentResult === 'partial'
+                      ? 'text-yellow-800 dark:text-yellow-200'
+                      : 'text-red-800 dark:text-red-200'
+                  }`}>
+                    <RichTextDisplay text={userSubmittedAnswer} enableImageZoom={true} />
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -733,28 +947,7 @@ export function OpenQuestion({
         />
       )}
 
-  {/* Reference answer now shown inside self-assessment panel */}
-
-  {/* Persistent reference + user answer block (including during self-assessment) */}
-  {(() => {
-    // Avoid duplicate reference/self-assessment when wrapped in simple QROC container
-    const usingWrapper = submitted && !hideImmediateResults && !disableIndividualSubmit;
-    if (usingWrapper) return null;
-    const canShowReference = submitted && expectedReference && (!hideImmediateResults || (showSelfAssessment && showDeferredSelfAssessment) || assessmentCompleted);
-    if (!canShowReference) return null;
-    return (
-      <div className="mt-0.5">
-        <div className="rounded-xl border border-emerald-300/60 dark:border-emerald-600/70 bg-emerald-50/80 dark:bg-emerald-900/50 px-6 py-2 shadow-sm">
-          <div className="mb-2">
-            <h3 className="text-base md:text-lg font-bold tracking-tight text-emerald-800 dark:text-emerald-50">Réponse</h3>
-          </div>
-          <div className="prose prose-sm md:prose-base dark:prose-invert max-w-none leading-relaxed text-emerald-800 dark:text-emerald-50">
-            <RichTextDisplay text={expectedReference} enableImageZoom={true} />
-          </div>
-        </div>
-      </div>
-    );
-  })()}
+  {/* Reference answer now shown inside self-assessment panel - removed duplicate */}
 
   {(() => {
     const usingWrapper = submitted && !hideImmediateResults && !disableIndividualSubmit;
@@ -764,10 +957,11 @@ export function OpenQuestion({
       <div ref={selfAssessmentRef}>
         <OpenQuestionSelfAssessment
           onAssessment={handleSelfAssessment}
-          userAnswerText={submitted ? answer : undefined}
+          userAnswerText={userSubmittedAnswer}
           questionId={question.id}
           enableHighlighting={enableAnswerHighlighting}
           highlightConfirm={highlightConfirm}
+          correctAnswer={expectedReference}
         />
       </div>
     );
@@ -782,8 +976,12 @@ export function OpenQuestion({
           showNext={submitted} // Show "Suivant" immediately after submission
           hasSubmitted={hasSubmitted}
           assessmentCompleted={assessmentCompleted}
+          assessmentResult={deferredAssessmentResult}
           showNotesArea={showNotesArea}
           hideNotesButton={false} // Always show notes button so users can hide/show notes
+          onResubmit={handleResubmit}
+          userAnswerText={userSubmittedAnswer}
+          correctAnswer={expectedReference}
           onToggleNotes={() => {
             setShowNotesArea(prev => !prev);
             setNotesManuallyControlled(true);

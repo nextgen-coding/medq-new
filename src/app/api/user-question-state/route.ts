@@ -37,23 +37,30 @@ function generateDeterministicUUID(input: string): string {
 
 // GET /api/user-question-state?userId=&questionId=
 export async function GET(req: Request) {
- 	try {
- 		const { searchParams } = new URL(req.url);
- 		const userId = searchParams.get('userId') as string | null;
- 		const questionId = searchParams.get('questionId') as string | null;
- 		if (!userId || !questionId) {
- 			return NextResponse.json({ error: 'userId and questionId are required' }, { status: 400 });
- 		}
+	try {
+		const { searchParams } = new URL(req.url);
+		const userId = searchParams.get('userId') as string | null;
+		const questionId = searchParams.get('questionId') as string | null;
+		if (!userId || !questionId) {
+			return NextResponse.json({ error: 'userId and questionId are required' }, { status: 400 });
+		}
 
- 		// Check if this is a clinical case or grouped question
- 		const isClinicalCase = questionId.startsWith('clinical-case-') ||
- 			questionId.startsWith('group-qroc-') ||
- 			questionId.startsWith('group-qcm-') ||
- 			questionId.startsWith('group-mcq-') ||
- 			questionId.startsWith('group-qcm-');
+		console.log('GET /api/user-question-state - Input:', { userId, questionId, isValidUUID: isValidUUID(questionId) });
 
- 		if (isClinicalCase) {
- 			// For clinical cases, try to get the data directly
+		// Always use raw SQL for maximum compatibility
+		const queryQuestionId = getQuestionIdForQuery(questionId);
+		console.log('GET /api/user-question-state - Querying with:', { userId, questionId, queryQuestionId, isValidUUID: isValidUUID(questionId) });
+
+		// Check if this is a clinical case or grouped question
+		const isClinicalCase = questionId.startsWith('clinical-case-') ||
+			questionId.startsWith('group-qroc-') ||
+			questionId.startsWith('group-qcm-') ||
+			questionId.startsWith('group-mcq-') ||
+			questionId.startsWith('group-qcm-');
+
+		if (isClinicalCase) {
+			// For clinical cases, try to get the data directly
+			console.log('GET /api/user-question-state - Handling as clinical case:', { userId, questionId, queryQuestionId });
  			try {
  				const rows = await prisma.$queryRaw<Array<any>>`
  					SELECT
@@ -74,6 +81,14 @@ export async function GET(req: Request) {
  					WHERE user_id = ${userId}::uuid AND question_id = ${getQuestionIdForQuery(questionId)}::uuid
  					LIMIT 1
  				`;
+ 				console.log('GET /api/user-question-state - Clinical case query result:', rows[0] ?? null);
+ 				console.log('GET /api/user-question-state - Clinical case query result details:', {
+ 					hasResult: rows.length > 0,
+ 					result: rows[0],
+ 					lastScore: rows[0]?.lastScore,
+ 					notes: rows[0]?.notes,
+ 					highlights: rows[0]?.highlights
+ 				});
  				return NextResponse.json(rows[0] ?? null);
  			} catch (sqlErr: any) {
  				console.warn('Clinical case notes query failed:', sqlErr?.message);
@@ -82,7 +97,6 @@ export async function GET(req: Request) {
  			}
  		}
 
- 		// Always use raw SQL for maximum compatibility
  		try {
  			const rows = await prisma.$queryRaw<Array<any>>`
  				SELECT
@@ -100,9 +114,17 @@ export async function GET(req: Request) {
  						ELSE ARRAY[]::text[]
  					END AS "notesImageUrls"
  				FROM question_user_data
- 				WHERE user_id = ${userId}::uuid AND question_id = ${getQuestionIdForQuery(questionId)}::uuid
+ 				WHERE user_id = ${userId}::uuid AND question_id = ${queryQuestionId}::uuid
  				LIMIT 1
  			`;
+ 			console.log('GET /api/user-question-state - Query result:', rows[0] ?? null);
+ 			console.log('GET /api/user-question-state - Query result details:', {
+ 				hasResult: rows.length > 0,
+ 				result: rows[0],
+ 				lastScore: rows[0]?.lastScore,
+ 				notes: rows[0]?.notes,
+ 				highlights: rows[0]?.highlights
+ 			});
  			return NextResponse.json(rows[0] ?? null);
  		} catch (sqlErr: any) {
  			console.warn('Raw SQL fallback failed, using minimal query:', sqlErr?.message);
@@ -161,8 +183,10 @@ async function handleClinicalCaseNotes(userId: string, questionId: string, notes
 	const highlightsJson = highlights !== undefined ? JSON.stringify(highlights) : null;
 
 	// Use a transaction to ensure both operations succeed
+	console.log('handleClinicalCaseNotes - Starting transaction:', { userId, questionId, placeholderQuestionId, notes, lastScore });
 	const result = await prisma.$transaction(async (tx) => {
 		// First, ensure the placeholder question exists
+		console.log('handleClinicalCaseNotes - Ensuring placeholder question exists');
 		await tx.$executeRaw`
 			INSERT INTO questions (id, text, type, options, correct_answers, created_at, updated_at)
 			VALUES (
@@ -214,6 +238,7 @@ async function handleClinicalCaseNotes(userId: string, questionId: string, notes
 				WHERE user_id = ${userId}::uuid AND question_id = ${placeholderQuestionId}::uuid
 				LIMIT 1
 			`;
+			console.log('handleClinicalCaseNotes - Final result (with images):', row[0]);
 			return row[0];
 		} else {
 			const row = await tx.$queryRaw<Array<any>>`
@@ -224,6 +249,7 @@ async function handleClinicalCaseNotes(userId: string, questionId: string, notes
 			`;
 			const result = row[0];
 			if (result) result.notesImageUrls = [];
+			console.log('handleClinicalCaseNotes - Final result (without images):', result);
 			return result;
 		}
 	});
@@ -233,24 +259,28 @@ async function handleClinicalCaseNotes(userId: string, questionId: string, notes
 
 // POST /api/user-question-state { userId, questionId, notes?, highlights?, attempts?, lastScore? }
 export async function POST(req: Request) {
- 	try {
- 		const body = await req.json();
- 				 const { userId, questionId, notes, highlights, attempts, lastScore, incrementAttempts, notesImageUrls } = body || {};
- 				 console.log('POST /api/user-question-state payload:', {
- 					 userId,
- 					 questionId,
- 					 notes,
- 					 highlights,
- 					 highlightsType: typeof highlights,
- 					 highlightsIsArray: Array.isArray(highlights),
- 					 attempts,
- 					 lastScore,
- 					 incrementAttempts,
- 					 notesImageUrls
- 				 });
- 		if (!userId || !questionId) {
- 			return NextResponse.json({ error: 'userId and questionId are required' }, { status: 400 });
- 		}
+	try {
+		const body = await req.json();
+				 const { userId, questionId, notes, highlights, attempts, lastScore, incrementAttempts, notesImageUrls } = body || {};
+				 console.log('POST /api/user-question-state payload:', {
+					 userId,
+					 questionId,
+					 notes,
+					 highlights,
+					 highlightsType: typeof highlights,
+					 highlightsIsArray: Array.isArray(highlights),
+					 attempts,
+					 lastScore,
+					 incrementAttempts,
+					 notesImageUrls
+				 });
+
+		const queryQuestionId = getQuestionIdForQuery(questionId);
+		console.log('POST /api/user-question-state - Using questionId:', { questionId, queryQuestionId, isValidUUID: isValidUUID(questionId) });
+
+		if (!userId || !questionId) {
+			return NextResponse.json({ error: 'userId and questionId are required' }, { status: 400 });
+		}
 
  		// Check if this is a clinical case or grouped question (non-UUID format)
  		const isClinicalCase = questionId.startsWith('clinical-case-') ||
@@ -265,8 +295,10 @@ export async function POST(req: Request) {
  		if (isClinicalCase) {
  			// For clinical cases and grouped questions, we need to handle them differently
  			// since they don't have entries in the questions table
+ 			console.log('POST /api/user-question-state - Handling as clinical case:', { userId, questionId, notes, highlights, lastScore });
  			try {
  				const result = await handleClinicalCaseNotes(userId, questionId, notes, highlights, attempts, lastScore, incrementAttempts, notesImageUrls);
+ 				console.log('POST /api/user-question-state - Clinical case result:', result);
  				return NextResponse.json(result);
  			} catch (sqlErr: any) {
  				console.error('POST clinical case notes error', sqlErr);
@@ -300,12 +332,24 @@ export async function POST(req: Request) {
 		   // Always use raw SQL for maximum compatibility
 		   // Serialize highlights as a single JSON value (not array type)
 		   const highlightsJson = highlights !== undefined ? JSON.stringify(highlights) : null;
+		   console.log('POST /api/user-question-state - About to save:', {
+		    userId,
+		    questionId,
+		    queryQuestionId,
+		    notes,
+		    highlights,
+		    highlightsJson,
+		    attempts: nextAttempts,
+		    lastScore,
+		    sanitizedImages
+		   });
 		   try {
-			   const result = await prisma.$transaction(async (tx) => {
-				   const existing = await tx.$queryRaw<Array<any>>`SELECT id FROM question_user_data WHERE user_id = ${userId}::uuid AND question_id = ${getQuestionIdForQuery(questionId)}::uuid LIMIT 1`;
-               
-				   // Add logging to confirm notes field processing
-				   console.log('Inserting/Updating notes field:', { notes });
+		    const result = await prisma.$transaction(async (tx) => {
+		     const existing = await tx.$queryRaw<Array<any>>`SELECT id FROM question_user_data WHERE user_id = ${userId}::uuid AND question_id = ${getQuestionIdForQuery(questionId)}::uuid LIMIT 1`;
+
+		     // Add logging to confirm notes field processing
+		     console.log('POST /api/user-question-state - Transaction started, existing record:', existing.length > 0);
+		     console.log('Inserting/Updating notes field:', { notes });
 
 				   if (existing.length === 0) {
 					   // Check if notes_image_urls column exists before including it
@@ -343,7 +387,7 @@ export async function POST(req: Request) {
 				
 				// Return the updated/created row
 				const hasImagesCol = await tx.$queryRaw<Array<any>>`SELECT 1 FROM information_schema.columns WHERE table_name='question_user_data' AND column_name='notes_image_urls' LIMIT 1`;
-				
+
 				if (hasImagesCol.length > 0) {
 					const row = await tx.$queryRaw<Array<any>>`
 						SELECT user_id::text AS "userId", question_id::text AS "questionId", notes, highlights, attempts, "lastScore", notes_image_urls AS "notesImageUrls"
@@ -351,6 +395,7 @@ export async function POST(req: Request) {
 						WHERE user_id = ${userId}::uuid AND question_id = ${getQuestionIdForQuery(questionId)}::uuid
 						LIMIT 1
 					`;
+					console.log('POST /api/user-question-state - Transaction result (with images):', row[0]);
 					return row[0];
 				} else {
 					const row = await tx.$queryRaw<Array<any>>`
@@ -361,6 +406,7 @@ export async function POST(req: Request) {
 					`;
 					const result = row[0];
 					if (result) result.notesImageUrls = [];
+					console.log('POST /api/user-question-state - Transaction result (without images):', result);
 					return result;
 				}
 			});

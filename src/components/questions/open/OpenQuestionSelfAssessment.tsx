@@ -5,6 +5,7 @@ import { CheckCircle, XCircle, MinusCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { RichTextDisplay } from '@/components/ui/rich-text-display';
 import { HighlightableAnswerDisplay } from '../HighlightableAnswerDisplay';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface OpenQuestionSelfAssessmentProps {
   onAssessment: (rating: 'correct' | 'wrong' | 'partial') => void;
@@ -13,9 +14,10 @@ interface OpenQuestionSelfAssessmentProps {
   enableHighlighting?: boolean; // whether to enable highlighting
   highlightConfirm?: boolean; // whether to show confirmation bubble
   variant?: 'panel' | 'flat'; // presentation style
+  correctAnswer?: string; // the correct answer to show for comparison
 }
 
-export function OpenQuestionSelfAssessment({ onAssessment, userAnswerText, questionId, enableHighlighting = false, highlightConfirm = false, variant = 'panel' }: OpenQuestionSelfAssessmentProps) {
+export function OpenQuestionSelfAssessment({ onAssessment, userAnswerText, questionId, enableHighlighting = false, highlightConfirm = false, variant = 'panel', correctAnswer }: OpenQuestionSelfAssessmentProps) {
   const { t } = useTranslation();
 
   // Keyboard shortcuts for self-assessment
@@ -43,7 +45,7 @@ export function OpenQuestionSelfAssessment({ onAssessment, userAnswerText, quest
   };
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       className="space-y-4 w-full max-w-full"
@@ -51,6 +53,35 @@ export function OpenQuestionSelfAssessment({ onAssessment, userAnswerText, quest
       {variant === 'panel' ? (
         <div className="p-3 md:p-4 rounded-lg bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
           <h4 className="font-medium mb-1 text-blue-900 dark:text-blue-200">Évaluez votre réponse</h4>
+
+          {/* User Answer vs Correct Answer Comparison - Always show if available */}
+          {(userAnswerText || correctAnswer) && (
+            <div className="mb-4 space-y-3">
+              {userAnswerText && (
+                <div className="rounded-lg border border-gray-200/80 dark:border-gray-700/60 bg-gray-50/80 dark:bg-gray-800/50 p-4 shadow-sm">
+                  <div className="mb-2 flex items-center">
+                    <div className="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
+                    <h5 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Votre réponse</h5>
+                  </div>
+                  <div className="prose prose-sm dark:prose-invert max-w-none text-gray-800 dark:text-gray-200 leading-relaxed">
+                    <RichTextDisplay text={userAnswerText} enableImageZoom={true} />
+                  </div>
+                </div>
+              )}
+
+              {correctAnswer && (
+                <div className="rounded-lg border border-emerald-200/80 dark:border-emerald-700/60 bg-emerald-50/80 dark:bg-emerald-900/40 p-4 shadow-sm">
+                  <div className="mb-2 flex items-center">
+                    <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400 mr-2" />
+                    <h5 className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">Réponse correcte</h5>
+                  </div>
+                  <div className="prose prose-sm dark:prose-invert max-w-none text-emerald-800 dark:text-emerald-200 leading-relaxed">
+                    <RichTextDisplay text={correctAnswer} enableImageZoom={true} />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="mt-1 flex flex-row gap-2 w-full">
             <Button
@@ -84,6 +115,35 @@ export function OpenQuestionSelfAssessment({ onAssessment, userAnswerText, quest
       ) : (
         <div className="pt-1">
           <h4 className="font-medium mb-2">Évaluez votre réponse</h4>
+
+          {/* User Answer vs Correct Answer Comparison - Always show if available */}
+          {(userAnswerText || correctAnswer) && (
+            <div className="mb-4 space-y-3">
+              {userAnswerText && (
+                <div className="rounded-lg border border-gray-200/80 dark:border-gray-700/60 bg-gray-50/80 dark:bg-gray-800/50 p-4 shadow-sm">
+                  <div className="mb-2 flex items-center">
+                    <div className="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
+                    <h5 className="text-sm font-semibold text-gray-700 dark:text-gray-300">Votre réponse</h5>
+                  </div>
+                  <div className="prose prose-sm dark:prose-invert max-w-none text-gray-800 dark:text-gray-200 leading-relaxed">
+                    <RichTextDisplay text={userAnswerText} enableImageZoom={true} />
+                  </div>
+                </div>
+              )}
+
+              {correctAnswer && (
+                <div className="rounded-lg border border-emerald-200/80 dark:border-emerald-700/60 bg-emerald-50/80 dark:bg-emerald-900/40 p-4 shadow-sm">
+                  <div className="mb-2 flex items-center">
+                    <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400 mr-2" />
+                    <h5 className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">Réponse correcte</h5>
+                  </div>
+                  <div className="prose prose-sm dark:prose-invert max-w-none text-emerald-800 dark:text-emerald-200 leading-relaxed">
+                    <RichTextDisplay text={correctAnswer} enableImageZoom={true} />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
           <div className="mt-1 flex flex-row gap-2 w-full">
             <Button
               size="lg"

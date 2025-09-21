@@ -410,6 +410,15 @@ export function CreateQuestionDialog({ lecture, isOpen, onOpenChange, onQuestion
       return;
     }
 
+    if ((formData.type === 'mcq' || formData.type === 'clinic_mcq') && (formData.number === undefined || formData.number === null)) {
+      toast({
+        title: 'Erreur de validation',
+        description: "Le numéro de la question est requis pour les QCM.",
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (formData.type === 'mcq' || formData.type === 'clinic_mcq') {
       const validOptions = options.filter(opt => opt.text.trim());
       if (validOptions.length < 2) {

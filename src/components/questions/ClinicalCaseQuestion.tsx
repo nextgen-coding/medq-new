@@ -280,23 +280,17 @@ export function ClinicalCaseQuestion({
     }
   };
 
-  // On mount (or case change) focus first unanswered question and set active index
+  // On mount (or case change) set active index but don't auto-scroll to first question
+  // This allows users to read the case statement first
   useEffect(() => {
     if (clinicalCase.questions.length > 0 && !showResults) {
       // Find first unanswered question
       const firstUnanswered = clinicalCase.questions.find(q => answers[q.id] === undefined);
-      const targetId = firstUnanswered?.id || clinicalCase.questions[0].id;
       const targetIndex = firstUnanswered ? clinicalCase.questions.findIndex(q => q.id === firstUnanswered.id) : 0;
       setActiveIndex(targetIndex);
-      
-      // Scroll to first unanswered question and focus it
-      setTimeout(() => {
-        const element = questionRefs.current[targetId];
-        if (element) {
-          element.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          setTimeout(() => focusFirstInput(targetId), 100);
-        }
-      }, 100);
+
+      // Don't auto-scroll - let users read the case statement first
+      // Users can manually scroll to questions or use keyboard navigation
     }
   }, [clinicalCase.caseNumber, showResults]);
 

@@ -15,18 +15,20 @@ interface QuestionFieldsProps {
   setQuestionNumber: (number: number | undefined) => void;
   session: string;
   setSession: (session: string) => void;
+  isRequired?: boolean;
 }
 
-export function QuestionFields({ 
-  questionText, 
-  setQuestionText, 
-  courseReminder, 
+export function QuestionFields({
+  questionText,
+  setQuestionText,
+  courseReminder,
   setCourseReminder,
   questionType,
   questionNumber,
   setQuestionNumber,
   session,
-  setSession
+  setSession,
+  isRequired = false
 }: QuestionFieldsProps) {
   const { t } = useTranslation();
   
@@ -35,7 +37,7 @@ export function QuestionFields({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         <div className="space-y-2">
           <Label htmlFor="question-number">{t('questions.questionNumber')}</Label>
-          <Input 
+          <Input
             id="question-number"
             type="number"
             placeholder={t('questions.questionNumber')}
@@ -44,6 +46,7 @@ export function QuestionFields({
               const value = e.target.value;
               setQuestionNumber(value === '' ? undefined : parseInt(value, 10));
             }}
+            required={isRequired || (questionType === 'mcq' || questionType === 'clinic_mcq')}
           />
         </div>
         

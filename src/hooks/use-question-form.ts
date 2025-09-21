@@ -99,6 +99,18 @@ export function useQuestionForm({ lectureId, editQuestionId, onComplete }: UseQu
     setMediaType(type);
   };
 
+  const validateForm = () => {
+    if (!questionText.trim()) {
+      return { isValid: false, error: 'Question text is required' };
+    }
+
+    if ((questionType === 'mcq' || questionType === 'clinic_mcq') && (questionNumber === undefined || questionNumber === null)) {
+      return { isValid: false, error: 'Question number is required for MCQ questions' };
+    }
+
+    return { isValid: true, error: null };
+  };
+
   return {
     isLoading,
     setIsLoading,
@@ -120,6 +132,7 @@ export function useQuestionForm({ lectureId, editQuestionId, onComplete }: UseQu
     mediaType,
     handleMediaChange,
     handleParsedContent,
-    fetchQuestionData
+    fetchQuestionData,
+    validateForm
   };
 }
