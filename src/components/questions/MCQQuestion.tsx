@@ -91,11 +91,23 @@ export function MCQQuestion({
 
   // Auto-show notes when content is detected, but don't auto-hide when content is deleted
   useEffect(() => {
-    if (!notesManuallyControlled && notesHasContent) {
-      setShowNotesArea(true);
+    if (!notesManuallyControlled) {
+      // Show notes if they have content, but don't hide them if content is deleted
+      // This allows users to continue editing even when notes are empty
+      if (notesHasContent) {
+        setShowNotesArea(true);
+      }
+      // Don't auto-hide when content becomes empty - keep notes visible for editing
     }
-    // Don't auto-hide when content becomes empty - let user manually close
   }, [notesHasContent, notesManuallyControlled]);
+
+  // Keep notes area visible even when content is deleted
+  useEffect(() => {
+    if (notesHasContent === false && showNotesArea) {
+      // Notes area is already visible, keep it visible even with no content
+      // This ensures users can still see the modify button
+    }
+  }, [notesHasContent, showNotesArea]);
 
   // If another branch introduced a prop to force-show notes after submit,
   // we intentionally keep local behavior (auto-show only when content exists
@@ -747,10 +759,11 @@ export function MCQQuestion({
   {/* Notes - always render for content detection, but show/hide based on showNotesArea */}
   {!hideNotes && (
         <div ref={notesRef} className={showNotesArea ? "" : "hidden"}>
-          <QuestionNotes 
-            questionId={question.id} 
+          <QuestionNotes
+            questionId={question.id}
+            questionType="regular"
             onHasContentChange={setNotesHasContent}
-            autoEdit={showNotesArea && !notesHasContent} // Auto-edit when manually opened and empty
+            autoEdit={!notesHasContent && !notesManuallyControlled}
           />
         </div>
       )}

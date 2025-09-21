@@ -260,32 +260,41 @@ export function QuestionControlPanel({
         
         questions.forEach((item, index) => {
           if ('questions' in item && 'caseNumber' in item) {
-            // Clinical case or grouped question
+            // Clinical case - always check for clinical-case-{caseNumber} notes
             const caseItem = item as ClinicalCase;
-            const allQroc = caseItem.questions.every(q => (q as any).type === 'qroc');
-            const allMcq = caseItem.questions.every(q => (q as any).type === 'mcq');
-            
-            if (allQroc) {
-              // Multi QROC group - check for group-qroc-{caseNumber} notes
-              noteIdsToCheck.push(`group-qroc-${caseItem.caseNumber}`);
-            } else if (allMcq) {
-              // Multi MCQ group - check for group-qcm-{caseNumber} notes
-              noteIdsToCheck.push(`group-qcm-${caseItem.caseNumber}`);
-            } else {
-              // Clinical case - check for clinical-case-{caseNumber} notes
-              noteIdsToCheck.push(`clinical-case-${caseItem.caseNumber}`);
-            }
+            noteIdsToCheck.push(`clinical-case-${caseItem.caseNumber}`);
+            console.log('Task Navigator - Adding clinical case note check:', `clinical-case-${caseItem.caseNumber}`);
           } else {
             // Regular question - check for question ID notes
             const question = item as Question;
             noteIdsToCheck.push(question.id);
+            console.log('Task Navigator - Adding regular question note check:', question.id);
           }
         });
+
+        console.log('Task Navigator - All note IDs to check:', noteIdsToCheck);
+        console.log('Task Navigator - Questions being processed:', questions.map(q => ({
+          id: 'questions' in q ? `clinical-case-${q.caseNumber}` : (q as any).id,
+          type: 'questions' in q ? 'clinicalCase' : (q as any).type,
+          caseNumber: 'caseNumber' in q ? q.caseNumber : null
+        })));
+
+        console.log('Task Navigator - Checking notes for IDs:', noteIdsToCheck);
 
         const results = await Promise.all(
           noteIdsToCheck.map(async (id) => {
             try {
-              const res = await fetch(`/api/user-question-state?userId=${encodeURIComponent(user.id)}&questionId=${encodeURIComponent(id)}`, {
+              // Determine which API to use based on question ID format
+              const isClinicalCase = id.startsWith('clinical-case-') ||
+                id.startsWith('group-qroc-') ||
+                id.startsWith('group-qcm-') ||
+                id.startsWith('group-mcq-');
+
+              const apiUrl = isClinicalCase ? '/api/clinical-case-notes' : '/api/user-question-state';
+
+              console.log(`Task Navigator - Checking notes for ${id}: using ${apiUrl}`);
+
+              const res = await fetch(`${apiUrl}?userId=${encodeURIComponent(user.id)}&questionId=${encodeURIComponent(id)}`, {
                 signal: controller.signal,
                 cache: 'no-cache'
               });
@@ -306,6 +315,8 @@ export function QuestionControlPanel({
           results.forEach(([id, hasNote]) => {
             newNotesMap[id] = hasNote;
           });
+          console.log('Task Navigator - Initial notes fetch results:', results);
+          console.log('Task Navigator - Setting initial notesMap:', newNotesMap);
           setNotesMap(newNotesMap);
         }
       } catch {
@@ -320,21 +331,26 @@ export function QuestionControlPanel({
   useEffect(() => {
     const handleNotesUpdate = (event: any) => {
       const { questionId, hasContent } = event.detail || {};
+      console.log('Task Navigator - Received notes-updated event:', { questionId, hasContent, currentNotesMap: notesMap });
       if (questionId) {
-        setNotesMap(prev => ({
-          ...prev,
-          [questionId]: hasContent
-        }));
+        setNotesMap(prev => {
+          const updated = {
+            ...prev,
+            [questionId]: hasContent
+          };
+          console.log('Task Navigator - Updated notesMap:', updated);
+          return updated;
+        });
       }
     };
 
     // Listen for custom events dispatched when notes are saved/cleared
     window.addEventListener('notes-updated', handleNotesUpdate);
-    
+
     return () => {
       window.removeEventListener('notes-updated', handleNotesUpdate);
     };
-  }, []);
+  }, []); // Remove notesMap dependency to prevent unnecessary re-renders
 
 
   // Only show on mobile devices using a drawer
@@ -455,19 +471,26 @@ export function QuestionControlPanel({
       isCurrent = actualIndex === currentQuestionIndex && !isComplete;
       // For clinical/group entries, check notesMap using the correct note ID format
       let hasNote = false;
+      let noteId = '';
       if (entry.type === 'clinical') {
         // Clinical case uses clinical-case-{caseNumber}
-        hasNote = notesMap[`clinical-case-${entry.caseNumber}`] === true;
+        noteId = `clinical-case-${entry.caseNumber}`;
+        hasNote = notesMap[noteId] === true;
       } else if (entry.type === 'group-qcm') {
         // Multi MCQ group uses group-qcm-{caseNumber}
-        hasNote = notesMap[`group-qcm-${entry.caseNumber}`] === true;
+        noteId = `group-qcm-${entry.caseNumber}`;
+        hasNote = notesMap[noteId] === true;
       } else if (entry.type === 'group-qroc') {
         // Multi QROC group uses group-qroc-{caseNumber}
-        hasNote = notesMap[`group-qroc-${entry.caseNumber}`] === true;
+        noteId = `group-qroc-${entry.caseNumber}`;
+        hasNote = notesMap[noteId] === true;
       } else {
         // Regular question uses question ID
+        noteId = entry.id;
         hasNote = notesMap[entry.id] === true;
       }
+
+      console.log('Task Navigator - Checking notes for entry:', { entryId: entry.id, entryType: entry.type, noteId, hasNote, notesMap: notesMap[noteId] });
       const isPinned = pinnedIds.includes(entry.id);
 
       return (
@@ -640,6 +663,18 @@ export function QuestionControlPanel({
       }
     });
 
+    console.log('Task Navigator - Classification results:', {
+  regularQuestions: regularQuestions.length,
+  multiQrocGroups: multiQrocGroups.length,
+  multiMcqGroups: multiMcqGroups.length,
+  clinicalCases: clinicalCases.length,
+  questions: questions.map(q => ({
+    id: 'questions' in q ? `clinical-case-${q.caseNumber}` : (q as any).id,
+    type: 'questions' in q ? 'clinicalCase' : (q as any).type,
+    caseNumber: 'caseNumber' in q ? q.caseNumber : null
+  }))
+});
+
     // We'll render multi QROC groups inside the QROC block instead of clinical cases
 
     // Group regular questions by type
@@ -674,6 +709,7 @@ export function QuestionControlPanel({
       });
       groupedQuestions['qroc'].sort((a,b)=> (a.number||0)-(b.number||0));
     }
+
 
     // Inject synthetic multi-MCQ navigation entries into mcq group
     if (multiMcqGroups.length) {
@@ -760,11 +796,14 @@ export function QuestionControlPanel({
               const caseNumber = question.number || question.id.replace('multimcq-', '');
               noteId = `group-qcm-${caseNumber}`;
             }
-            
+
             const hasNote = notesMap[noteId] === true;
+            console.log('Task Navigator - Regular question notes check:', { questionId: question.id, noteId, hasNote, notesMap: notesMap[noteId] });
             const isHidden = (question as any).hidden === true;
             const isPinned = pinnedIds.includes(question.id) || (isGroup && groupChildren.some((q: any)=> pinnedIds.includes(q.id)));
             const isGroupHidden = isGroup && groupChildren.every((q:any)=> q.hidden);
+
+            console.log('Task Navigator - Regular question notes check:', { questionId: question.id, noteId, hasNote, notesMap });
             return (
               <motion.div
                 key={question.id}
@@ -935,7 +974,10 @@ export function QuestionControlPanel({
                 }
                 
                 // Check for notes using clinical-case-{caseNumber} format
-                const hasNote = notesMap[`clinical-case-${clinicalCase.caseNumber}`] === true;
+                const noteId = `clinical-case-${clinicalCase.caseNumber}`;
+                const hasNote = notesMap[noteId] === true;
+
+                console.log('Task Navigator - Clinical case notes check:', { caseNumber: clinicalCase.caseNumber, noteId, hasNote, notesMap: notesMap[noteId] });
                 
                 // Aggregate pin/hidden for clinical case
                 const anyPinned = clinicalCase.questions.some(q => pinnedIds.includes(q.id));

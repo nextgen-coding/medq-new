@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { CheckCircle, Circle, AlertCircle, Eye, FileText, Pin, PinOff, EyeOff, Trash2, Pencil, StickyNote, ChevronRight, Flag } from 'lucide-react';
+import { CheckCircle, Circle, AlertCircle, Eye, FileText, Pin, PinOff, EyeOff, Trash2, Pencil, StickyNote, ChevronRight, Flag, XCircle } from 'lucide-react';
 import { ReportQuestionDialog } from './ReportQuestionDialog';
 import { HighlightableCaseText } from './HighlightableCaseText';
 import { RichTextDisplay } from '@/components/ui/rich-text-display';
@@ -83,6 +83,7 @@ export function ClinicalCaseQuestion({
   const [isTogglingHidden, setIsTogglingHidden] = useState(false);
   const [showNotesArea, setShowNotesArea] = useState(false);
   const [notesHasContent, setNotesHasContent] = useState(false); // track if notes have content
+  const [notesManuallyControlled, setNotesManuallyControlled] = useState(false); // track if user manually opened/closed notes
   // Evaluation phase state (after submission)
   const [evaluationOrder, setEvaluationOrder] = useState<string[]>([]); // ordered list of open question ids needing evaluation
   const [evaluationIndex, setEvaluationIndex] = useState<number>(0); // current evaluation pointer
@@ -94,18 +95,53 @@ export function ClinicalCaseQuestion({
   // Removed per-question submission; single global submit after all questions answered
 
   // Auto-show notes when content is detected, but don't auto-hide when content is deleted
+  // Only auto-show if user hasn't manually controlled the notes area
   useEffect(() => {
-    if (notesHasContent && !showNotesArea) {
+    if (notesHasContent && !showNotesArea && !notesManuallyControlled) {
       setShowNotesArea(true);
     }
     // Don't auto-hide when content becomes empty - let user manually close
-  }, [notesHasContent, showNotesArea]);
+  }, [notesHasContent, showNotesArea, notesManuallyControlled]);
+
+  // Auto-show notes area if clinical case has existing notes on mount
+  // Only run if user hasn't manually controlled notes
+  useEffect(() => {
+    if (!notesManuallyControlled && !showNotesArea) {
+      // Check if clinical case has notes by looking at the notes content
+      // The QuestionNotes component will handle fetching and setting notesHasContent
+      // This effect runs after the QuestionNotes component has had a chance to load
+      setTimeout(() => {
+        console.log('ClinicalCaseQuestion - Auto-show check:', { notesHasContent, showNotesArea, notesManuallyControlled });
+        if (notesHasContent && !notesManuallyControlled) {
+          console.log('ClinicalCaseQuestion - Auto-showing notes area');
+          setShowNotesArea(true);
+        }
+      }, 100);
+    }
+  }, [notesHasContent, notesManuallyControlled, showNotesArea]);
+
+  // Keep notes area visible even when content is deleted, but only if manually controlled
+  useEffect(() => {
+    if (notesHasContent === false && showNotesArea && notesManuallyControlled) {
+      // Notes area is already visible and user manually opened it, keep it visible even with no content
+      // This ensures users can still see the modify button
+    }
+  }, [notesHasContent, showNotesArea, notesManuallyControlled]);
   const [openCaseEdit, setOpenCaseEdit] = useState(false);
   const [openGroupQrocEdit, setOpenGroupQrocEdit] = useState(false);
   const [openGroupMcqEdit, setOpenGroupMcqEdit] = useState(false);
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
   const [reportTargetQuestion, setReportTargetQuestion] = useState<Question | null>(null);
   const questionRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  // Debug logging for displayMode and question type detection
+  console.log('ClinicalCaseQuestion - Props:', {
+    displayMode,
+    clinicalCase: {
+      caseNumber: clinicalCase.caseNumber,
+      questions: clinicalCase.questions.map(q => ({ id: q.id, type: (q as any).type }))
+    }
+  });
 
   // Count only non-empty answers for progress (arrays with length, non-empty strings, or truthy values)
   const answeredQuestions = clinicalCase.questions.reduce((count, q) => {
@@ -803,64 +839,111 @@ export function ClinicalCaseQuestion({
                     size="sm"
                     disabled={answeredQuestions !== clinicalCase.totalQuestions || isCaseComplete}
                     className={`font-semibold ${answeredQuestions === clinicalCase.totalQuestions && !isCaseComplete ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-600/50 text-white cursor-not-allowed'}`}
-                  >Soumettre</Button>
+                  >Soumettre la réponse</Button>
                 )}
 
-                {/* Resubmit button visible after submission (for both MCQ-only and open cases) */}
-                {isCaseComplete && showResults && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleResubmit}
-                    className="flex items-center gap-1"
-                  >
-                    Soumettre à nouveau
-                  </Button>
-                )}
+                {/* Result display and action buttons when submitted */}
+                {showResults && (
+                  <div className="flex items-center gap-2">
+                    {/* Result display */}
+                    <div className="flex items-center">
+                      {(() => {
+                        const overallResult = (() => {
+                          if (!hasOpen) {
+                            // For MCQ-only cases, use the case-level result
+                            return answerResult;
+                          } else {
+                            // For cases with open questions, check if evaluation is complete
+                            if (evaluationComplete) {
+                              const correctCount = Object.values(questionResults).filter(r => r === true).length;
+                              const totalCount = Object.keys(questionResults).length;
+                              if (correctCount === totalCount) return true;
+                              if (correctCount > 0) return 'partial';
+                              return false;
+                            }
+                            return null;
+                          }
+                        })();
 
-                {/* Next button after submission: always for MCQ-only; for open, after evaluation complete */}
-                {isCaseComplete && showResults && (!hasOpen || evaluationComplete) && (
-                  <Button onClick={onNext} size="sm" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold">
-                    Suivant
-                    <ChevronRight className="h-4 w-4 ml-2" />
-                  </Button>
-                )}
+                        if (overallResult === true) {
+                          return (
+                            <div className="flex items-center text-green-600">
+                              <CheckCircle className="h-5 w-5 mr-2" />
+                              <span className="font-medium">Correcte!</span>
+                            </div>
+                          );
+                        } else if (overallResult === 'partial') {
+                          return (
+                            <div className="flex items-center text-yellow-600">
+                              <AlertCircle className="h-5 w-5 mr-2" />
+                              <span className="font-medium">Partiellement correcte</span>
+                            </div>
+                          );
+                        } else if (overallResult === false) {
+                          return (
+                            <div className="flex items-center text-red-600">
+                              <XCircle className="h-5 w-5 mr-2" />
+                              <span className="font-medium">Incorrecte</span>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
+                    </div>
 
-                {/* Notes toggle: immediately after submit for Multi QROC + Multi QCM; after evaluation for mixed clinical with open */}
-                {(() => {
-                  const canShowNotesToggle = (
-                    ((displayMode === 'multi_qroc' || displayMode === 'multi_qcm') && isCaseComplete && showResults) ||
-                    (hasOpen && isCaseComplete && showResults && evaluationComplete)
-                  );
-                  if (!canShowNotesToggle) return null;
-                  return (
+                    {/* Resubmit button */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleResubmit}
+                      className="flex items-center gap-1"
+                    >
+                      Soumettre à nouveau
+                    </Button>
+
+                    {/* Notes toggle: positioned before next button like in MCQActions */}
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        setShowNotesArea(p => !p);
-                        if (!showNotesArea) setTimeout(() => { document.getElementById(`clinical-case-notes-${clinicalCase.caseNumber}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 30);
+                        const newShowNotesArea = !showNotesArea;
+                        setShowNotesArea(newShowNotesArea);
+                        setNotesManuallyControlled(true);
+                        if (newShowNotesArea) {
+                          setTimeout(() => {
+                            document.getElementById(`clinical-case-notes-${clinicalCase.caseNumber}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                          }, 30);
+                        }
                       }}
                       className="flex items-center gap-1"
                     >
                       <StickyNote className="h-4 w-4" />
                       <span className="hidden sm:inline">{showNotesArea ? 'Fermer les notes' : 'Mes notes'}</span>
                     </Button>
-                  );
-                })()}
+
+                    {/* Next button: only show when evaluation is complete for open questions */}
+                    {(!hasOpen || evaluationComplete) && (
+                      <Button onClick={onNext} size="sm" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold">
+                        Question suivante
+                        <ChevronRight className="h-4 w-4 ml-2" />
+                      </Button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
             {(hasOpen || displayMode === 'multi_qcm') && (
             <div id={`clinical-case-notes-${clinicalCase.caseNumber}`} className="space-y-6">
-              {(showNotesArea || notesHasContent) && (
+              <div className={showNotesArea ? "" : "hidden"}>
                 <QuestionNotes
-                  questionId={displayMode === 'multi_qroc' ? generateDeterministicUUID(`group-qroc-${clinicalCase.caseNumber}`) : displayMode === 'multi_qcm' ? generateDeterministicUUID(`group-qcm-${clinicalCase.caseNumber}`) : generateDeterministicUUID(`clinical-case-${clinicalCase.caseNumber}`)}
+                  questionId={`clinical-case-${clinicalCase.caseNumber}`}
                   onHasContentChange={setNotesHasContent}
-                  autoEdit={showNotesArea && !notesHasContent}
+                  autoEdit={!notesHasContent && !notesManuallyControlled}
+                  questionType="clinical-case"
                 />
-              )}
+              </div>
               {isCaseComplete && (
-                <QuestionComments questionId={displayMode === 'multi_qroc' ? generateDeterministicUUID(`group-qroc-${clinicalCase.caseNumber}`) : displayMode === 'multi_qcm' ? generateDeterministicUUID(`group-qcm-${clinicalCase.caseNumber}`) : generateDeterministicUUID(`clinical-case-${clinicalCase.caseNumber}`)} />
+                <QuestionComments questionId={displayMode === 'multi_qroc' ? `group-qroc-${clinicalCase.caseNumber}` : displayMode === 'multi_qcm' ? `group-qcm-${clinicalCase.caseNumber}` : `clinical-case-${clinicalCase.caseNumber}`} />
               )}
             </div>)}
           </div>

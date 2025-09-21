@@ -97,19 +97,33 @@ export function OpenQuestion({
 
   // Auto-show notes when content is detected, but don't auto-hide when content is deleted
   useEffect(() => {
-    if (!notesManuallyControlled && notesHasContent) {
-      setShowNotesArea(true);
+    if (!notesManuallyControlled) {
+      // Show notes if they have content (auto-show behavior)
+      if (notesHasContent) {
+        setShowNotesArea(true);
+      }
+      // Don't auto-hide when content becomes empty - keep notes visible for editing
+      // Notes should only be hidden when user manually closes them
     }
-    // Don't auto-hide when content becomes empty - let user manually close
   }, [notesHasContent, notesManuallyControlled]);
+
+  // Keep notes area visible even when content is deleted
+  useEffect(() => {
+    if (notesHasContent === false && showNotesArea) {
+      // Notes area is already visible, keep it visible even with no content
+      // This ensures users can still see the modify button
+    }
+  }, [notesHasContent, showNotesArea]);
 
   // Force show notes after submission if showNotesAfterSubmit is enabled, but only if notes have content
   useEffect(() => {
     if (showNotesAfterSubmit && isAnswered && !notesManuallyControlled) {
       setShowNotesArea(notesHasContent);
-    } else if (!showNotesAfterSubmit && !notesManuallyControlled) {
+    } else if (!showNotesAfterSubmit && !notesManuallyControlled && !isAnswered) {
+      // Only hide notes if question is not answered and showNotesAfterSubmit is false
       setShowNotesArea(false);
     }
+    // Don't auto-hide notes after submission - let user manually control visibility
   }, [showNotesAfterSubmit, isAnswered, notesManuallyControlled, notesHasContent]);
   const notesRef = useRef<HTMLDivElement | null>(null);
   const hasSubmittedRef = useRef(false); // Immediate synchronous access to submission state
@@ -825,8 +839,9 @@ export function OpenQuestion({
     <div ref={notesRef} className={showNotesArea ? "" : "hidden"}>
       <QuestionNotes
         questionId={question.id}
+        questionType="regular"
         onHasContentChange={setNotesHasContent}
-        autoEdit={showNotesArea && !notesHasContent}
+        autoEdit={!notesHasContent && !notesManuallyControlled}
       />
     </div>
   )}

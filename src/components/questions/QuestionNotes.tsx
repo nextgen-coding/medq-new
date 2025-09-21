@@ -13,6 +13,7 @@ interface QuestionNotesProps {
   questionId: string;
   onHasContentChange?: (hasContent: boolean) => void;
   autoEdit?: boolean; // Auto-enter edit mode when opened
+  questionType?: 'regular' | 'clinical-case' | 'grouped-qroc' | 'grouped-qcm' | 'grouped-mcq'; // Explicit question type
   // Note: close handling removed – parent now solely controls visibility
 }
 
@@ -21,7 +22,7 @@ type SaveState = 'idle' | 'saving' | 'saved' | 'error' | 'loading';
 // Handwritten style font (must be at module scope for next/font)
 const handwritten = Kalam({ subsets: ['latin'], weight: ['400', '700'], display: 'swap' });
 
-export function QuestionNotes({ questionId, onHasContentChange, autoEdit = false }: QuestionNotesProps) {
+export function QuestionNotes({ questionId, onHasContentChange, autoEdit = false, questionType = 'regular' }: QuestionNotesProps) {
   const { user } = useAuth();
   const [value, setValue] = useState('');
   const [images, setImages] = useState<ImageData[]>([]);
@@ -29,10 +30,14 @@ export function QuestionNotes({ questionId, onHasContentChange, autoEdit = false
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [manuallyEnteredEditMode, setManuallyEnteredEditMode] = useState(false);
   const lastSavedValueRef = useRef('');
   const lastSavedImagesRef = useRef<ImageData[]>([]);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const syncDebounceRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Debug logging for props
+  console.log('QuestionNotes - Props:', { questionId, questionType, autoEdit });
 
   // Generate localStorage key for this question and user
   const localStorageKey = useMemo(() => {
@@ -52,9 +57,19 @@ export function QuestionNotes({ questionId, onHasContentChange, autoEdit = false
   // Auto-enter edit mode when autoEdit is true and no content exists
   useEffect(() => {
     if (autoEdit && !hasContent && initialLoaded) {
+      console.log('QuestionNotes - Auto-entering edit mode:', { autoEdit, hasContent, initialLoaded, questionType });
       setIsEditing(true);
+      setManuallyEnteredEditMode(true); // Mark as manually entered when autoEdit triggers
     }
-  }, [autoEdit, hasContent, initialLoaded]);
+  }, [autoEdit, hasContent, initialLoaded, questionType]);
+
+  // Reset editing state when content is loaded and exists (show modify button instead)
+  // But don't exit edit mode if user manually entered it
+  useEffect(() => {
+    if (hasContent && initialLoaded && !autoEdit && !manuallyEnteredEditMode) {
+      setIsEditing(false);
+    }
+  }, [hasContent, initialLoaded, autoEdit, manuallyEnteredEditMode]);
 
   // Helper function to extract image IDs from content
   const extractImageIds = (content: string): string[] => {
@@ -105,6 +120,7 @@ export function QuestionNotes({ questionId, onHasContentChange, autoEdit = false
     setInitialLoaded(false);
     setSaveState('idle');
     setIsEditing(false);
+    setManuallyEnteredEditMode(false);
     lastSavedValueRef.current = '';
     lastSavedImagesRef.current = [];
 
@@ -130,7 +146,18 @@ export function QuestionNotes({ questionId, onHasContentChange, autoEdit = false
       if (!user?.id || cancelled) return;
       try {
         setSaveState('loading');
-        const res = await fetch(`/api/user-question-state?userId=${user.id}&questionId=${questionId}`);
+
+        // Check if this is a clinical case or grouped question based on explicit questionType
+        const isClinicalCase = questionType === 'clinical-case' ||
+          questionType === 'grouped-qroc' ||
+          questionType === 'grouped-qcm' ||
+          questionType === 'grouped-mcq';
+
+        const apiUrl = isClinicalCase ? '/api/clinical-case-notes' : '/api/user-question-state';
+
+        console.log('QuestionNotes - API routing:', { questionId, questionType, isClinicalCase, apiUrl });
+
+        const res = await fetch(`${apiUrl}?userId=${user.id}&questionId=${questionId}`);
         if (!res.ok || cancelled) return;
         const data = await res.json();
         
@@ -162,7 +189,7 @@ export function QuestionNotes({ questionId, onHasContentChange, autoEdit = false
             }
           }
 
-          if (shouldUseServerData && (serverNotes || serverImageUrls.length > 0)) {
+          if (shouldUseServerData) {
             // Clean orphaned image references from content
             const cleanedNotes = cleanOrphanedImages(serverNotes, serverImageUrls);
             
@@ -231,42 +258,39 @@ export function QuestionNotes({ questionId, onHasContentChange, autoEdit = false
 
   // Add validation and logging to prevent null values in syncToServer
   // Add validation and logging to prevent null values in syncToServer
-  const syncToServer = async (content: string, imageUrls: string[], silent = true) => {
+  const syncToServer = async (content: string, imageUrls: string[], silent = true, forceEmpty = false) => {
     if (!user?.id) {
       console.warn('Skipping server sync: user is not logged in');
       return false;
     }
 
-    // Validate content and imageUrls
-    if (!content.trim() && imageUrls.length === 0) {
+    // Allow empty content only when explicitly forcing it (for clearing notes)
+    if (!forceEmpty && !content.trim() && imageUrls.length === 0) {
       console.warn('Skipping server sync: notes content and image URLs are empty');
       return false;
     }
 
     console.log('Syncing to server with content:', content, 'and image URLs:', imageUrls);
 
-    if (!user?.id) {
-      console.warn('Skipping server sync: user is not logged in');
-      return false;
-    }
+    // Check if this is a clinical case or grouped question based on explicit questionType
+    const isClinicalCase = questionType === 'clinical-case' ||
+      questionType === 'grouped-qroc' ||
+      questionType === 'grouped-qcm' ||
+      questionType === 'grouped-mcq';
 
-    // Validate content and imageUrls
-    if (!content.trim() && imageUrls.length === 0) {
-      console.warn('Skipping server sync: notes content and image URLs are empty');
-      return false;
-    }
+    console.log('Is clinical case:', isClinicalCase, 'questionId:', questionId, 'questionType:', questionType);
 
-    console.log('Syncing to server with content:', content, 'and image URLs:', imageUrls);
+    const apiUrl = isClinicalCase ? '/api/clinical-case-notes' : '/api/user-question-state';
 
     try {
-      const res = await fetch('/api/user-question-state', {
+      const res = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          userId: user.id, 
-          questionId, 
-          notes: content, 
-          notesImageUrls: imageUrls 
+        body: JSON.stringify({
+          userId: user.id,
+          questionId,
+          notes: content,
+          notesImageUrls: imageUrls
         }),
       });
 
@@ -308,14 +332,16 @@ export function QuestionNotes({ questionId, onHasContentChange, autoEdit = false
         if (!silent) toast({ title: 'Sauvegardé', description: 'Votre note a été sauvegardée.' });
         
         // Notify other components that notes have been updated
+        const hasContent = cleanedContent.trim().length > 0;
+        console.log('QuestionNotes - Dispatching notes-updated event:', { questionId, hasContent, contentLength: cleanedContent.trim().length });
         window.dispatchEvent(new CustomEvent('notes-updated', {
-          detail: { questionId, hasContent: cleanedContent.trim().length > 0 }
+          detail: { questionId, hasContent }
         }));
         
         // Sync to server in background with debounce
         if (syncDebounceRef.current) clearTimeout(syncDebounceRef.current);
         syncDebounceRef.current = setTimeout(() => {
-          syncToServer(cleanedContent, imageUrls, true);
+          syncToServer(cleanedContent, imageUrls, true, !cleanedContent.trim() && imageUrls.length === 0);
         }, 2000); // 2 second delay for server sync
         
         // revert to idle after a moment
@@ -357,6 +383,7 @@ export function QuestionNotes({ questionId, onHasContentChange, autoEdit = false
     }
     
     // Notify other components that notes have been cleared
+    console.log('QuestionNotes - Dispatching notes-cleared event:', { questionId, hasContent: false });
     window.dispatchEvent(new CustomEvent('notes-updated', {
       detail: { questionId, hasContent: false }
     }));
@@ -369,6 +396,7 @@ export function QuestionNotes({ questionId, onHasContentChange, autoEdit = false
 
   const handleEdit = () => {
     setIsEditing(true);
+    setManuallyEnteredEditMode(true);
   };
 
   const handleCancelEdit = () => {
@@ -376,31 +404,77 @@ export function QuestionNotes({ questionId, onHasContentChange, autoEdit = false
     setValue(lastSavedValueRef.current);
     setImages([...lastSavedImagesRef.current]);
     setIsEditing(false);
+    setManuallyEnteredEditMode(false);
   };
 
   const handleSaveEdit = async () => {
-    await save(false);
-    setIsEditing(false);
+    // Check if notes are empty (no text and no images)
+    const isEmpty = !value.trim() && images.length === 0;
+
+    if (isEmpty) {
+      // For empty notes, save immediately and exit edit mode
+      setSaveState('saving');
+
+      // Clear localStorage immediately
+      try {
+        localStorage.removeItem(localStorageKey);
+      } catch (error) {
+        console.error('Error clearing localStorage:', error);
+      }
+
+      // Clear on server immediately (no delay)
+      if (user?.id) {
+        try {
+          await syncToServer('', [], false, true); // forceEmpty = true
+          setSaveState('saved');
+          toast({ title: 'Sauvegardé', description: 'Votre note a été sauvegardée.' });
+        } catch (error) {
+          setSaveState('error');
+          console.error('Failed to save empty note:', error);
+        }
+      }
+
+      // Update local state
+      setValue('');
+      setImages([]);
+      lastSavedValueRef.current = '';
+      lastSavedImagesRef.current = [];
+      setLastSavedAt(null);
+
+      // Notify other components that notes have been cleared
+      console.log('QuestionNotes - Dispatching notes-cleared event:', { questionId, hasContent: false });
+      window.dispatchEvent(new CustomEvent('notes-updated', {
+        detail: { questionId, hasContent: false }
+      }));
+
+      // Exit edit mode immediately
+      setIsEditing(false);
+      setManuallyEnteredEditMode(false);
+
+      // Revert to idle after a moment
+      setTimeout(() => setSaveState('idle'), 1200);
+    } else {
+      // For non-empty notes, use the regular save flow
+      await save(false);
+      setIsEditing(false);
+      setManuallyEnteredEditMode(false);
+    }
   };
 
-  // Notify parent when notes content changes
+  // Notify parent when notes content changes - use the computed hasContent value
   useEffect(() => {
-    if (onHasContentChange) {
-      onHasContentChange(value.trim().length > 0);
-    }
-  }, [value, onHasContentChange]);
+    onHasContentChange?.(hasContent);
+  }, [hasContent, onHasContentChange]);
 
   // Explicitly trigger a state update in the task navigator
   useEffect(() => {
-    if (onHasContentChange) {
-      onHasContentChange(value.trim().length > 0);
-    }
-  }, [value, onHasContentChange]);
+    onHasContentChange?.(hasContent);
+  }, [hasContent, onHasContentChange]);
 
   // Force a re-render or state update in the task navigator
   const notifyTaskNavigator = () => {
     if (onHasContentChange) {
-      onHasContentChange(value.trim().length > 0);
+      onHasContentChange(hasContent);
     }
   };
 
@@ -408,9 +482,12 @@ export function QuestionNotes({ questionId, onHasContentChange, autoEdit = false
   const handleSave = async () => {
     setSaveState('saving');
     try {
-      await syncToServer(value, images.map(img => img.url), false); // Provide content and image URLs
+      await syncToServer(value, images.map(img => img.url), false, !value.trim() && images.length === 0); // Provide content and image URLs
       setSaveState('saved');
-      notifyTaskNavigator(); // Explicitly notify task navigator
+      // Use hasContent instead of value.trim().length > 0
+      if (onHasContentChange) {
+        onHasContentChange(hasContent);
+      }
     } catch (error) {
       setSaveState('error');
       console.error('Failed to save note:', error);
@@ -420,7 +497,7 @@ export function QuestionNotes({ questionId, onHasContentChange, autoEdit = false
   // Trigger notifyTaskNavigator in useEffect to ensure updates
   useEffect(() => {
     notifyTaskNavigator();
-  }, [value]);
+  }, [hasContent]);
 
   // Ensure input field remains visible when notes are cleared
   const handleInputChange = (newValue: string) => {

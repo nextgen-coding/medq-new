@@ -64,6 +64,8 @@ model User {
   sessionCorrectionSubmissions  SessionCorrectionSubmission[]
   // AI validation jobs relation
   aiValidationJobs              AiValidationJob[]
+  // Clinical case notes relation
+  clinicalCaseNotes             ClinicalCaseNotes[]
 
   @@map("profiles")
 }
@@ -284,6 +286,25 @@ model QuestionUserData {
   @@index([userId], map: "idx_question_user_data_user")
   @@index([questionId], map: "idx_question_user_data_question")
   @@map("question_user_data")
+}
+
+// Separate table for clinical case notes that don't reference the questions table
+// Used for text-based question IDs like "clinical-case-1", "group-qroc-2", etc.
+model ClinicalCaseNotes {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  questionId  String   @map("question_id") // Text-based ID like "clinical-case-1"
+  notes       String?
+  // Personal note image attachments (stored as uploaded URLs or small data URIs)
+  notesImageUrls String[] @map("notes_image_urls") @default([])
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, questionId], map: "unique_user_clinical_case_notes")
+  @@index([userId], map: "idx_clinical_case_notes_user")
+  @@index([questionId], map: "idx_clinical_case_notes_question")
+  @@map("clinical_case_notes")
 }
 
 model QuestionComment {
