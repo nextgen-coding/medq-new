@@ -97,11 +97,6 @@ export async function PUT(request: NextRequest) {
 
     // Notify admins if niveau changed
     if (currentUser && currentUser.niveauId !== niveauId) {
-      const admins = await prisma.user.findMany({
-        where: { role: 'admin' },
-        select: { id: true },
-      });
-
       const oldNiveau = currentUser.niveauId ? await prisma.niveau.findUnique({
         where: { id: currentUser.niveauId },
         select: { name: true },
@@ -112,20 +107,15 @@ export async function PUT(request: NextRequest) {
         select: { name: true },
       });
 
-      const notifications = admins.map(admin => ({
-        userId: admin.id,
-        title: 'Changement de niveau utilisateur',
-        message: `${currentUser.name || currentUser.email} a changé de niveau de "${oldNiveau?.name || 'Aucun'}" à "${newNiveau?.name || 'Aucun'}".`,
-        type: 'info',
-        category: 'system',
-        isAdminNotification: true,
-      }));
-
-      if (notifications.length > 0) {
-        await prisma.notification.createMany({
-          data: notifications,
-        });
-      }
+      await prisma.notification.create({
+        data: {
+          title: 'Changement de niveau utilisateur',
+          message: `${currentUser.name || currentUser.email} a changé de niveau de "${oldNiveau?.name || 'Aucun'}" à "${newNiveau?.name || 'Aucun'}".\n[USER_ID:${authResult.userId}]`,
+          type: 'info',
+          category: 'system',
+          isAdminNotification: true,
+        },
+      });
     }
 
     // Remove sensitive data
