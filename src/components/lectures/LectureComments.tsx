@@ -102,7 +102,7 @@ export function LectureComments({ lectureId }: LectureCommentsProps) {
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-    if (diffMins < 1) return 'Just now';
+    if (diffMins < 1) return 'À l\'instant';
     if (diffMins < 60) return `${diffMins}m`;
     if (diffHours < 24) return `${diffHours}h`;
     if (diffDays < 7) return `${diffDays}d`;
@@ -159,7 +159,7 @@ export function LectureComments({ lectureId }: LectureCommentsProps) {
 
   const handleSubmitComment = async () => {
     if (!user?.id) {
-      toast({ title: "Error", description: "Please sign in to comment.", variant: "destructive" });
+      toast({ title: "Erreur", description: "Veuillez vous connecter pour commenter.", variant: "destructive" });
       return;
     }
 
@@ -191,7 +191,7 @@ export function LectureComments({ lectureId }: LectureCommentsProps) {
       setImages([]);
       setPostAnon(false);
 
-      toast({ title: "Success", description: "Comment posted successfully!" });
+      toast({ title: "Succès", description: "Commentaire publié avec succès !" });
     } catch (error) {
       console.error('Error submitting comment:', error);
       toast({ title: "Error", description: "Failed to post comment.", variant: "destructive" });
@@ -230,7 +230,7 @@ export function LectureComments({ lectureId }: LectureCommentsProps) {
       setComments(prev => insertReply(prev, replyToComment.id, newReply));
       setReplyTo(null);
 
-      toast({ title: "Success", description: "Reply posted successfully!" });
+      toast({ title: "Succès", description: "Réponse publiée avec succès !" });
     } catch (error) {
       console.error('Error submitting reply:', error);
       toast({ title: "Error", description: "Failed to post reply.", variant: "destructive" });
@@ -264,21 +264,21 @@ export function LectureComments({ lectureId }: LectureCommentsProps) {
         setEditingComment(null);
         setEditContent('');
         toast({
-          title: "Comment Updated",
-          description: "Your comment has been updated.",
+          title: "Commentaire mis à jour",
+          description: "Votre commentaire a été mis à jour.",
         });
       } else {
         const errorData = await response.json();
         toast({
-          title: "Error",
-          description: errorData.error || "Failed to update comment.",
+          title: "Erreur",
+          description: errorData.error || "Échec de la mise à jour du commentaire.",
           variant: "destructive",
         });
       }
     } catch (e) {
       toast({
-        title: "Error",
-        description: "Failed to update comment.",
+        title: "Erreur",
+        description: "Échec de la mise à jour du commentaire.",
         variant: "destructive",
       });
     }
@@ -293,13 +293,13 @@ export function LectureComments({ lectureId }: LectureCommentsProps) {
           .filter(c => c.id !== commentId)
           .map(c => ({ ...c, replies: c.replies?.filter(r => r.id !== commentId) }))
         );
-        toast({ title: 'Comment Deleted', description: 'The comment has been deleted successfully.' });
+        toast({ title: 'Commentaire supprimé', description: 'Le commentaire a été supprimé avec succès.' });
       } else {
         const errorData = await response.json();
-        toast({ title: 'Error', description: errorData.error || 'Failed to delete comment.', variant: 'destructive' });
+        toast({ title: 'Erreur', description: errorData.error || 'Échec de la suppression du commentaire.', variant: 'destructive' });
       }
     } catch (e) {
-      toast({ title: 'Error', description: 'Failed to delete comment.', variant: 'destructive' });
+      toast({ title: 'Erreur', description: 'Échec de la suppression du commentaire.', variant: 'destructive' });
     } finally {
       setIsDeleting(false);
       setDeleteTarget(null);
@@ -321,8 +321,8 @@ export function LectureComments({ lectureId }: LectureCommentsProps) {
   };
 
   const displayName = (c: Comment) => {
-    if (c.isAnonymous) return 'Anonymous';
-    return c.user?.name || c.user?.email || 'User';
+    if (c.isAnonymous) return 'Anonyme';
+    return c.user?.name || c.user?.email || 'Utilisateur';
   };
 
   // toggleLike removed
@@ -347,9 +347,9 @@ export function LectureComments({ lectureId }: LectureCommentsProps) {
       <Card>
         <CardContent className="p-6 text-center">
           <MessageCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">Sign in to view comments</h3>
+          <h3 className="text-lg font-semibold mb-2">Connectez-vous pour voir les commentaires</h3>
           <p className="text-muted-foreground">
-            Join the discussion by signing in to your account.
+            Rejoignez la discussion en vous connectant à votre compte.
           </p>
         </CardContent>
       </Card>
@@ -456,15 +456,15 @@ export function LectureComments({ lectureId }: LectureCommentsProps) {
                     e.target.style.unicodeBidi = 'plaintext';
                   }}
                   className="min-h-[70px] text-sm bg-transparent border-none resize-none" 
-                  placeholder="Edit your comment..." 
+                  placeholder="Modifier votre commentaire..."
                   style={{ direction: 'ltr' }}
                 />
                 <div className="flex gap-2 mt-2">
                   <Button size="sm" variant="outline" onClick={() => setEditingComment(null)}>
-                    Cancel
+                    Annuler
                   </Button>
                   <Button size="sm" disabled={!editContent.trim()} onClick={() => handleEditComment(comment.id)}>
-                    Save
+                    Enregistrer
                   </Button>
                 </div>
               </div>
@@ -480,7 +480,7 @@ export function LectureComments({ lectureId }: LectureCommentsProps) {
                 }}
                 className="text-xs font-semibold text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
               >
-                Reply
+                Répondre
               </button>
               
               {isOwner && !isEditing && (
@@ -491,7 +491,7 @@ export function LectureComments({ lectureId }: LectureCommentsProps) {
                   }}
                   className="text-xs font-semibold text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
                 >
-                  Edit
+                  Modifier
                 </button>
               )}
               
@@ -500,7 +500,7 @@ export function LectureComments({ lectureId }: LectureCommentsProps) {
                   onClick={() => setDeleteTarget(comment)}
                   className="text-xs font-semibold text-red-600 hover:text-red-800 transition-colors"
                 >
-                  Delete
+                  Supprimer
                 </button>
               )}
               
@@ -530,7 +530,7 @@ export function LectureComments({ lectureId }: LectureCommentsProps) {
                   onClick={() => toggleReplies(comment.id)}
                   className="text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors"
                 >
-                  {isExpanded ? 'Hide' : 'Show'} {replyCount} {replyCount === 1 ? 'reply' : 'replies'}
+                  {isExpanded ? 'Masquer' : 'Afficher'} {replyCount} {replyCount === 1 ? 'réponse' : 'réponses'}
                 </button>
               </div>
             )}
@@ -554,7 +554,7 @@ export function LectureComments({ lectureId }: LectureCommentsProps) {
       <div className="flex items-center gap-3 py-2">
         <UserRound className="h-5 w-5 text-gray-400" />
         <span className="text-gray-500 dark:text-gray-400">
-          Sign in to join the discussion.
+          Connectez-vous pour rejoindre la discussion.
         </span>
       </div>
     );
@@ -644,7 +644,7 @@ export function LectureComments({ lectureId }: LectureCommentsProps) {
                     e.currentTarget.style.unicodeBidi = 'plaintext';
                     autoResizeTextarea(e.currentTarget, 3, 28);
                   }}
-                  placeholder="Share your thoughts about this lecture..."
+                  placeholder="Partagez vos réflexions sur ce cours..."
                   className="force-ltr flex-1 bg-transparent border-none outline-none resize-none text-base leading-6 placeholder:text-gray-500 dark:placeholder:text-gray-400 transition-all duration-200 ease-in-out"
                   style={{
                     minHeight: '24px',
@@ -715,7 +715,7 @@ export function LectureComments({ lectureId }: LectureCommentsProps) {
                         const results = await Promise.all(files.map(processFile));
                         setImages(prev => [...prev, ...results].slice(0, 6)); // Max 6 images
                       } catch (err) {
-                        toast({ title: 'Error', description: 'Failed to process images', variant: 'destructive' });
+                        toast({ title: 'Erreur', description: 'Échec du traitement des images', variant: 'destructive' });
                       }
                       
                       e.target.value = '';
@@ -738,7 +738,7 @@ export function LectureComments({ lectureId }: LectureCommentsProps) {
                       onCheckedChange={(v) => setPostAnon(!!v)} 
                       className="h-4 w-4" 
                     />
-                    Anonymous
+                    Anonyme
                   </label>
                 </div>
               </div>
@@ -765,19 +765,19 @@ export function LectureComments({ lectureId }: LectureCommentsProps) {
       <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete comment</AlertDialogTitle>
+            <AlertDialogTitle>Supprimer le commentaire</AlertDialogTitle>
             <AlertDialogDescription>
-              This action will permanently remove the comment{deleteTarget?.replies && deleteTarget.replies.length > 0 ? ' and its replies' : ''}. This cannot be undone.
+              Cette action supprimera définitivement le commentaire{deleteTarget?.replies && deleteTarget.replies.length > 0 ? ' et ses réponses' : ''}. Cette action ne peut pas être annulée.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setDeleteTarget(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              disabled={isDeleting} 
-              onClick={() => deleteTarget && handleDeleteComment(deleteTarget.id)} 
+            <AlertDialogCancel onClick={() => setDeleteTarget(null)}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isDeleting}
+              onClick={() => deleteTarget && handleDeleteComment(deleteTarget.id)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {isDeleting ? 'Deleting...' : 'Delete'}
+              {isDeleting ? 'Suppression...' : 'Supprimer'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -862,7 +862,7 @@ function ReplyForm({ replyTo, displayName, onSubmit, onCancel, isSubmitting }: R
                 e.currentTarget.style.textAlign = 'left';
                 e.currentTarget.style.unicodeBidi = 'plaintext';
               }}
-              placeholder={`Reply to ${displayName}...`}
+              placeholder={`Répondre à ${displayName}...`}
               className="force-ltr flex-1 bg-transparent border-none outline-none resize-none text-sm leading-5 placeholder:text-gray-500 dark:placeholder:text-gray-400 transition-all duration-200 ease-in-out"
               style={{
                 minHeight: '20px',
@@ -957,20 +957,20 @@ function ReplyForm({ replyTo, displayName, onSubmit, onCancel, isSubmitting }: R
                   className="h-3 w-3" 
                   disabled={isSubmitting}
                 />
-                Post anonymously
+                Publier anonymement
               </label>
             </div>
             <div className="flex gap-2">
               <Button size="sm" variant="outline" onClick={onCancel} disabled={isSubmitting}>
-                Cancel
+                Annuler
               </Button>
-              <Button 
-                size="sm" 
-                disabled={(!content.trim() && replyImages.length === 0) || isSubmitting} 
+              <Button
+                size="sm"
+                disabled={(!content.trim() && replyImages.length === 0) || isSubmitting}
                 onClick={handleSubmit}
                 className="bg-blue-500 hover:bg-blue-600"
               >
-                {isSubmitting ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Reply'}
+                {isSubmitting ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Répondre'}
               </Button>
             </div>
           </div>
