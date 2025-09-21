@@ -45,11 +45,9 @@ export async function GET(req: Request) {
 			return NextResponse.json({ error: 'userId and questionId are required' }, { status: 400 });
 		}
 
-		console.log('GET /api/user-question-state - Input:', { userId, questionId, isValidUUID: isValidUUID(questionId) });
 
 		// Always use raw SQL for maximum compatibility
 		const queryQuestionId = getQuestionIdForQuery(questionId);
-		console.log('GET /api/user-question-state - Querying with:', { userId, questionId, queryQuestionId, isValidUUID: isValidUUID(questionId) });
 
 		// Check if this is a clinical case or grouped question
 		const isClinicalCase = questionId.startsWith('clinical-case-') ||
