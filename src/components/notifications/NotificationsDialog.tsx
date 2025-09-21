@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useCallback, useMemo, memo } from 'react';
+import React, { useState, useCallback, useMemo, memo, useRef, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -25,6 +25,7 @@ interface NotificationsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onNotificationsUpdated?: () => void;
+  focusNotificationId?: string;
 }
 
 // No mock data; notifications are fetched from the API
@@ -94,6 +95,7 @@ const NotificationItem = memo(({
 
   return (
     <div
+      data-notification-id={notification.id}
       className={`group relative p-4 rounded-xl border transition-all duration-200 hover:shadow-md ${
         notification.read
           ? 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700'
@@ -127,7 +129,7 @@ const NotificationItem = memo(({
                   {notification.title}
                 </h4>
               </div>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 leading-relaxed">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-2 leading-relaxed whitespace-pre-line">
                 {notification.message}
               </p>
               <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-500">
@@ -171,8 +173,9 @@ const NotificationItem = memo(({
 NotificationItem.displayName = 'NotificationItem';
 
 // Main component with performance optimizations
-export function NotificationsDialog({ open, onOpenChange, onNotificationsUpdated }: NotificationsDialogProps) {
+export function NotificationsDialog({ open, onOpenChange, onNotificationsUpdated, focusNotificationId }: NotificationsDialogProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   const formatTime = (d: string | Date) => {
     const date = typeof d === 'string' ? new Date(d) : d;
@@ -205,6 +208,24 @@ export function NotificationsDialog({ open, onOpenChange, onNotificationsUpdated
     };
     if (open) load();
   }, [open]);
+
+  // Scroll to focused notification when dialog opens
+  useEffect(() => {
+    if (open && focusNotificationId && scrollAreaRef.current) {
+      // Small delay to ensure DOM is updated
+      setTimeout(() => {
+        const notificationElement = scrollAreaRef.current?.querySelector(`[data-notification-id="${focusNotificationId}"]`);
+        if (notificationElement) {
+          notificationElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // Add a temporary highlight effect
+          notificationElement.classList.add('ring-2', 'ring-blue-500', 'ring-opacity-50');
+          setTimeout(() => {
+            notificationElement.classList.remove('ring-2', 'ring-blue-500', 'ring-opacity-50');
+          }, 2000);
+        }
+      }, 100);
+    }
+  }, [open, focusNotificationId, notifications]);
 
   // Memoized calculations for better performance
   const unreadCount = useMemo(() => 
@@ -344,7 +365,7 @@ export function NotificationsDialog({ open, onOpenChange, onNotificationsUpdated
         </div>
 
         {/* Notifications List */}
-        <ScrollArea className="flex-1 px-6">
+        <ScrollArea ref={scrollAreaRef} className="flex-1 px-6">
           <div className="py-4 space-y-3">
             {notifications.length === 0 ? EmptyState : NotificationsList}
           </div>

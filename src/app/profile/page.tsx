@@ -100,11 +100,10 @@ export default function ProfilePageRoute() {
         toast({ title: 'Erreur', description: 'Le mot de passe doit contenir au moins une lettre minuscule.', variant: 'destructive' });
         return;
       }
-      const isGoogleUser = !!user?.google_id;
-      // Only send the fields required by the backend
-      const payload = isGoogleUser
-        ? { newPassword: passwordData.newPassword }
-        : { currentPassword: passwordData.currentPassword, newPassword: passwordData.newPassword };
+      // Send currentPassword if user has an existing password, regardless of Google status
+      const payload = user?.password
+        ? { currentPassword: passwordData.currentPassword, newPassword: passwordData.newPassword }
+        : { newPassword: passwordData.newPassword };
       const res = await fetch('/api/user/password', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -115,7 +114,7 @@ export default function ProfilePageRoute() {
         toast({ title: 'Erreur', description: errorData.error || 'Impossible de changer le mot de passe', variant: 'destructive' });
         return;
       }
-      toast({ title: 'Succès', description: isGoogleUser ? 'Mot de passe défini' : 'Mot de passe mis à jour', variant: 'default' })
+      toast({ title: 'Succès', description: user?.password ? 'Mot de passe mis à jour' : 'Mot de passe défini', variant: 'default' })
       setShowChangePassword(false)
       setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' })
       // Refresh user context so UI updates to require current password next time
@@ -396,11 +395,10 @@ export default function ProfilePageRoute() {
                                   <SelectValue placeholder="Sélectionnez votre faculté" />
                                 </SelectTrigger>
                                 <SelectContent className="bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600">
-                                  <SelectItem value="FMT">Faculté de Médecine de Tunis</SelectItem>
-                                  <SelectItem value="FMS">Faculté de Médecine de Sfax</SelectItem>
-                                  <SelectItem value="FMSf">Faculté de Médecine de Sousse</SelectItem>
-                                  <SelectItem value="FMM">Faculté de Médecine de Monastir</SelectItem>
-                                  <SelectItem value="FMG">Faculté de Médecine de Gabès</SelectItem>
+                                  <SelectItem value="FMT">Faculté de Médecine de Tunis F.M.T.</SelectItem>
+                                  <SelectItem value="FMS">Faculté de Médecine de Sfax F.M.S.</SelectItem>
+                                  <SelectItem value="FMM">Faculté de Médecine de Monastir F.M.M.</SelectItem>
+                                  <SelectItem value="FMSf">Faculté de Médecine de Sousse F.M.So.</SelectItem>
                                 </SelectContent>
                               </Select>
                             </div>
