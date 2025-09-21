@@ -6,6 +6,9 @@ import { requireAdmin, AuthenticatedRequest } from '@/lib/auth-middleware';
 async function getHandler(request: AuthenticatedRequest) {
   try {
     const notifications = await prisma.notification.findMany({
+      where: {
+        isAdminNotification: true,
+      },
       select: {
         id: true,
         userId: true,
@@ -128,22 +131,42 @@ async function postHandler(request: AuthenticatedRequest) {
 
 export const POST = requireAdmin(postHandler);
 
-// DELETE /api/admin/notifications/[id] - Delete a specific notification
-async function deleteHandler(request: AuthenticatedRequest) {
+// PATCH /api/admin/notifications?id=... - Mark a notification as read
+async function patchHandler(request: AuthenticatedRequest) {
   try {
     const url = new URL(request.url);
-    const notificationId = url.searchParams.get('id');
+    const id = url.searchParams.get('id');
+    if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
 
-    if (!notificationId) {
-      return NextResponse.json({ error: 'Notification ID is required' }, { status: 400 });
-    }
+    await prisma.notification.update({
+      where: { id },
+      data: { isRead: true }
+    });
 
-    await prisma.notification.delete({ where: { id: notificationId } });
-    return NextResponse.json({ success: true, message: 'Notification deleted' });
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error deleting notification:', error);
+    console.error('Error marking admin notification as read:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
+// DELETE /api/admin/notifications?id=... - Delete a notification
+async function deleteHandler(request: AuthenticatedRequest) {
+  try {
+    const url = new URL(request.url);
+    const id = url.searchParams.get('id');
+    if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
+
+    await prisma.notification.delete({
+      where: { id }
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting admin notification:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+export const PATCH = requireAdmin(patchHandler);
 export const DELETE = requireAdmin(deleteHandler);

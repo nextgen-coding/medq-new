@@ -66,6 +66,7 @@ export function UniversalHeader({
   const [recentNotifications, setRecentNotifications] = useState<RecentNotification[]>([]);
   const { toggleSidebar, open, openMobile, isMobile } = useSidebar();
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [focusedNotificationId, setFocusedNotificationId] = useState<string | undefined>();
 
   const handleSignOut = async () => {
     try {
@@ -235,7 +236,10 @@ export function UniversalHeader({
                 <DropdownMenuSeparator />
                 {recentNotifications.length > 0 ? (
                   recentNotifications.map((n) => (
-                    <DropdownMenuItem key={n.id} className="p-4">
+                    <DropdownMenuItem key={n.id} className="p-4 cursor-pointer" onClick={() => {
+                      setFocusedNotificationId(n.id);
+                      setNotificationsOpen(true);
+                    }}>
                       <div className="flex flex-col space-y-1 w-full min-w-0">
                         <p className="text-sm font-medium truncate">{n.title}</p>
                         <p className="text-xs text-muted-foreground">{n.time}</p>
@@ -325,10 +329,14 @@ export function UniversalHeader({
       )}
       
       {/* Notifications Dialog */}
-      <NotificationsDialog 
-        open={notificationsOpen} 
-        onOpenChange={setNotificationsOpen}
+      <NotificationsDialog
+        open={notificationsOpen}
+        onOpenChange={(open) => {
+          setNotificationsOpen(open);
+          if (!open) setFocusedNotificationId(undefined);
+        }}
         onNotificationsUpdated={reloadNotifications}
+        focusNotificationId={focusedNotificationId}
       />
     </div>
   );

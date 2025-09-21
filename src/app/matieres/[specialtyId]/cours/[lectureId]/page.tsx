@@ -1073,12 +1073,13 @@ function GroupedQrocContainer({ clinicalCase, answers, answerResults, pinnedQues
   const [notesHasContent, setNotesHasContent] = useState(false); // track if notes have content
   const notesRef = useRef<HTMLDivElement | null>(null);
 
-  // Auto-close notes when content becomes empty
+  // Auto-show notes when content is detected, but don't auto-hide when content is deleted
   useEffect(() => {
-    if (!notesHasContent) {
-      setOpenNotes(false);
+    if (notesHasContent && !openNotes) {
+      setOpenNotes(true);
     }
-  }, [notesHasContent]);
+    // Don't auto-hide when content becomes empty - let user manually close
+  }, [notesHasContent, openNotes]);
 
   const groupAnswered = clinicalCase.questions.every((q: any) => answers[q.id] !== undefined);
   // Duplicate group-level controls (pin/hide/edit/report/delete) removed to avoid redundancy with header actions
@@ -1197,10 +1198,11 @@ function GroupedQrocContainer({ clinicalCase, answers, answerResults, pinnedQues
             </div>
             <div ref={notesRef} className="space-y-6">
               {(openNotes || (groupAnswered && notesHasContent)) && (
-                <QuestionNotes 
-                  questionId={`group-qroc-${clinicalCase.caseNumber}`} 
+                <QuestionNotes
+                  questionId={`group-qroc-${clinicalCase.caseNumber}`}
+                  questionType="grouped-qroc"
                   onHasContentChange={setNotesHasContent}
-                  autoEdit={openNotes && !notesHasContent} // Auto-edit when manually opened and empty
+                  autoEdit={openNotes && !notesHasContent}
                 />
               )}
               <QuestionComments questionId={`group-qroc-${clinicalCase.caseNumber}`} />

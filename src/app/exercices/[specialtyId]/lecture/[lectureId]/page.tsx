@@ -636,10 +636,11 @@ function GroupedQrocContainer({ clinicalCase, answers, answerResults, pinnedQues
             </div>
             <div ref={notesRef} className="space-y-6">
               {(openNotes || (groupAnswered && notesHasContent)) && (
-                <QuestionNotes 
-                  questionId={`group-qroc-${clinicalCase.caseNumber}`} 
+                <QuestionNotes
+                  questionId={`group-qroc-${clinicalCase.caseNumber}`}
+                  questionType="grouped-qroc"
                   onHasContentChange={setNotesHasContent}
-                  autoEdit={openNotes && !notesHasContent} // Auto-edit when manually opened and empty
+                  autoEdit={openNotes && !notesHasContent}
                 />
               )}
               <QuestionComments questionId={`group-qroc-${clinicalCase.caseNumber}`} />
@@ -664,6 +665,7 @@ function GroupedQrocContainer({ clinicalCase, answers, answerResults, pinnedQues
 function GroupedMcqContainer({ clinicalCase, answers, answerResults, pinnedQuestionIds, user, lecture, lectureId, specialtyId, onAnswerSubmit, onNext, onQuestionUpdate, setOpenQuestionsDialog }: any) {
   const [openNotes, setOpenNotes] = useState(false);
   const [notesHasContent, setNotesHasContent] = useState(false);
+  const [notesManuallyControlled, setNotesManuallyControlled] = useState(false); // track manual control of notes
   const notesRef = useRef<HTMLDivElement | null>(null);
   const groupPinned = clinicalCase.questions.some((q: any) => pinnedQuestionIds.includes(q.id));
   const groupHidden = clinicalCase.questions.every((q: any) => (q as any).hidden);
@@ -795,8 +797,9 @@ function GroupedMcqContainer({ clinicalCase, answers, answerResults, pinnedQuest
             </div>
             <div ref={notesRef} className="space-y-6">
               {(openNotes || (groupAnswered && notesHasContent)) && (
-                <QuestionNotes 
-                  questionId={`group-mcq-${clinicalCase.caseNumber}`} 
+                <QuestionNotes
+                  questionId={`group-mcq-${clinicalCase.caseNumber}`}
+                  questionType="grouped-mcq"
                   onHasContentChange={setNotesHasContent}
                   autoEdit={openNotes && !notesHasContent}
                 />

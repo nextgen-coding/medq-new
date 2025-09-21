@@ -40,7 +40,8 @@ export function QuestionForm({ lectureId, editQuestionId, onComplete }: Question
     mediaUrl,
     mediaType,
     handleMediaChange,
-    handleParsedContent
+    handleParsedContent,
+    validateForm
   } = useQuestionForm({ lectureId, editQuestionId, onComplete });
 
   const handleCancel = () => {
@@ -62,8 +63,9 @@ export function QuestionForm({ lectureId, editQuestionId, onComplete }: Question
         <form onSubmit={async (e) => {
           e.preventDefault();
 
-          if (!questionText.trim()) {
-            toast({ title: 'Validation Error', description: 'Question text is required', variant: 'destructive' });
+          const validation = validateForm();
+          if (!validation.isValid) {
+            toast({ title: 'Validation Error', description: validation.error, variant: 'destructive' });
             return;
           }
 
@@ -127,7 +129,7 @@ export function QuestionForm({ lectureId, editQuestionId, onComplete }: Question
             </div>
           )}
           
-          <QuestionFields 
+          <QuestionFields
             questionText={questionText}
             setQuestionText={setQuestionText}
             courseReminder={courseReminder}
@@ -137,6 +139,7 @@ export function QuestionForm({ lectureId, editQuestionId, onComplete }: Question
             setQuestionNumber={setQuestionNumber}
             session={session}
             setSession={setSession}
+            isRequired={questionType === 'mcq' || questionType === 'clinic_mcq'}
           />
           
           <Separator className="my-6" />

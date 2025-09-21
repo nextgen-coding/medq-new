@@ -33,10 +33,10 @@ async function putHandler(request: AuthenticatedRequest) {
       );
     }
     
-    // Get current user with password
+    // Get current user with password and google_id
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { password: true }
+      select: { password: true, google_id: true }
     });
     
     if (!user) {
@@ -46,8 +46,14 @@ async function putHandler(request: AuthenticatedRequest) {
       );
     }
     
-    // If current password is provided, verify it
-    if (currentPassword && user.password) {
+    // If user has an existing password, require current password verification
+    if (user.password) {
+      if (!currentPassword) {
+        return NextResponse.json(
+          { error: 'Current password is required' },
+          { status: 400 }
+        );
+      }
       const isValidPassword = await bcrypt.compare(currentPassword, user.password);
       if (!isValidPassword) {
         return NextResponse.json(

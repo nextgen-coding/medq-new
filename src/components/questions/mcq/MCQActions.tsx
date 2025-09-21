@@ -19,19 +19,21 @@ interface MCQActionsProps {
   showNotesArea?: boolean;
   onToggleNotes?: () => void;
   hideNotesButton?: boolean; // Hide notes button when notes have content
+  onResubmit?: () => void; // Allow resubmitting the question
 }
 
-export function MCQActions({ 
-  isSubmitted, 
-  canSubmit, 
-  isCorrect, 
-  onSubmit, 
+export function MCQActions({
+  isSubmitted,
+  canSubmit,
+  isCorrect,
+  onSubmit,
   onNext,
   hasSubmitted = false,
   buttonRef,
   showNotesArea,
   onToggleNotes,
-  hideNotesButton = false
+  hideNotesButton = false,
+  onResubmit
 }: MCQActionsProps) {
   return (
     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 pt-4">
@@ -97,6 +99,18 @@ export function MCQActions({
             )}
           </div>
           <div className="flex gap-2 justify-end flex-wrap items-center">
+            {/* Resubmit Button */}
+            {onResubmit && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onResubmit}
+                className="flex items-center gap-1"
+              >
+                <span className="hidden sm:inline">Soumettre à nouveau</span>
+                <span className="sm:hidden">Réessayer</span>
+              </Button>
+            )}
       {onToggleNotes && !hideNotesButton && (
               <Button
                 type="button"

@@ -7,10 +7,11 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LogOut, Settings, User, Heart, Stethoscope, Menu, Bell, Moon, Sun, X } from 'lucide-react';
+import { LogOut, Settings, User, Heart, Stethoscope, Menu, Moon, Sun, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { useSidebar } from '@/components/ui/sidebar';
@@ -39,6 +40,7 @@ export function AppHeader() {
       setOpen(!open);
     }
   };
+
 
   return (
     <header className="border-b border-border/40 bg-gradient-to-r from-background via-background to-muted/20 backdrop-blur-xl supports-[backdrop-filter]:bg-background/80 sticky top-0 z-40 shadow-sm">

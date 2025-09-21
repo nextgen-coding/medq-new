@@ -9,25 +9,19 @@ interface OpenQuestionInputProps {
   isSubmitted: boolean;
   onSubmit?: () => void; // optional submit handler for Enter key
   onBlur?: (answer: string) => void; // callback when leaving input field
-  autoFocusEnabled?: boolean; // when false, do not autofocus textarea on mount
-  disableEnterKey?: boolean; // when true, don't handle Enter locally
+  isActive?: boolean; // whether this question is currently active/focused
 }
 
-export function OpenQuestionInput({ answer, setAnswer, isSubmitted, onSubmit, onBlur, autoFocusEnabled = true, disableEnterKey = false }: OpenQuestionInputProps) {
+export function OpenQuestionInput({ answer, setAnswer, isSubmitted, onSubmit, onBlur, isActive = false }: OpenQuestionInputProps) {
   const { t } = useTranslation();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  
-  // Auto-focus on the textarea when component mounts and not submitted (if enabled)
+
+  // Auto-focus on the textarea only when this question becomes active and not submitted
   useEffect(() => {
-    if (autoFocusEnabled && !isSubmitted && textareaRef.current) {
-      // Use requestAnimationFrame to ensure DOM is ready and avoid focus conflicts
-      requestAnimationFrame(() => {
-        if (textareaRef.current && !isSubmitted) {
-          textareaRef.current.focus();
-        }
-      });
+    if (!isSubmitted && isActive && textareaRef.current) {
+      textareaRef.current.focus();
     }
-  }, [isSubmitted, autoFocusEnabled]);
+  }, [isSubmitted, isActive]);
   
   const handleAnswerChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
     if (isSubmitted) return;

@@ -1,4 +1,4 @@
-'use client';
+ 'use client';
 
 import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -134,6 +134,7 @@ export function CreateQuestionDialog({ lecture, isOpen, onOpenChange, onQuestion
     setCaseNumber(undefined);
     setCaseText('');
     setSubQuestions([emptySubQuestion()]);
+    setBuilderModeInternal(false);
   };
 
   const resetForm = () => {
@@ -410,6 +411,15 @@ export function CreateQuestionDialog({ lecture, isOpen, onOpenChange, onQuestion
       return;
     }
 
+    if ((formData.type === 'mcq' || formData.type === 'clinic_mcq') && (formData.number === undefined || formData.number === null)) {
+      toast({
+        title: 'Erreur de validation',
+        description: "Le numéro de la question est requis pour les QCM.",
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (formData.type === 'mcq' || formData.type === 'clinic_mcq') {
       const validOptions = options.filter(opt => opt.text.trim());
       if (validOptions.length < 2) {
@@ -605,34 +615,14 @@ export function CreateQuestionDialog({ lecture, isOpen, onOpenChange, onQuestion
 
   // ===== Builder Submit =====
   const handleBuilderSubmit = async () => {
-    // Allow user to only fill the top "N°" field (formData.number) and auto-use it as caseNumber
-    let effectiveCaseNumber = caseNumber;
-    if ((effectiveCaseNumber === undefined || isNaN(effectiveCaseNumber)) && formData.number !== undefined && !isNaN(formData.number as any)) {
-      effectiveCaseNumber = formData.number as number;
-      setCaseNumber(formData.number); // sync UI for subsequent edits
-    }
-    // If still missing, try auto-assign next available (like grouped QROC logic)
-    if (effectiveCaseNumber === undefined || isNaN(effectiveCaseNumber)) {
-      try {
-        const resp = await fetch(`/api/questions?lectureId=${lecture.id}`);
-        if (resp.ok) {
-          const data = await resp.json();
-          const maxExisting = (data as any[])
-            .filter(q => (q.type === 'clinic_mcq' || q.type === 'clinic_croq') && q.caseNumber)
-            .reduce((m, q) => Math.max(m, q.caseNumber || 0), 0);
-          if (maxExisting >= 0) {
-            effectiveCaseNumber = maxExisting + 1;
-            setCaseNumber(effectiveCaseNumber);
-          }
-        }
-      } catch {
-        // swallow – fallback to validation below
-      }
-    }
-    if (effectiveCaseNumber === undefined || isNaN(effectiveCaseNumber)) {
-      toast({ title: 'Erreur de validation', description: 'Numéro de cas requis.', variant: 'destructive' });
+    // Check if case number is explicitly provided by user
+    if (caseNumber === undefined || isNaN(caseNumber)) {
+      toast({ title: 'Erreur de validation', description: 'Numéro de cas requis. Veuillez saisir un numéro dans le champ "Numéro du cas".', variant: 'destructive' });
       return;
     }
+
+    // Use the explicitly provided case number
+    const effectiveCaseNumber = caseNumber;
     if (!caseText.trim()) {
       toast({ title: 'Erreur de validation', description: 'Texte du cas requis.', variant: 'destructive' });
       return;
@@ -944,7 +934,7 @@ export function CreateQuestionDialog({ lecture, isOpen, onOpenChange, onQuestion
                 <CardHeader className="pb-3"><CardTitle className="text-sm">Données du cas</CardTitle></CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className="space-y-2"><Label htmlFor="caseNumber">Numéro du cas *</Label><Input id="caseNumber" type="number" value={caseNumber === undefined ? '' : caseNumber} onChange={e=> setCaseNumber(e.target.value === '' ? undefined : parseInt(e.target.value,10))} /></div>
+                    <div className="space-y-2"><Label htmlFor="caseNumber">Numéro du cas *</Label><Input id="caseNumber" type="number" value={caseNumber === undefined ? '' : caseNumber} onChange={e=> setCaseNumber(e.target.value === '' ? undefined : parseInt(e.target.value,10))} required /></div>
                     <div className="md:col-span-3 space-y-2"><Label htmlFor="caseText">Texte du cas *</Label><RichTextInput value={caseText} onChange={setCaseText} images={images} onImagesChange={setImages} rows={6} placeholder="Description clinique partagée... Vous pouvez inclure des images." /></div>
                   </div>
                 </CardContent>

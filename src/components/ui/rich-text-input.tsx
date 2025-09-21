@@ -174,6 +174,16 @@ export function RichTextInput({
           return;
         }
         
+        // Handle div elements (contentEditable often creates divs for new lines)
+        if (el.tagName.toLowerCase() === 'div') {
+          // Add newline before div content (except for the first div)
+          if (content && !content.endsWith('\n')) {
+            content += '\n';
+          }
+          el.childNodes.forEach(child => processNode(child));
+          return;
+        }
+        
         // For other elements, just process their children
         el.childNodes.forEach(child => processNode(child));
       }
@@ -320,7 +330,8 @@ export function RichTextInput({
       } else if (part.type === 'text' && part.content) {
         const lines = part.content.split('\n');
         for (let i = 0; i < lines.length; i++) {
-          if (lines[i]) editor.appendChild(document.createTextNode(lines[i]));
+          // Always add the line content, even if it's empty (to preserve empty lines)
+          editor.appendChild(document.createTextNode(lines[i]));
           if (i < lines.length - 1) editor.appendChild(document.createElement('br'));
         }
       }

@@ -166,7 +166,7 @@ export default function SessionViewerPage() {
   // Capabilities: Zone is available to admins at all times, and to students only if a DB correction exists. PDF depends on URL.
   const canShowCorrectionPdf = !!(session && correctionUrlRaw);
   const canShowCorrectionZone = !!session && (isAdminOrMaintainer || hasDbCorrection === true);
-  const canShowCorrectionButton = canShowCorrectionPdf || canShowCorrectionZone;
+  const canShowCorrectionButton = isAdminOrMaintainer && (canShowCorrectionPdf || canShowCorrectionZone);
   // auto open PDF view (in-panel) if ?type=correction
   useEffect(() => { if (viewType === 'correction' && canShowCorrectionPdf) { setPanelCollapsed(false); setShowCorrectionPdf(true); } }, [viewType, canShowCorrectionPdf]);
 

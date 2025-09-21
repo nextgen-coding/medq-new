@@ -13,12 +13,21 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const { name, sexe, niveauId, semesterId, faculty, image, highlightColor } = await request.json();
+    const { name, sexe, niveauId, semesterId, faculty, image, highlightColor, email } = await request.json();
 
     // Validate input
     if (!name || !sexe || !niveauId) {
       return NextResponse.json(
         { error: 'All fields are required' },
+        { status: 400 }
+      );
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (email && !emailRegex.test(email)) {
+      return NextResponse.json(
+        { error: 'Invalid email format' },
         { status: 400 }
       );
     }
@@ -48,11 +57,18 @@ export async function PUT(request: NextRequest) {
       validSemesterId = semester.id;
     }
 
+    // Get current user to check for niveau change
+    const currentUser = await prisma.user.findUnique({
+      where: { id: authResult.userId },
+      select: { niveauId: true, name: true, email: true },
+    });
+
     // Update user profile
     const updatedUser = await prisma.user.update({
       where: { id: authResult.userId },
       data: {
         name,
+        email: email ?? undefined,
         sexe,
         niveauId,
         semesterId: validSemesterId, // null if not provided or no semesters
@@ -78,6 +94,29 @@ export async function PUT(request: NextRequest) {
         updatedAt: true,
       },
     });
+
+    // Notify admins if niveau changed
+    if (currentUser && currentUser.niveauId !== niveauId) {
+      const oldNiveau = currentUser.niveauId ? await prisma.niveau.findUnique({
+        where: { id: currentUser.niveauId },
+        select: { name: true },
+      }) : null;
+
+      const newNiveau = await prisma.niveau.findUnique({
+        where: { id: niveauId },
+        select: { name: true },
+      });
+
+      await prisma.notification.create({
+        data: {
+          title: 'Changement de niveau utilisateur',
+          message: `${currentUser.name || currentUser.email} a changé de niveau de "${oldNiveau?.name || 'Aucun'}" à "${newNiveau?.name || 'Aucun'}".\n[USER_ID:${authResult.userId}]`,
+          type: 'info',
+          category: 'system',
+          isAdminNotification: true,
+        },
+      });
+    }
 
     // Remove sensitive data
     const userWithoutSensitiveData = {

@@ -91,16 +91,25 @@ export function MCQQuestion({
   const [notesHasContent, setNotesHasContent] = useState(false); // track if notes have content
   const [notesManuallyControlled, setNotesManuallyControlled] = useState(false); // track if user manually opened/closed notes
 
-  // Auto-show notes when content is detected, but only if not manually controlled
+  // Auto-show notes when content is detected, but don't auto-hide when content is deleted
   useEffect(() => {
     if (!notesManuallyControlled) {
+      // Show notes if they have content, but don't hide them if content is deleted
+      // This allows users to continue editing even when notes are empty
       if (notesHasContent) {
         setShowNotesArea(true);
-      } else {
-        setShowNotesArea(false);
       }
+      // Don't auto-hide when content becomes empty - keep notes visible for editing
     }
   }, [notesHasContent, notesManuallyControlled]);
+
+  // Keep notes area visible even when content is deleted
+  useEffect(() => {
+    if (notesHasContent === false && showNotesArea) {
+      // Notes area is already visible, keep it visible even with no content
+      // This ensures users can still see the modify button
+    }
+  }, [notesHasContent, showNotesArea]);
 
   // If another branch introduced a prop to force-show notes after submit,
   // we intentionally keep local behavior (auto-show only when content exists
@@ -525,6 +534,42 @@ export function MCQQuestion({
     } catch {}
   };
 
+  const handleResubmit = () => {
+    console.log('🔄 handleResubmit called for MCQ question:', question.id);
+    console.log('Current state before resubmit:', {
+      selectedOptionIds,
+      submitted,
+      hasSubmitted,
+      isCorrect
+    });
+
+    // Reset all question state to allow resubmission
+    setSelectedOptionIds([]);
+    setSubmitted(false);
+    setIsCorrect(null);
+    setExpandedExplanations([]);
+    setHasSubmitted(false);
+    setIsSubmitting(false);
+    hasSubmittedRef.current = false;
+
+    // Reset notes area state
+    setShowNotesArea(false);
+    setNotesHasContent(false);
+    setNotesManuallyControlled(false);
+
+    console.log('✅ MCQ question state reset via resubmit');
+
+    // Scroll to question top
+    setTimeout(() => {
+      if (questionRef.current) {
+        questionRef.current.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start'
+        });
+      }
+    }, 100);
+  };
+
   // Keyboard shortcuts (robust): digits/numpad 1-9 or letters A-I to toggle, Backspace clear, Enter submit/next
   const rootRef = useRef<HTMLDivElement | null>(null);
   const shortcutHandler = useCallback((event: KeyboardEvent) => {
@@ -688,7 +733,7 @@ export function MCQQuestion({
 
       {!hideActions && (
         <div ref={resultsRef}>
-          <MCQActions 
+          <MCQActions
             isSubmitted={submitted}
             canSubmit={!hasSubmitted && !isSubmitting && selectedOptionIds.length > 0}
             isCorrect={isCorrect}
@@ -698,6 +743,7 @@ export function MCQQuestion({
             buttonRef={buttonRef}
             showNotesArea={showNotesArea}
             hideNotesButton={false} // Always show notes button so users can hide/show notes
+            onResubmit={handleResubmit}
             onToggleNotes={() => {
               setShowNotesArea(prev => !prev);
               setNotesManuallyControlled(true);
@@ -753,10 +799,11 @@ export function MCQQuestion({
   {/* Notes - always render for content detection, but show/hide based on showNotesArea */}
   {!hideNotes && (
         <div ref={notesRef} className={showNotesArea ? "" : "hidden"}>
-          <QuestionNotes 
-            questionId={question.id} 
+          <QuestionNotes
+            questionId={question.id}
+            questionType="regular"
             onHasContentChange={setNotesHasContent}
-            autoEdit={showNotesArea && !notesHasContent} // Auto-edit when manually opened and empty
+            autoEdit={!notesHasContent && !notesManuallyControlled}
           />
         </div>
       )}

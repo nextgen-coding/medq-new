@@ -53,9 +53,10 @@ function renderTextWithLineBreaks(text: string, keyPrefix: string): React.ReactN
   const elements: React.ReactNode[] = [];
   
   for (let i = 0; i < lines.length; i++) {
-    if (lines[i]) {
-      elements.push(<span key={`${keyPrefix}-line-${i}`}>{lines[i]}</span>);
-    }
+    // Always add the line content, even if it's empty (to preserve empty lines)
+    elements.push(<span key={`${keyPrefix}-line-${i}`}>{lines[i]}</span>);
+    
+    // Add line break after each line except the last one
     if (i < lines.length - 1) {
       elements.push(<br key={`${keyPrefix}-br-${i}`} />);
     }

@@ -276,107 +276,111 @@ export default function SpecialtyPageRoute() {
     return (
       <ProtectedRoute>
         <AppSidebarProvider>
-          <AppSidebar />
-          <SidebarInset className="flex flex-col min-h-0">
-            <UniversalHeader title="Chargement..." hideSeparator />
-            <div className="bg-gray-50 dark:bg-gray-900 p-4 lg:p-6 overflow-hidden">
-              <div className="max-w-7xl mx-auto h-full flex flex-col gap-6">
-                {/* HEADER CARD */}
-                <div className="rounded-2xl border border-gray-200/60 dark:border-gray-800 bg-white/70 dark:bg-gray-800/60 backdrop-blur-sm p-5 lg:p-6 flex flex-col gap-6 animate-fade-in">
-                  <div className="flex flex-col lg:flex-row lg:items-start gap-4">
-                    <div className="flex-1 space-y-4">
-                      <div className="h-7 w-48 sm:w-64 rounded-md bg-gray-200 dark:bg-gray-700 animate-pulse" />
-                      <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 gap-4">
-                        {[...Array(3)].map((_,i)=>(
-                          <div key={i} className="h-16 rounded-xl bg-gray-200 dark:bg-gray-700 animate-pulse" />
+          <div className="flex w-full h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden">
+            <AppSidebar />
+            <SidebarInset className="flex flex-col h-full bg-gray-50 dark:bg-gray-900">
+              <UniversalHeader title="Chargement..." hideSeparator />
+              <main className="flex-1 min-h-0 overflow-y-auto">
+                <div className="bg-gray-50 dark:bg-gray-900 p-4 lg:p-6 min-w-0 overflow-x-hidden flex-1">
+                  <div className="max-w-7xl mx-auto h-full flex flex-col gap-6">
+                    {/* HEADER CARD */}
+                    <div className="rounded-2xl border border-gray-200/60 dark:border-gray-800 bg-white/70 dark:bg-gray-800/60 backdrop-blur-sm p-5 lg:p-6 flex flex-col gap-6 animate-fade-in">
+                      <div className="flex flex-col lg:flex-row lg:items-start gap-4">
+                        <div className="flex-1 space-y-4">
+                          <div className="h-7 w-48 sm:w-64 rounded-md bg-gray-200 dark:bg-gray-700 animate-pulse" />
+                          <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 gap-4">
+                            {[...Array(3)].map((_,i)=>(
+                              <div key={i} className="h-16 rounded-xl bg-gray-200 dark:bg-gray-700 animate-pulse" />
+                            ))}
+                          </div>
+                        </div>
+                        <div className="h-8 w-24 rounded-lg bg-gray-200 dark:bg-gray-700 animate-pulse self-start" />
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-xs text-gray-400 dark:text-gray-500">
+                          <span>Progression globale</span>
+                          <span className="h-3 w-8 rounded bg-gray-200 dark:bg-gray-700 animate-pulse" />
+                        </div>
+                        <div className="h-2 w-full rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700 relative">
+                          <div className="absolute inset-y-0 left-0 w-1/4 bg-gray-300 dark:bg-gray-600 animate-pulse" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* GROUP MANAGEMENT BAR */}
+                    <div className="rounded-2xl border border-gray-200/60 dark:border-gray-800 bg-white/60 dark:bg-gray-800/50 backdrop-blur-sm px-4 sm:px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-4 animate-pulse">
+                      <div className="h-5 w-56 sm:w-72 bg-gray-200 dark:bg-gray-700 rounded" />
+                      <div className="sm:ml-auto flex gap-3">
+                        <div className="h-9 w-32 sm:w-40 bg-gray-200 dark:bg-gray-700 rounded" />
+                      </div>
+                    </div>
+
+                    {/* SEARCH + FILTERS ROW */}
+                    <div className="flex flex-col md:flex-row gap-3 animate-pulse">
+                      <div className="h-11 flex-1 min-w-[240px] rounded-xl bg-white/70 dark:bg-gray-800/60 border border-gray-200/60 dark:border-gray-800" />
+                      <div className="flex gap-3 md:ml-auto">
+                        <div className="h-11 w-28 sm:w-32 rounded-xl bg-white/70 dark:bg-gray-800/60 border border-gray-200/60 dark:border-gray-800" />
+                        <div className="h-11 w-28 sm:w-32 rounded-xl bg-white/70 dark:bg-gray-800/60 border border-gray-200/60 dark:border-gray-800" />
+                      </div>
+                    </div>
+
+                    {/* TABLE SKELETON */}
+                    <div className="flex-1 rounded-2xl border border-gray-200/60 dark:border-gray-800 bg-white/70 dark:bg-gray-800/60 backdrop-blur-sm flex flex-col overflow-hidden">
+                      {/* Column headers */}
+                      <div className="hidden md:grid grid-cols-12 gap-4 px-4 lg:px-6 py-3 border-b border-gray-200 dark:border-gray-700 text-xs font-medium text-gray-500 dark:text-gray-400">
+                        <div className="col-span-4 h-4 bg-gray-200/70 dark:bg-gray-700/70 rounded" />
+                        <div className="col-span-1 h-4 bg-gray-200/70 dark:bg-gray-700/70 rounded" />
+                        <div className="col-span-1 h-4 bg-gray-200/70 dark:bg-gray-700/70 rounded" />
+                        <div className="col-span-2 h-4 bg-gray-200/70 dark:bg-gray-700/70 rounded" />
+                        <div className="col-span-2 h-4 bg-gray-200/70 dark:bg-gray-700/70 rounded" />
+                        <div className="col-span-2 h-4 bg-gray-200/70 dark:bg-gray-700/70 rounded" />
+                      </div>
+                      <div className="flex-1 overflow-y-auto custom-scroll-thin divide-y divide-gray-100 dark:divide-gray-800">
+                        {[...Array(12)].map((_, i) => (
+                          <div key={i} className="grid grid-cols-12 items-center gap-3 sm:gap-4 px-4 lg:px-6 py-4 animate-pulse">
+                            {/* Course / title */}
+                            <div className="col-span-12 md:col-span-4 flex items-start gap-3">
+                              <div className="w-4 h-4 rounded-full border-2 border-gray-300 dark:border-gray-600 mt-1" />
+                              <div className="flex-1 space-y-2">
+                                <div className="h-4 w-40 sm:w-48 bg-gray-200 dark:bg-gray-700 rounded" />
+                                <div className="h-3 w-32 sm:w-40 bg-gray-100 dark:bg-gray-600 rounded" />
+                              </div>
+                            </div>
+                            {/* Reports (hide on small) */}
+                            <div className="hidden md:flex col-span-1 items-center gap-2">
+                              <div className="w-4 h-4 bg-gray-200 dark:bg-gray-700 rounded" />
+                              <div className="h-4 w-5 bg-gray-200 dark:bg-gray-700 rounded" />
+                            </div>
+                            {/* Note */}
+                            <div className="hidden md:flex col-span-1">
+                              <div className="h-6 w-12 rounded-full bg-gray-200 dark:bg-gray-700" />
+                            </div>
+                            {/* Progress */}
+                            <div className="col-span-8 md:col-span-2 space-y-2">
+                              <div className="h-4 w-10 bg-gray-200 dark:bg-gray-700 rounded" />
+                              <div className="h-2 w-full rounded-full bg-gray-100 dark:bg-gray-600 overflow-hidden relative">
+                                <div className="absolute inset-y-0 left-0 w-1/3 bg-gray-300 dark:bg-gray-500" />
+                              </div>
+                            </div>
+                            {/* Comments */}
+                            <div className="hidden md:flex col-span-2 items-center gap-3">
+                              <div className="h-9 w-9 rounded-full bg-gray-200 dark:bg-gray-700" />
+                              <div className="h-4 w-4 bg-gray-200 dark:bg-gray-700 rounded" />
+                            </div>
+                            {/* Action */}
+                            <div className="col-span-4 md:col-span-2 flex items-center gap-2 sm:gap-3 justify-end">
+                              <div className="h-8 w-20 sm:w-24 rounded-md bg-sky-200/50 dark:bg-sky-700/40" />
+                              <div className="h-8 w-8 rounded-md bg-gray-200 dark:bg-gray-700" />
+                            </div>
+                          </div>
                         ))}
                       </div>
                     </div>
-                    <div className="h-8 w-24 rounded-lg bg-gray-200 dark:bg-gray-700 animate-pulse self-start" />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-xs text-gray-400 dark:text-gray-500">
-                      <span>Progression globale</span>
-                      <span className="h-3 w-8 rounded bg-gray-200 dark:bg-gray-700 animate-pulse" />
-                    </div>
-                    <div className="h-2 w-full rounded-full overflow-hidden bg-gray-200 dark:bg-gray-700 relative">
-                      <div className="absolute inset-y-0 left-0 w-1/4 bg-gray-300 dark:bg-gray-600 animate-pulse" />
-                    </div>
                   </div>
                 </div>
-
-                {/* GROUP MANAGEMENT BAR */}
-                <div className="rounded-2xl border border-gray-200/60 dark:border-gray-800 bg-white/60 dark:bg-gray-800/50 backdrop-blur-sm px-4 sm:px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-4 animate-pulse">
-                  <div className="h-5 w-56 sm:w-72 bg-gray-200 dark:bg-gray-700 rounded" />
-                  <div className="sm:ml-auto flex gap-3">
-                    <div className="h-9 w-32 sm:w-40 bg-gray-200 dark:bg-gray-700 rounded" />
-                  </div>
-                </div>
-
-                {/* SEARCH + FILTERS ROW */}
-                <div className="flex flex-col md:flex-row gap-3 animate-pulse">
-                  <div className="h-11 flex-1 min-w-[240px] rounded-xl bg-white/70 dark:bg-gray-800/60 border border-gray-200/60 dark:border-gray-800" />
-                  <div className="flex gap-3 md:ml-auto">
-                    <div className="h-11 w-28 sm:w-32 rounded-xl bg-white/70 dark:bg-gray-800/60 border border-gray-200/60 dark:border-gray-800" />
-                    <div className="h-11 w-28 sm:w-32 rounded-xl bg-white/70 dark:bg-gray-800/60 border border-gray-200/60 dark:border-gray-800" />
-                  </div>
-                </div>
-
-                {/* TABLE SKELETON */}
-                <div className="flex-1 rounded-2xl border border-gray-200/60 dark:border-gray-800 bg-white/70 dark:bg-gray-800/60 backdrop-blur-sm flex flex-col overflow-hidden">
-                  {/* Column headers */}
-                  <div className="hidden md:grid grid-cols-12 gap-4 px-4 lg:px-6 py-3 border-b border-gray-200 dark:border-gray-700 text-xs font-medium text-gray-500 dark:text-gray-400">
-                    <div className="col-span-4 h-4 bg-gray-200/70 dark:bg-gray-700/70 rounded" />
-                    <div className="col-span-1 h-4 bg-gray-200/70 dark:bg-gray-700/70 rounded" />
-                    <div className="col-span-1 h-4 bg-gray-200/70 dark:bg-gray-700/70 rounded" />
-                    <div className="col-span-2 h-4 bg-gray-200/70 dark:bg-gray-700/70 rounded" />
-                    <div className="col-span-2 h-4 bg-gray-200/70 dark:bg-gray-700/70 rounded" />
-                    <div className="col-span-2 h-4 bg-gray-200/70 dark:bg-gray-700/70 rounded" />
-                  </div>
-                  <div className="flex-1 overflow-y-auto custom-scroll-thin divide-y divide-gray-100 dark:divide-gray-800">
-                    {[...Array(12)].map((_, i) => (
-                      <div key={i} className="grid grid-cols-12 items-center gap-3 sm:gap-4 px-4 lg:px-6 py-4 animate-pulse">
-                        {/* Course / title */}
-                        <div className="col-span-12 md:col-span-4 flex items-start gap-3">
-                          <div className="w-4 h-4 rounded-full border-2 border-gray-300 dark:border-gray-600 mt-1" />
-                          <div className="flex-1 space-y-2">
-                            <div className="h-4 w-40 sm:w-48 bg-gray-200 dark:bg-gray-700 rounded" />
-                            <div className="h-3 w-32 sm:w-40 bg-gray-100 dark:bg-gray-600 rounded" />
-                          </div>
-                        </div>
-                        {/* Reports (hide on small) */}
-                        <div className="hidden md:flex col-span-1 items-center gap-2">
-                          <div className="w-4 h-4 bg-gray-200 dark:bg-gray-700 rounded" />
-                          <div className="h-4 w-5 bg-gray-200 dark:bg-gray-700 rounded" />
-                        </div>
-                        {/* Note */}
-                        <div className="hidden md:flex col-span-1">
-                          <div className="h-6 w-12 rounded-full bg-gray-200 dark:bg-gray-700" />
-                        </div>
-                        {/* Progress */}
-                        <div className="col-span-8 md:col-span-2 space-y-2">
-                          <div className="h-4 w-10 bg-gray-200 dark:bg-gray-700 rounded" />
-                          <div className="h-2 w-full rounded-full bg-gray-100 dark:bg-gray-600 overflow-hidden relative">
-                            <div className="absolute inset-y-0 left-0 w-1/3 bg-gray-300 dark:bg-gray-500" />
-                          </div>
-                        </div>
-                        {/* Comments */}
-                        <div className="hidden md:flex col-span-2 items-center gap-3">
-                          <div className="h-9 w-9 rounded-full bg-gray-200 dark:bg-gray-700" />
-                          <div className="h-4 w-4 bg-gray-200 dark:bg-gray-700 rounded" />
-                        </div>
-                        {/* Action */}
-                        <div className="col-span-4 md:col-span-2 flex items-center gap-2 sm:gap-3 justify-end">
-                          <div className="h-8 w-20 sm:w-24 rounded-md bg-sky-200/50 dark:bg-sky-700/40" />
-                          <div className="h-8 w-8 rounded-md bg-gray-200 dark:bg-gray-700" />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </SidebarInset>
+              </main>
+            </SidebarInset>
+          </div>
         </AppSidebarProvider>
       </ProtectedRoute>
     )
@@ -489,660 +493,577 @@ export default function SpecialtyPageRoute() {
   return (
     <ProtectedRoute>
       <AppSidebarProvider>
-        <AppSidebar />
-  <SidebarInset className="flex flex-col min-h-screen overflow-x-hidden">
-          <UniversalHeader title={specialty.name} />
+        <div className="flex w-full h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden">
+          <AppSidebar />
+          <SidebarInset className="flex flex-col h-full bg-gray-50 dark:bg-gray-900">
+            <UniversalHeader title={specialty ? specialty.name : 'Matière'} />
+            <main className="flex-1 min-h-0 overflow-y-auto">
+              <div className="bg-gray-50 dark:bg-gray-900 p-4 sm:p-6 lg:p-8 min-w-0 overflow-x-hidden flex-1">
+                <div className="max-w-7xl mx-auto space-y-6 min-w-0">
+                  {/* Breadcrumb */}
+                  <div className="flex items-center gap-4 min-w-0">
+                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 min-w-0 flex-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => router.push('/matieres')}
+                        className="flex items-center gap-1 px-2 py-1 h-auto hover:bg-gray-100 dark:hover:bg-gray-700 flex-shrink-0"
+                      >
+                        <ArrowLeft className="h-3 w-3" />
+                        Matières
+                      </Button>
+                      <span className="flex-shrink-0">/</span>
+                      <span className="text-gray-900 dark:text-gray-100 font-medium truncate">{specialty.name}</span>
+                    </div>
+                    {isAdmin && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={handleEdit} 
+                        className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-100 transition-colors flex-shrink-0"
+                      >
+                        <Edit className="w-4 h-4" />
+                        Modifier
+                      </Button>
+                    )}
+                  </div>
 
-          <div className="bg-gray-50 dark:bg-gray-900 p-4 sm:p-6 lg:p-8 min-w-0 overflow-x-hidden flex-1">
-            <div className="max-w-7xl mx-auto space-y-6 min-w-0">
-              {/* Breadcrumb */}
-              <div className="flex items-center gap-4 min-w-0">
-                <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 min-w-0 flex-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => router.push('/matieres')}
-                    className="flex items-center gap-1 px-2 py-1 h-auto hover:bg-gray-100 dark:hover:bg-gray-700 flex-shrink-0"
-                  >
-                    <ArrowLeft className="h-3 w-3" />
-                    Matières
-                  </Button>
-                  <span className="flex-shrink-0">/</span>
-                  <span className="text-gray-900 dark:text-gray-100 font-medium truncate">{specialty.name}</span>
-                </div>
-                {isAdmin && (
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={handleEdit} 
-                    className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-100 transition-colors flex-shrink-0"
-                  >
-                    <Edit className="w-4 h-4" />
-                    Modifier
-                  </Button>
-                )}
-              </div>
+                  {/* Overview */}
+                  <Card className="bg-white dark:bg-gray-800 shadow-sm min-w-0">
+                    <CardContent className="p-6 min-w-0">
+                      <div className="mb-4 min-w-0">
+                        <div className="flex-1 min-w-0">
+                          {specialty.description && (
+                            <p className="text-gray-600 dark:text-gray-400 mb-4 min-w-0">{specialty.description}</p>
+                          )}
 
-              {/* Overview */}
-              <Card className="bg-white dark:bg-gray-800 shadow-sm min-w-0">
-                <CardContent className="p-6 min-w-0">
-                  <div className="mb-4 min-w-0">
-                    <div className="flex-1 min-w-0">
-                      {specialty.description && (
-                        <p className="text-gray-600 dark:text-gray-400 mb-4 min-w-0">{specialty.description}</p>
-                      )}
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 min-w-0">
-                        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 min-w-0">
-                          <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{specialty.progress?.totalLectures || 0}</div>
-                          <div className="text-sm text-blue-600 dark:text-blue-400">Cours totaux</div>
-                        </div>
-                        <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 min-w-0">
-                          <div className="text-2xl font-bold text-green-700 dark:text-green-300">{specialty.progress?.completedLectures || 0}</div>
-                          <div className="text-sm text-green-600 dark:text-green-400">Terminés</div>
-                        </div>
-                        <div className="bg-medblue-50 dark:bg-medblue-900/20 rounded-lg p-4 min-w-0">
-                          <div className="text-2xl font-bold text-medblue-700 dark:text-medblue-300">{Math.round(specialty.progress?.questionProgress || 0)}%</div>
-                          <div className="text-sm text-medblue-600 dark:text-medblue-400">Progression</div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 min-w-0">
+                            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 min-w-0">
+                              <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{specialty.progress?.totalLectures || 0}</div>
+                              <div className="text-sm text-blue-600 dark:text-blue-400">Cours totaux</div>
+                            </div>
+                            <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 min-w-0">
+                              <div className="text-2xl font-bold text-green-700 dark:text-green-300">{specialty.progress?.completedLectures || 0}</div>
+                              <div className="text-sm text-green-600 dark:text-green-400">Terminés</div>
+                            </div>
+                            <div className="bg-medblue-50 dark:bg-medblue-900/20 rounded-lg p-4 min-w-0">
+                              <div className="text-2xl font-bold text-medblue-700 dark:text-medblue-300">{Math.round(specialty.progress?.questionProgress || 0)}%</div>
+                              <div className="text-sm text-medblue-600 dark:text-medblue-400">Progression</div>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600 dark:text-gray-400">Progression globale</span>
-                      <span className="font-semibold text-blue-600 dark:text-blue-400">{Math.round(specialty.progress?.questionProgress || 0)}%</span>
-                    </div>
-                    <div className="relative h-2 w-full overflow-hidden rounded-full bg-gray-200">
-                      <div className="absolute h-full bg-green-500" style={{ width: `${headerCorrectPercent}%` }} />
-                      <div className="absolute h-full bg-orange-500" style={{ left: `${headerCorrectPercent}%`, width: `${headerPartialPercent}%` }} />
-                      <div className="absolute h-full bg-red-500" style={{ left: `${headerCorrectPercent + headerPartialPercent}%`, width: `${headerIncorrectPercent}%` }} />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600 dark:text-gray-400">Progression globale</span>
+                          <span className="font-semibold text-blue-600 dark:text-blue-400">{Math.round(specialty.progress?.questionProgress || 0)}%</span>
+                        </div>
+                        <div className="relative h-2 w-full overflow-hidden rounded-full bg-gray-200">
+                          <div className="absolute h-full bg-green-500" style={{ width: `${headerCorrectPercent}%` }} />
+                          <div className="absolute h-full bg-orange-500" style={{ left: `${headerCorrectPercent}%`, width: `${headerPartialPercent}%` }} />
+                          <div className="absolute h-full bg-red-500" style={{ left: `${headerCorrectPercent + headerPartialPercent}%`, width: `${headerIncorrectPercent}%` }} />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
 
-              {/* Group Management */}
-              {isAdmin && (
-                <Card className="bg-white dark:bg-gray-800 shadow-sm min-w-0">
-                  <CardContent className="p-4 min-w-0">
-                    <div className="flex items-center justify-between mb-4 min-w-0">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 truncate">Gestion des groupes de cours</h3>
-                      <Button onClick={() => setIsGroupManagementOpen(!isGroupManagementOpen)} variant="outline" size="sm" className="bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-100 transition-colors flex-shrink-0">
-                        <Settings className="w-4 h-4 mr-2" />
-                        {isGroupManagementOpen ? 'Masquer' : 'Gérer les groupes'}
-                      </Button>
-                    </div>
-
-                    {isGroupManagementOpen && (
-                      <div className="space-y-4">
-                        <div className="flex gap-2 min-w-0">
-                          <Input placeholder="Nom du nouveau groupe..." value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} className="flex-1 min-w-0" />
-                          <Button onClick={createGroup} disabled={!newGroupName.trim()} className="bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0">
-                            <Plus className="w-4 h-4 mr-2" />
-                            Créer un groupe
+                  {/* Group Management */}
+                  {isAdmin && (
+                    <Card className="bg-white dark:bg-gray-800 shadow-sm min-w-0">
+                      <CardContent className="p-4 min-w-0">
+                        <div className="flex items-center justify-between mb-4 min-w-0">
+                          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 truncate">Gestion des groupes de cours</h3>
+                          <Button onClick={() => setIsGroupManagementOpen(!isGroupManagementOpen)} variant="outline" size="sm" className="bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-100 transition-colors flex-shrink-0">
+                            <Settings className="w-4 h-4 mr-2" />
+                            {isGroupManagementOpen ? 'Masquer' : 'Gérer les groupes'}
                           </Button>
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 min-w-0">
-                          {Object.keys(courseGroups).map((groupName) => (
-                            <div key={groupName} className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg space-y-2">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <Folder className="w-4 h-4 text-blue-600" />
-                                  <span className="font-medium">{groupName}</span>
-                                  <Badge variant="secondary" className="text-xs">{courseGroups[groupName].ids.length}</Badge>
-                                  <Badge variant="outline" className="text-xs">Coeff: {courseGroups[groupName].coefficient}</Badge>
-                                </div>
-                                <Button variant="ghost" size="sm" onClick={() => deleteGroup(groupName)} className="h-8 w-8 p-0 text-red-600 hover:bg-red-50">
-                                  <Trash className="w-3 h-3" />
-                                </Button>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Input
-                                  className="h-8 w-24"
-                                  type="number"
-                                  step="0.1"
-                                  value={editingCoeff[groupName] ?? String(courseGroups[groupName].coefficient)}
-                                  onChange={(e)=> setEditingCoeff(prev=> ({...prev, [groupName]: e.target.value}))}
-                                />
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={async ()=>{
-                                    const coeff = parseFloat(editingCoeff[groupName] ?? String(courseGroups[groupName].coefficient))
-                                    if (isNaN(coeff)) return
-                                    try {
-                                      // find group id
-                                      const groupsResponse = await fetch(`/api/course-groups?userId=${user?.id}&specialtyId=${specialtyId}`)
-                                      const groups = groupsResponse.ok? await groupsResponse.json(): []
-                                      const target = groups.find((g:any)=> g.name===groupName)
-                                      if (!target) return
-                                      const r = await fetch(`/api/course-groups/${target.id}`, { method: 'PUT', headers: { 'Content-Type':'application/json' }, body: JSON.stringify({ coefficient: coeff }) })
-                                      if (r.ok){
-                                        setCourseGroups(prev=> ({...prev, [groupName]: { ...prev[groupName], coefficient: coeff }}))
-                                        toast({ title: 'Coefficient mis à jour', description: `${groupName}: ${coeff}` })
-                                      } else {
-                                        toast({ title: 'Erreur', description: 'Échec de mise à jour du coefficient', variant: 'destructive' })
-                                      }
-                                    } catch(e){ console.error(e) }
-                                  }}
-                                >Enregistrer</Button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                        <div className="flex items-center gap-2 mt-3">
-                          <span className="text-xs text-muted-foreground">Coeff. par défaut du nouveau groupe</span>
-                          <Input className="h-8 w-24" type="number" step="0.1" value={newGroupCoeff} onChange={(e)=> setNewGroupCoeff(e.target.value)} />
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              )}
 
-              {/* Search and Filter */}
-              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center min-w-0">
-                <div className="relative flex-1 w-full min-w-0">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4 flex-shrink-0" />
-                  <Input placeholder="Rechercher des cours..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 bg-white dark:bg-gray-800 min-w-0" />
-                </div>
-                <div className="flex gap-2 w-full sm:w-auto min-w-0">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-100 transition-colors flex-1 sm:flex-none min-w-0">
-                        <Filter className="w-4 h-4 flex-shrink-0" />
-                        <span className="truncate">Filtrer</span>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => setSelectedFilter('all')}>Tous les cours</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setSelectedFilter('completed')}>Terminés</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setSelectedFilter('in-progress')}>En cours</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setSelectedFilter('not-started')}>Non commencés</DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-100 transition-colors flex-1 sm:flex-none min-w-0">
-                        <ArrowUpDown className="w-4 h-4 flex-shrink-0" />
-                        <span className="truncate">
-                          {(() => {
-                            if (sortOption === 'default') return 'Trier';
-                            const dirArrow = sortDirection === 'asc' ? '↑' : '↓';
-                            if (sortOption === 'name') return `Nom ${dirArrow}`;
-                            if (sortOption === 'note') return `Note ${dirArrow}`;
-                            if (sortOption === 'lastAccessed') return `Accès ${dirArrow}`;
-                            return 'Trier';
-                          })()}
-                        </span>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-48">
-                      <DropdownMenuItem onClick={() => { setSortOption('default'); setSortDirection('asc'); }}>Par défaut</DropdownMenuItem>
-                      <div className="px-2 py-1 text-xs text-gray-500">Nom</div>
-                      <DropdownMenuItem onClick={() => { setSortOption('name'); setSortDirection('asc'); }}>Nom A→Z</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => { setSortOption('name'); setSortDirection('desc'); }}>Nom Z→A</DropdownMenuItem>
-                      <div className="px-2 pt-2 pb-1 text-xs text-gray-500">Note /20</div>
-                      <DropdownMenuItem onClick={() => { setSortOption('note'); setSortDirection('desc'); }}>Note haute→basse</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => { setSortOption('note'); setSortDirection('asc'); }}>Note basse→haute</DropdownMenuItem>
-                      <div className="px-2 pt-2 pb-1 text-xs text-gray-500">Dernier accès</div>
-                      <DropdownMenuItem onClick={() => { setSortOption('lastAccessed'); setSortDirection('desc'); }}>Plus récent</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => { setSortOption('lastAccessed'); setSortDirection('asc'); }}>Plus ancien</DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
-
-              {/* Lectures table or Empty State */}
-              <Card className="bg-white dark:bg-gray-800 shadow-sm min-w-0">
-                {sortedLectures.length === 0 ? (
-                  <CardContent className="p-8">
-                    <div className="max-w-3xl mx-auto text-center space-y-3">
-                      <div className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Aucun cours à afficher</div>
-                      {(() => {
-                        const totalHeader = specialty.progress?.totalLectures || 0;
-                        const filtersActive = (selectedFilter !== 'all') || (searchQuery.trim().length > 0);
-                        if (filtersActive) {
-                          return (
-                            <>
-                              <p className="text-gray-600 dark:text-gray-400">
-                                Aucun cours ne correspond aux filtres ou à votre recherche.
-                              </p>
-                              <div className="flex flex-col sm:flex-row items-center justify-center gap-2 pt-2">
-                                <Button variant="outline" onClick={() => { setSelectedFilter('all'); setSearchQuery(''); setSortOption('default'); setSortDirection('asc'); }}>
-                                  Réinitialiser les filtres
-                                </Button>
-                                <Button variant="ghost" onClick={() => router.refresh?.()}>Actualiser</Button>
-                              </div>
-                            </>
-                          );
-                        }
-                        if (totalHeader > 0 && lectures.length === 0) {
-                          return (
-                            <>
-                              <p className="text-gray-600 dark:text-gray-400">
-                                Incohérence détectée : cette matière indique {totalHeader} cours, mais aucun cours n'est actuellement accessible.
-                              </p>
-                              <p className="text-gray-600 dark:text-gray-400">
-                                Cela peut provenir d'une synchronisation en retard, de droits d'accès, ou d'un problème côté matière.
-                              </p>
-                              <div className="flex flex-col sm:flex-row items-center justify-center gap-2 pt-2">
-                                <Button variant="outline" onClick={() => router.refresh?.()}>Réessayer</Button>
-                                <Button variant="ghost" onClick={() => router.push('/matieres')}>Retour aux matières</Button>
-                              </div>
-                            </>
-                          );
-                        }
-                        if (lectures.length === 0) {
-                          return (
-                            <>
-                              <p className="text-gray-600 dark:text-gray-400">
-                                Cette matière ne contient pas encore de cours.
-                              </p>
-                              {isAdmin ? (
-                                <div className="flex items-center justify-center gap-2 pt-2">
-                                  <Button onClick={() => setIsEditDialogOpen(true)}>Modifier la matière</Button>
-                                  <Button variant="outline" onClick={() => router.push('/admin/import')}>Importer des questions</Button>
-                                </div>
-                              ) : (
-                                <div className="pt-2">
-                                  <Button variant="ghost" onClick={() => router.push('/matieres')}>Retour aux matières</Button>
-                                </div>
-                              )}
-                            </>
-                          );
-                        }
-                        // Fallback generic message
-                        return (
-                          <>
-                            <p className="text-gray-600 dark:text-gray-400">
-                              Aucun cours n'est disponible pour le moment.
-                            </p>
-                            <div className="pt-2">
-                              <Button variant="ghost" onClick={() => router.push('/matieres')}>Retour aux matières</Button>
+                        {isGroupManagementOpen && (
+                          <div className="space-y-4">
+                            <div className="flex gap-2 min-w-0">
+                              <Input placeholder="Nom du nouveau groupe..." value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} className="flex-1 min-w-0" />
+                              <Button onClick={createGroup} disabled={!newGroupName.trim()} className="bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0">
+                                <Plus className="w-4 h-4 mr-2" />
+                                Créer un groupe
+                              </Button>
                             </div>
-                          </>
-                        );
-                      })()}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 min-w-0">
+                              {Object.keys(courseGroups).map((groupName) => (
+                                <div key={groupName} className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      <Folder className="w-4 h-4 text-blue-600" />
+                                      <span className="font-medium">{groupName}</span>
+                                      <Badge variant="secondary" className="text-xs">{courseGroups[groupName].ids.length}</Badge>
+                                      <Badge variant="outline" className="text-xs">Coeff: {courseGroups[groupName].coefficient}</Badge>
+                                    </div>
+                                    <Button variant="ghost" size="sm" onClick={() => deleteGroup(groupName)} className="h-8 w-8 p-0 text-red-600 hover:bg-red-50">
+                                      <Trash className="w-3 h-3" />
+                                    </Button>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Input
+                                      className="h-8 w-24"
+                                      type="number"
+                                      step="0.1"
+                                      value={editingCoeff[groupName] ?? String(courseGroups[groupName].coefficient)}
+                                      onChange={(e)=> setEditingCoeff(prev=> ({...prev, [groupName]: e.target.value}))}
+                                    />
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={async ()=>{
+                                        const coeff = parseFloat(editingCoeff[groupName] ?? String(courseGroups[groupName].coefficient))
+                                        if (isNaN(coeff)) return
+                                        try {
+                                          // find group id
+                                          const groupsResponse = await fetch(`/api/course-groups?userId=${user?.id}&specialtyId=${specialtyId}`)
+                                          const groups = groupsResponse.ok? await groupsResponse.json(): []
+                                          const target = groups.find((g:any)=> g.name===groupName)
+                                          if (!target) return
+                                          const r = await fetch(`/api/course-groups/${target.id}`, { method: 'PUT', headers: { 'Content-Type':'application/json' }, body: JSON.stringify({ coefficient: coeff }) })
+                                          if (r.ok){
+                                            setCourseGroups(prev=> ({...prev, [groupName]: { ...prev[groupName], coefficient: coeff }}))
+                                            toast({ title: 'Coefficient mis à jour', description: `${groupName}: ${coeff}` })
+                                          } else {
+                                            toast({ title: 'Erreur', description: 'Échec de mise à jour du coefficient', variant: 'destructive' })
+                                          }
+                                        } catch(e){ console.error(e) }
+                                      }}
+                                    >Enregistrer</Button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                            <div className="flex items-center gap-2 mt-3">
+                              <span className="text-xs text-muted-foreground">Coeff. par défaut du nouveau groupe</span>
+                              <Input className="h-8 w-24" type="number" step="0.1" value={newGroupCoeff} onChange={(e)=> setNewGroupCoeff(e.target.value)} />
+
+                            </div>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Search and Filter */}
+                  <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center min-w-0">
+                    <div className="relative flex-1 w-full min-w-0">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4 flex-shrink-0" />
+                      <Input placeholder="Rechercher des cours..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 bg-white dark:bg-gray-800 min-w-0" />
                     </div>
-                  </CardContent>
-                ) : (
-                <CardContent className="p-0 min-w-0">
-                  <div className="overflow-x-auto w-full min-w-0 -mx-2 px-2 sm:mx-0 sm:px-0">
-                    <Table className="min-w-full w-full">
-                      <TableHeader>
-                        <TableRow>
-                          {isAdmin && (
-                            <TableHead className="w-8">
-                              <Checkbox
-                                aria-label="Tout sélectionner"
-                                checked={(() => {
-                                  const ids = [...ungroupedLectures, ...Object.values(groupedLectures).flat()].map(l => l.id)
-                                  return ids.length > 0 && ids.every(id => selectedCourseIds[id])
-                                })()}
-                                onCheckedChange={(checked) => {
-                                  const allIds = [...ungroupedLectures, ...Object.values(groupedLectures).flat()].map(l => l.id)
-                                  const next: Record<string, boolean> = { ...selectedCourseIds }
-                                  allIds.forEach(id => { next[id] = !!checked })
-                                  setSelectedCourseIds(next)
-                                }}
-                              />
-                            </TableHead>
-                          )}
-                          <TableHead className="min-w-0">Cours</TableHead>
-                          {isAdmin && <TableHead className="hidden lg:table-cell min-w-0">Rapports</TableHead>}
-                          <TableHead className="hidden md:table-cell min-w-0">Note /20</TableHead>
-                          <TableHead className="min-w-0 w-20 sm:w-24 md:w-32 lg:w-40">Progression</TableHead>
-                          <TableHead className="hidden xl:table-cell min-w-0">Commentaires</TableHead>
-                          <TableHead className="min-w-0 w-16 sm:w-20 md:w-24">Action</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                      {isAdmin && Object.values(selectedCourseIds).some(v => v) && (
-                        <TableRow className="bg-blue-50/40 dark:bg-blue-900/10">
-                          <TableCell colSpan={isAdmin ? 6 : 5} className="p-4 min-w-0">
-                            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 min-w-0">
-                              <span className="text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap flex-shrink-0">Affecter en masse au groupe :</span>
-                              <Select onValueChange={(v) => v && bulkAssignToGroup(v)}>
-                                <SelectTrigger className="w-full sm:w-56 min-w-0">
-                                  <SelectValue placeholder="Choisir un groupe" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {Object.keys(courseGroups).map((groupName) => (
-                                    <SelectItem key={groupName} value={groupName}>{groupName}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                              <Button variant="ghost" size="sm" onClick={() => setSelectedCourseIds({})} className="bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-100 transition-colors whitespace-nowrap flex-shrink-0">Effacer la sélection</Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )}
+                    <div className="flex gap-2 w-full sm:w-auto min-w-0">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-100 transition-colors flex-1 sm:flex-none min-w-0">
+                            <Filter className="w-4 h-4 flex-shrink-0" />
+                            <span className="truncate">Filtrer</span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => setSelectedFilter('all')}>Tous les cours</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setSelectedFilter('completed')}>Terminés</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setSelectedFilter('in-progress')}>En cours</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setSelectedFilter('not-started')}>Non commencés</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-100 transition-colors flex-1 sm:flex-none min-w-0">
+                            <ArrowUpDown className="w-4 h-4 flex-shrink-0" />
+                            <span className="truncate">
+                              {(() => {
+                                if (sortOption === 'default') return 'Trier';
+                                const dirArrow = sortDirection === 'asc' ? '↑' : '↓';
+                                if (sortOption === 'name') return `Nom ${dirArrow}`;
+                                if (sortOption === 'note') return `Note ${dirArrow}`;
+                                if (sortOption === 'lastAccessed') return `Accès ${dirArrow}`;
+                                return 'Trier';
+                              })()}
+                            </span>
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                          <DropdownMenuItem onClick={() => { setSortOption('default'); setSortDirection('asc'); }}>Par défaut</DropdownMenuItem>
+                          <div className="px-2 py-1 text-xs text-gray-500">Nom</div>
+                          <DropdownMenuItem onClick={() => { setSortOption('name'); setSortDirection('asc'); }}>Nom A→Z</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => { setSortOption('name'); setSortDirection('desc'); }}>Nom Z→A</DropdownMenuItem>
+                          <div className="px-2 pt-2 pb-1 text-xs text-gray-500">Note /20</div>
+                          <DropdownMenuItem onClick={() => { setSortOption('note'); setSortDirection('desc'); }}>Note haute→basse</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => { setSortOption('note'); setSortDirection('asc'); }}>Note basse→haute</DropdownMenuItem>
+                          <div className="px-2 pt-2 pb-1 text-xs text-gray-500">Dernier accès</div>
+                          <DropdownMenuItem onClick={() => { setSortOption('lastAccessed'); setSortDirection('desc'); }}>Plus récent</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => { setSortOption('lastAccessed'); setSortDirection('asc'); }}>Plus ancien</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
 
-                      {/* Ungrouped rows */}
-                      {ungroupedLectures.map((lecture) => (
-                        <TableRow key={`lecture-ungrouped-${lecture.id}`} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                          {isAdmin && (
-                            <TableCell className="align-middle">
-                              <Checkbox
-                                checked={!!selectedCourseIds[lecture.id]}
-                                onCheckedChange={(checked) => setSelectedCourseIds(prev => ({ ...prev, [lecture.id]: !!checked }))
-                                }
-                              />
-                            </TableCell>
-                          )}
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <File className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                              <button
-                                type="button"
-                                onClick={() => goToLectureMode(lecture.id)}
-                                title="Ouvrir le cours dans le mode sélectionné"
-                                className="min-w-0 flex-1 text-left"
-                              >
-                                {/* Mobile: truncate to half, desktop: full */}
-                                <div className="font-medium truncate text-sky-700 hover:underline dark:text-sky-300">
-                                  <span className="block sm:hidden">{lecture.title.length > 16 ? lecture.title.slice(0, Math.ceil(lecture.title.length/2)) + '…' : lecture.title}</span>
-                                  <span className="hidden sm:block">{lecture.title}</span>
+                  {/* Lectures table */}
+                  <Card className="bg-white dark:bg-gray-800 shadow-sm min-w-0">
+                    <CardContent className="p-0 min-w-0">
+                      <div className="overflow-x-auto w-full min-w-0 -mx-2 px-2 sm:mx-0 sm:px-0">
+                        <Table className="min-w-full w-full">
+                          <TableHeader>
+                            <TableRow>
+                                {isAdmin && (
+                                  <TableHead className="w-8">{/* always show select on desktop */}
+                                    <Checkbox
+                                      aria-label="Tout sélectionner"
+                                      checked={(() => {
+                                        const ids = [...ungroupedLectures, ...Object.values(groupedLectures).flat()].map(l => l.id)
+                                        return ids.length > 0 && ids.every(id => selectedCourseIds[id])
+                                      })()}
+                                      onCheckedChange={(checked) => {
+                                        const allIds = [...ungroupedLectures, ...Object.values(groupedLectures).flat()].map(l => l.id)
+                                        const next: Record<string, boolean> = { ...selectedCourseIds }
+                                        allIds.forEach(id => { next[id] = !!checked })
+                                        setSelectedCourseIds(next)
+                                      }}
+                                    />
+                                  </TableHead>
+                                )}
+                                <TableHead className="min-w-0">Cours</TableHead>
+                                {isAdmin && <TableHead className="hidden lg:table-cell min-w-0">Rapports</TableHead>}
+                                <TableHead className="hidden md:table-cell min-w-0">Note /20</TableHead>
+                                <TableHead className="min-w-0 w-20 sm:w-24 md:w-32 lg:w-40">Progression</TableHead>
+                                <TableHead className="hidden xl:table-cell min-w-0">Commentaires</TableHead>
+                                <TableHead className="min-w-0 w-16 sm:w-20 md:w-24">Action</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                        <TableBody>
+                          {isAdmin && Object.values(selectedCourseIds).some(v => v) && (
+                            <TableRow className="bg-blue-50/40 dark:bg-blue-900/10">
+                              <TableCell colSpan={isAdmin ? 6 : 5} className="p-4 min-w-0">
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 min-w-0">
+                                  <span className="text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap flex-shrink-0">Affecter en masse au groupe :</span>
+                                  <Select onValueChange={(v) => v && bulkAssignToGroup(v)}>
+                                    <SelectTrigger className="w-full sm:w-56 min-w-0">
+                                      <SelectValue placeholder="Choisir un groupe" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {Object.keys(courseGroups).map((groupName) => (
+                                        <SelectItem key={groupName} value={groupName}>{groupName}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <Button variant="ghost" size="sm" onClick={() => setSelectedCourseIds({})} className="bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-100 transition-colors whitespace-nowrap flex-shrink-0">Effacer la sélection</Button>
                                 </div>
-                                <div className="text-sm text-gray-500 truncate">
-                                  <span className="block sm:hidden">{lecture.description && lecture.description.length > 16 ? lecture.description.slice(0, Math.ceil(lecture.description.length/2)) + '…' : lecture.description}</span>
-                                  <span className="hidden sm:block">{lecture.description}</span>
-                                </div>
-                              </button>
-                            </div>
-                          </TableCell>
-                          {isAdmin && (
-                            <TableCell className="hidden lg:table-cell">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => router.push(`/admin/reports?lectureId=${lecture.id}`)}
-                                className="flex items-center gap-2 hover:bg-orange-50 dark:hover:bg-orange-900/20"
-                              >
-                                <AlertTriangle className="w-4 h-4 text-orange-600" />
-                                <span className="font-medium">{lecture.reportsCount || 0}</span>
-                                <ExternalLink className="w-3 h-3 text-gray-400" />
-                              </Button>
-                            </TableCell>
+                              </TableCell>
+                            </TableRow>
                           )}
-                          <TableCell className="hidden md:table-cell">
-                            {(() => {
-                              const note = lecture.culmonNote;
-                              if (note == null || isNaN(note)) return <span className="text-xs text-gray-400">-</span>;
-                              const isGood = note > 10;
-                              const cls = isGood
-                                ? 'text-green-700 dark:text-green-400'
-                                : 'text-red-600 dark:text-red-400';
-                              return (
-                                <span className={`inline-flex items-center font-semibold tabular-nums text-sm sm:text-base leading-none ${cls}`}>
-                                  {note.toFixed(2)}
-                                </span>
-                              );
-                            })()}
-                          </TableCell>
-                          <TableCell className="min-w-0 w-20 sm:w-24 md:w-32 lg:w-40">
-                            <div className="space-y-1">
-                              <div className="flex justify-between text-sm">
-                                <span>{Math.round(lecture.progress?.percentage || 0)}%</span>
-                                <span className="text-xs text-gray-500 hidden md:inline">{lecture.progress?.completedQuestions || 0}/{lecture.progress?.totalQuestions || 0}</span>
-                              </div>
-                              <div className="relative h-2 w-full overflow-hidden rounded-full bg-gray-200">
-                                {(() => {
-                                  const total = lecture.progress?.totalQuestions || 1
-                                  const correct = lecture.progress?.correctAnswers || 0
-                                  const incorrect = lecture.progress?.incorrectAnswers || 0
-                                  const partial = lecture.progress?.partialAnswers || 0
-                                  const correctPercent = (correct / total) * 100
-                                  const incorrectPercent = (incorrect / total) * 100
-                                  const partialPercent = (partial / total) * 100
-                                  return (
-                                    <>
-                                      <div className="absolute top-0 left-0 h-full bg-green-500" style={{ width: `${correctPercent}%` }} />
-                                      <div className="absolute top-0 h-full bg-red-500" style={{ left: `${correctPercent}%`, width: `${incorrectPercent}%` }} />
-                                      <div className="absolute top-0 h-full bg-yellow-500" style={{ left: `${correctPercent + incorrectPercent}%`, width: `${partialPercent}%` }} />
-                                    </>
-                                  )
-                                })()}
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="hidden xl:table-cell">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setCommentsLectureId(lecture.id)}
-                              className="group flex items-center gap-2 px-2 py-1 hover:bg-transparent"
-                              aria-label="Voir les commentaires"
-                            >
-                              <span className="flex items-center justify-center w-[30px] h-[30px] rounded-full bg-blue-500/10 dark:bg-blue-400/10">
-                                <MessageCircle className="w-4 h-4 sm:w-[16px] sm:h-[16px] text-blue-500 dark:text-blue-400" strokeWidth={2} />
-                              </span>
-                              <span className="text-sm font-semibold leading-none tabular-nums text-blue-500 dark:text-blue-400">
-                                {lecture.commentsCount ?? 0}
-                              </span>
-                            </Button>
-                          </TableCell>
-                          <TableCell className="min-w-0 w-16 sm:w-20 md:w-24">
-                            <div className="flex items-center gap-1 sm:gap-2">
-                              <Button
-                                size="sm"
-                                onClick={() => goToLectureMode(lecture.id)}
-                                className="h-8 bg-sky-500 hover:bg-sky-600 text-white text-xs px-1 sm:px-2 md:px-3"
-                              >
-                                <Play className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                                <span className="hidden sm:inline md:inline">{getModeLabel(getLectureMode(lecture.id))}</span>
-                              </Button>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
+
+                          {/* Ungrouped rows */}
+                          {ungroupedLectures.map((lecture) => (
+                            <TableRow key={`lecture-ungrouped-${lecture.id}`} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                              {isAdmin && (
+                                <TableCell className="align-middle">
+                                  <Checkbox
+                                    checked={!!selectedCourseIds[lecture.id]}
+                                    onCheckedChange={(checked) => setSelectedCourseIds(prev => ({ ...prev, [lecture.id]: !!checked }))
+                                    }
+                                  />
+                                </TableCell>
+                              )}
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  <File className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                                  <div className="min-w-0 flex-1">
+                                    {/* Mobile: truncate to half, desktop: full */}
+                                    <div className="font-medium truncate">
+                                      <span className="block sm:hidden">{lecture.title.length > 16 ? lecture.title.slice(0, Math.ceil(lecture.title.length/2)) + '…' : lecture.title}</span>
+                                      <span className="hidden sm:block">{lecture.title}</span>
+                                    </div>
+                                    <div className="text-sm text-gray-500 truncate">
+                                      <span className="block sm:hidden">{lecture.description && lecture.description.length > 16 ? lecture.description.slice(0, Math.ceil(lecture.description.length/2)) + '…' : lecture.description}</span>
+                                      <span className="hidden sm:block">{lecture.description}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </TableCell>
+                              {isAdmin && (
+                                <TableCell className="hidden lg:table-cell">
                                   <Button
-                                    aria-label="Changer le mode"
-                                    variant="outline"
-                                    size="icon"
-                                    className="h-8 w-8 rounded-md bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-100 transition-colors"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => router.push(`/admin/reports?lectureId=${lecture.id}`)}
+                                    className="flex items-center gap-2 hover:bg-orange-50 dark:hover:bg-orange-900/20"
                                   >
-                                    <ChevronDown className="w-3 h-3 sm:w-4 sm:h-4" />
+                                    <AlertTriangle className="w-4 h-4 text-orange-600" />
+                                    <span className="font-medium">{lecture.reportsCount || 0}</span>
+                                    <ExternalLink className="w-3 h-3 text-gray-400" />
                                   </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={() => setLectureMode(lecture.id, 'study')}>Étude</DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => setLectureMode(lecture.id, 'revision')}>Révision</DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => setLectureMode(lecture.id, 'pinned')}>Épinglé</DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-
-                      {/* Grouped rows */}
-                      {Object.entries(groupedLectures).map(([groupName, glist]) => [
-                        <TableRow key={`group-${groupName}`} className="bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-700/50">
-                          <TableCell colSpan={isAdmin ? 6 : 5} className="p-4 min-w-0">
-                            <Button variant="ghost" onClick={() => setExpandedGroups(prev => ({ ...prev, [groupName]: !prev[groupName] }))} className="flex items-center gap-2 p-0 h-auto font-medium text-gray-900 dark:text-gray-100 min-w-0 w-full">
-                              <Folder className="w-4 h-4 text-blue-600 flex-shrink-0" />
-                              {expandedGroups[groupName] ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                              <span className="truncate flex-1 min-w-0">{groupName}</span>
-                              <Badge variant="secondary" className="ml-2 flex-shrink-0">{glist.length} cours</Badge>
-                            </Button>
-                          </TableCell>
-                        </TableRow>,
-                        ...(expandedGroups[groupName] ? glist.map((lecture) => (
-                          <TableRow key={`lecture-${lecture.id}`} className="border-l-4 border-l-blue-200 dark:border-l-blue-800">
-                            {isAdmin && (
-                              <TableCell className="align-middle">
-                                <Checkbox
-                                  checked={!!selectedCourseIds[lecture.id]}
-                                  onCheckedChange={(checked) => setSelectedCourseIds(prev => ({ ...prev, [lecture.id]: !!checked }))
-                                  }
-                                />
-                               </TableCell>
-                            )}
-                            <TableCell>
-                              <div className="flex items-center gap-2 pl-4 sm:pl-6">
-                                <File className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                                <button
-                                  type="button"
-                                  onClick={() => goToLectureMode(lecture.id)}
-                                  title="Ouvrir le cours dans le mode sélectionné"
-                                  className="min-w-0 flex-1 text-left"
+                                </TableCell>
+                              )}
+                              <TableCell className="hidden md:table-cell">
+                                {(() => {
+                                  const note = lecture.culmonNote;
+                                  if (note == null || isNaN(note)) return <span className="text-xs text-gray-400">-</span>;
+                                  const isGood = note > 10;
+                                  const cls = isGood
+                                    ? 'text-green-700 dark:text-green-400'
+                                    : 'text-red-600 dark:text-red-400';
+                                  return (
+                                    <span className={`inline-flex items-center font-semibold tabular-nums text-sm sm:text-base leading-none ${cls}`}>
+                                      {note.toFixed(2)}
+                                    </span>
+                                  );
+                                })()}
+                              </TableCell>
+                              <TableCell className="min-w-0 w-20 sm:w-24 md:w-32 lg:w-40">
+                                <div className="space-y-1">
+                                  <div className="flex justify-between text-sm">
+                                    <span>{Math.round(lecture.progress?.percentage || 0)}%</span>
+                                    <span className="text-xs text-gray-500 hidden md:inline">{lecture.progress?.completedQuestions || 0}/{lecture.progress?.totalQuestions || 0}</span>
+                                  </div>
+                                  <div className="relative h-2 w-full overflow-hidden rounded-full bg-gray-200">
+                                    {(() => {
+                                      const total = lecture.progress?.totalQuestions || 1
+                                      const correct = lecture.progress?.correctAnswers || 0
+                                      const incorrect = lecture.progress?.incorrectAnswers || 0
+                                      const partial = lecture.progress?.partialAnswers || 0
+                                      const correctPercent = (correct / total) * 100
+                                      const incorrectPercent = (incorrect / total) * 100
+                                      const partialPercent = (partial / total) * 100
+                                      return (
+                                        <>
+                                          <div className="absolute top-0 left-0 h-full bg-green-500" style={{ width: `${correctPercent}%` }} />
+                                          <div className="absolute top-0 h-full bg-red-500" style={{ left: `${correctPercent}%`, width: `${incorrectPercent}%` }} />
+                                          <div className="absolute top-0 h-full bg-yellow-500" style={{ left: `${correctPercent + incorrectPercent}%`, width: `${partialPercent}%` }} />
+                                        </>
+                                      )
+                                    })()}
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell className="hidden xl:table-cell">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setCommentsLectureId(lecture.id)}
+                                  className="group flex items-center gap-2 px-2 py-1 hover:bg-transparent"
+                                  aria-label="Voir les commentaires"
                                 >
-                                  <div className="font-medium truncate text-sky-700 hover:underline dark:text-sky-300">
-                                    <span className="block sm:hidden">{lecture.title.length > 16 ? lecture.title.slice(0, Math.ceil(lecture.title.length/2)) + '…' : lecture.title}</span>
-                                    <span className="hidden sm:block">{lecture.title}</span>
-                                  </div>
-                                  <div className="text-sm text-gray-500 truncate">
-                                    <span className="block sm:hidden">{lecture.description && lecture.description.length > 16 ? lecture.description.slice(0, Math.ceil(lecture.description.length/2)) + '…' : lecture.description}</span>
-                                    <span className="hidden sm:block">{lecture.description}</span>
-                                  </div>
-                                </button>
-                              </div>
-                            </TableCell>
-                            {isAdmin && (
-                              <TableCell className="hidden lg:table-cell">
-                                <Button variant="ghost" size="sm" onClick={() => router.push(`/admin/reports?lectureId=${lecture.id}`)} className="flex items-center gap-2 hover:bg-orange-50 dark:hover:bg-orange-900/20">
-                                  <AlertTriangle className="w-4 h-4 text-orange-600" />
-                                  <span className="font-medium">{lecture.reportsCount || 0}</span>
-                                  <ExternalLink className="w-3 h-3 text-gray-400" />
+                                  <span className="flex items-center justify-center w-[30px] h-[30px] rounded-full bg-blue-500/10 dark:bg-blue-400/10">
+                                    <MessageCircle className="w-4 h-4 sm:w-[16px] sm:h-[16px] text-blue-500 dark:text-blue-400" strokeWidth={2} />
+                                  </span>
+                                  <span className="text-sm font-semibold leading-none tabular-nums text-blue-500 dark:text-blue-400">
+                                    {lecture.commentsCount ?? 0}
+                                  </span>
                                 </Button>
                               </TableCell>
-                            )}
-                            <TableCell className="hidden md:table-cell">
-                              {(() => {
-                                const note = (lecture as any).culmonNote;
-                                if (note == null || isNaN(note)) return <span className="text-xs text-gray-400">-</span>;
-                                const isGood = note > 10;
-                                const cls = isGood
-                                  ? 'text-green-700 dark:text-green-400'
-                                  : 'text-red-600 dark:text-red-400';
-                                return (
-                                  <span className={`inline-flex items-center font-semibold tabular-nums text-sm sm:text-base leading-none ${cls}`}>
-                                    {note.toFixed(2)}
-                                  </span>
-                                );
-                              })()}
-                            </TableCell>
-                            <TableCell className="min-w-0 w-20 sm:w-24 md:w-32 lg:w-40">
-                              <div className="space-y-1">
-                                <div className="flex justify-between text-sm">
-                                  <span>{Math.round(lecture.progress?.percentage || 0)}%</span>
-                                  <span className="text-xs text-gray-500 hidden md:inline">{lecture.progress?.completedQuestions || 0}/{lecture.progress?.totalQuestions || 0}</span>
+                              <TableCell className="min-w-0 w-16 sm:w-20 md:w-24">
+                                <div className="flex items-center gap-1 sm:gap-2">
+                                  <Button
+                                    size="sm"
+                                    onClick={() => goToLectureMode(lecture.id)}
+                                    className="h-8 bg-sky-500 hover:bg-sky-600 text-white text-xs px-1 sm:px-2 md:px-3"
+                                  >
+                                    <Play className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                                    <span className="hidden sm:inline md:inline">{getModeLabel(getLectureMode(lecture.id))}</span>
+                                  </Button>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button
+                                        aria-label="Changer le mode"
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8 rounded-md bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-100 transition-colors"
+                                      >
+                                        <ChevronDown className="w-3 h-3 sm:w-4 sm:h-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem onClick={() => setLectureMode(lecture.id, 'study')}>Étude</DropdownMenuItem>
+                                      <DropdownMenuItem onClick={() => setLectureMode(lecture.id, 'revision')}>Révision</DropdownMenuItem>
+                                      <DropdownMenuItem onClick={() => setLectureMode(lecture.id, 'pinned')}>Épinglé</DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
                                 </div>
-                                {/* Three-color progress bar with real data */}
-                                <div className="relative h-2 w-full overflow-hidden rounded-full bg-gray-200">
+                              </TableCell>
+                            </TableRow>
+                          ))}
+
+                          {/* Grouped rows */}
+                          {Object.entries(groupedLectures).map(([groupName, glist]) => [
+                            <TableRow key={`group-${groupName}`} className="bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-700/50">
+                              <TableCell colSpan={7} className="!p-0 min-w-0 align-middle border-0">
+                                <Button
+                                  variant="ghost"
+                                  onClick={() => setExpandedGroups(prev => ({ ...prev, [groupName]: !prev[groupName] }))}
+                                  className="w-full flex items-center gap-2 h-full p-3 font-medium text-gray-900 dark:text-gray-100 min-w-0 justify-start text-left rounded-none focus:outline-none focus:ring-2 focus:ring-blue-400"
+                                  style={{ boxShadow: 'none' }}
+                                >
+                                  <Folder className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                                  {expandedGroups[groupName] ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                                  <span className="truncate flex-1 min-w-0 text-base font-semibold">{groupName}</span>
+                                  <Badge variant="secondary" className="ml-2 flex-shrink-0 px-2 py-0.5 text-xs font-semibold">{glist.length} cours</Badge>
+                                </Button>
+                              </TableCell>
+                            </TableRow>,
+                            ...(expandedGroups[groupName] ? glist.map((lecture) => (
+                              <TableRow key={`lecture-${lecture.id}`} className="border-l-4 border-l-blue-200 dark:border-l-blue-800">
+                                {isAdmin && (
+                                  <TableCell className="align-middle">
+                                    <Checkbox
+                                      checked={!!selectedCourseIds[lecture.id]}
+                                      onCheckedChange={(checked) => setSelectedCourseIds(prev => ({ ...prev, [lecture.id]: !!checked }))
+                                      }
+                                    />
+                                   </TableCell>
+                                )}
+                                <TableCell>
+                                  <div className="flex items-center gap-2 pl-4 sm:pl-6">
+                                    <File className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                                    <div className="min-w-0 flex-1">
+                                      <div className="font-medium truncate">
+                                        <span className="block sm:hidden">{lecture.title.length > 16 ? lecture.title.slice(0, Math.ceil(lecture.title.length/2)) + '…' : lecture.title}</span>
+                                        <span className="hidden sm:block">{lecture.title}</span>
+                                      </div>
+                                      <div className="text-sm text-gray-500 truncate">
+                                        <span className="block sm:hidden">{lecture.description && lecture.description.length > 16 ? lecture.description.slice(0, Math.ceil(lecture.description.length/2)) + '…' : lecture.description}</span>
+                                        <span className="hidden sm:block">{lecture.description}</span>
+                                      </div>
+                                    </div>
+
+                                  </div>
+                                </TableCell>
+                                {isAdmin && (
+                                  <TableCell className="hidden lg:table-cell">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => router.push(`/admin/reports?lectureId=${lecture.id}`)}
+                                      className="flex items-center gap-2 hover:bg-orange-50 dark:hover:bg-orange-900/20"
+                                    >
+                                      <AlertTriangle className="w-4 h-4 text-orange-600" />
+                                      <span className="font-medium">{lecture.reportsCount || 0}</span>
+                                      <ExternalLink className="w-3 h-3 text-gray-400" />
+                                    </Button>
+                                  </TableCell>
+                                )}
+                                <TableCell className="hidden md:table-cell">
                                   {(() => {
-                                    const total = lecture.progress?.totalQuestions || 1;
-                                    const correct = lecture.progress?.correctAnswers || 0;
-                                    const incorrect = lecture.progress?.incorrectAnswers || 0;
-                                    const partial = lecture.progress?.partialAnswers || 0;
-                                    
-                                    const correctPercent = (correct / total) * 100;
-                                    const incorrectPercent = (incorrect / total) * 100;
-                                    const partialPercent = (partial / total) * 100;
-                                    
+                                    const note = (lecture as any).culmonNote;
+                                    if (note == null || isNaN(note)) return <span className="text-xs text-gray-400">-</span>;
+                                    const isGood = note > 10;
+                                    const cls = isGood
+                                      ? 'text-green-700 dark:text-green-400'
+                                      : 'text-red-600 dark:text-red-400';
                                     return (
-                                      <>
-                                        {/* Correct answers - green */}
-                                        <div 
-                                          className="absolute top-0 left-0 h-full bg-green-500"
-                                          style={{ width: `${correctPercent}%` }}
-                                        />
-                                        {/* Incorrect answers - red */}
-                                        <div 
-                                          className="absolute top-0 h-full bg-red-500"
-                                          style={{ 
-                                            left: `${correctPercent}%`,
-                                            width: `${incorrectPercent}%` 
-                                          }}
-                                        />
-                                        {/* Partial answers - yellow */}
-                                        <div 
-                                          className="absolute top-0 h-full bg-yellow-500"
-                                          style={{ 
-                                            left: `${correctPercent + incorrectPercent}%`,
-                                            width: `${partialPercent}%` 
-                                          }}
-                                        />
-                                      </>
+                                      <span className={`inline-flex items-center font-semibold tabular-nums text-sm sm:text-base leading-none ${cls}`}>
+                                        {note.toFixed(2)}
+                                      </span>
                                     );
                                   })()}
+                                </TableCell>
+                                <TableCell className="min-w-0 w-20 sm:w-24 md:w-32 lg:w-40">
+                                  <div className="space-y-1">
+                                    <div className="flex justify-between text-sm">
+                                      <span>{Math.round(lecture.progress?.percentage || 0)}%</span>
+                                      <span className="text-xs text-gray-500 hidden md:inline">{lecture.progress?.completedQuestions || 0}/{lecture.progress?.totalQuestions || 0}</span>
+                                    </div>
+                                    {/* Three-color progress bar with real data */}
+                                    <div className="relative h-2 w-full overflow-hidden rounded-full bg-gray-200">
+                                      {(() => {
+                                        const total = lecture.progress?.totalQuestions || 1;
+                                        const correct = lecture.progress?.correctAnswers || 0;
+                                        const incorrect = lecture.progress?.incorrectAnswers || 0;
+                                        const partial = lecture.progress?.partialAnswers || 0;
+                                        
+                                        const correctPercent = (correct / total) * 100;
+                                        const incorrectPercent = (incorrect / total) * 100;
+                                        const partialPercent = (partial / total) * 100;
+                                        
+                                        return (
+                                          <>
+                                            {/* Correct answers - green */}
+                                            <div 
+                                              className="absolute top-0 left-0 h-full bg-green-500"
+                                              style={{ width: `${correctPercent}%` }}
+                                            />
+                                            {/* Incorrect answers - red */}
+                                            <div 
+                                              className="absolute top-0 h-full bg-red-500"
+                                              style={{ 
+                                                left: `${correctPercent}%`,
+                                                width: `${incorrectPercent}%` 
+                                              }}
+                                            />
+                                            {/* Partial answers - yellow */}
+                                            <div 
+                                              className="absolute top-0 h-full bg-yellow-500"
+                                              style={{ 
+                                                left: `${correctPercent + incorrectPercent}%`,
+                                                width: `${partialPercent}%` 
+                                              }}
+                                            />
+                                          </>
+                                        );
+                                      })()}
+                                    </div>
                                 </div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="hidden xl:table-cell">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setCommentsLectureId(lecture.id)}
-                              className="group flex items-center gap-2 px-2 py-1 hover:bg-transparent"
-                              aria-label="Voir les commentaires"
-                            >
-                              <span className="flex items-center justify-center w-[30px] h-[30px] rounded-full bg-blue-500/10 dark:bg-blue-400/10">
-                                <MessageCircle className="w-4 h-4 sm:w-[16px] sm:h-[16px] text-blue-500 dark:text-blue-400" strokeWidth={2} />
-                              </span>
-                              <span className="text-sm font-semibold leading-none tabular-nums text-blue-500 dark:text-blue-400">
-                                {lecture.commentsCount ?? 0}
-                              </span>
-                            </Button>
-                          </TableCell>
-                          <TableCell className="min-w-0 w-16 sm:w-20 md:w-24">
-                            <div className="flex items-center gap-1 sm:gap-2">
-                              <Button
-                                size="sm"
-                                onClick={() => goToLectureMode(lecture.id)}
-                                className="h-8 bg-sky-500 hover:bg-sky-600 text-white text-xs px-1 sm:px-2 md:px-3"
-                              >
-                                <Play className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                                <span className="hidden sm:inline md:inline">{getModeLabel(getLectureMode(lecture.id))}</span>
-                              </Button>
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
+                              </TableCell>
+                              <TableCell className="hidden xl:table-cell">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setCommentsLectureId(lecture.id)}
+                                  className="group flex items-center gap-2 px-2 py-1 hover:bg-transparent"
+                                  aria-label="Voir les commentaires"
+                                >
+                                  <span className="flex items-center justify-center w-[30px] h-[30px] rounded-full bg-blue-500/10 dark:bg-blue-400/10">
+                                    <MessageCircle className="w-4 h-4 sm:w-[16px] sm:h-[16px] text-blue-500 dark:text-blue-400" strokeWidth={2} />
+                                  </span>
+                                  <span className="text-sm font-semibold leading-none tabular-nums text-blue-500 dark:text-blue-400">
+                                    {lecture.commentsCount ?? 0}
+                                  </span>
+                                </Button>
+                              </TableCell>
+                              <TableCell className="min-w-0 w-16 sm:w-20 md:w-24">
+                                <div className="flex items-center gap-1 sm:gap-2">
                                   <Button
-                                    aria-label="Changer le mode"
-                                    variant="outline"
-                                    size="icon"
-                                    className="h-8 w-8 rounded-md bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-100 transition-colors"
+                                    size="sm"
+                                    onClick={() => goToLectureMode(lecture.id)}
+                                    className="h-8 bg-sky-500 hover:bg-sky-600 text-white text-xs px-1 sm:px-2 md:px-3"
                                   >
-                                    <ChevronDown className="w-3 h-3 sm:w-4 sm:h-4" />
+                                    <Play className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                                    <span className="hidden sm:inline md:inline">{getModeLabel(getLectureMode(lecture.id))}</span>
                                   </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => setLectureMode(lecture.id, 'study')}>Étude</DropdownMenuItem>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button
+                                        aria-label="Changer le mode"
+                                        variant="outline"
+                                        size="icon"
+                                        className="h-8 w-8 rounded-md bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-100 transition-colors"
+                                      >
+                                        <ChevronDown className="w-3 h-3 sm:w-4 sm:h-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => setLectureMode(lecture.id, 'study')}>Étude</DropdownMenuItem>
                       <DropdownMenuItem onClick={() => setLectureMode(lecture.id, 'revision')}>Révision</DropdownMenuItem>
                       <DropdownMenuItem onClick={() => setLectureMode(lecture.id, 'pinned')}>Épinglé</DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                        )) : [])
-                      ].flat())}
-                    </TableBody>
-                  </Table>
-                  </div>
-                </CardContent>
-                )}
-              </Card>
-            </div>
-          </div>
-
-         </SidebarInset>
-
-          {/* Lecture Comments Modal */}
-          <Dialog open={!!commentsLectureId} onOpenChange={(open) => { if (!open) setCommentsLectureId(null) }}>
-            <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
-              <DialogHeader>
-                <DialogTitle>Commentaires du cours</DialogTitle>
-              </DialogHeader>
-              {commentsLectureId && (
-                <LectureComments lectureId={commentsLectureId} />
-              )}
-            </DialogContent>
-          </Dialog>
-
-           <EditSpecialtyDialog specialty={specialty} isOpen={isEditDialogOpen} onOpenChange={setIsEditDialogOpen} onSpecialtyUpdated={handleSpecialtyUpdated} />
-       </AppSidebarProvider>
-     </ProtectedRoute>
-   )
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                            )) : [])
+                          ].flat())}
+                        </TableBody>
+                      </Table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            </main>
+          </SidebarInset>
+        </div>
+      </AppSidebarProvider>
+    </ProtectedRoute>
+  )
  }
