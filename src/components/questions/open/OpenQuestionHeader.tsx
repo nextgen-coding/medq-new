@@ -1,6 +1,13 @@
+"use client";
 
-import { useTranslation } from 'react-i18next';
+import { useState } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Clock, BookOpen, Eye, EyeOff } from 'lucide-react';
 import { HighlightableQuestionText } from '../HighlightableQuestionText';
+import { RichTextDisplay } from '@/components/ui/rich-text-display';
+import { useTranslation } from 'react-i18next';
 
 interface OpenQuestionHeaderProps {
   questionText: string;
@@ -11,22 +18,22 @@ interface OpenQuestionHeaderProps {
   questionId?: string;
   highlightConfirm?: boolean;
   hideMeta?: boolean;
+  correctAnswers?: string[];
+  showEyeButton?: boolean; // Whether to show the eye button (clinical/multi contexts)
 }
 
-export function OpenQuestionHeader({ questionText, questionNumber, session, lectureTitle, specialtyName, questionId, highlightConfirm, hideMeta }: OpenQuestionHeaderProps) {
+export function OpenQuestionHeader({ questionText, questionNumber, session, lectureTitle, specialtyName, questionId, highlightConfirm, hideMeta, correctAnswers, showEyeButton }: OpenQuestionHeaderProps) {
   const { t } = useTranslation();
+  const [showAnswer, setShowAnswer] = useState(false);
   
   // Enhanced session formatting to preserve full session information
   const formatSession = (sessionValue?: string) => {
     if (!sessionValue) return '';
     
-    // Clean up parentheses and extra spaces
-    let cleaned = sessionValue.replace(/^\(|\)$/g, '').trim();
+    // Clean up extra whitespace and normalize
+    const cleaned = sessionValue.trim().replace(/\s+/g, ' ');
     
-    // If already contains "Session", use as-is
-    if (/session/i.test(cleaned)) return cleaned;
-    
-    // If it's just a number or year, format as "Session X"
+    // If it's just a number, prefix with "Session"
     if (/^\d+$/.test(cleaned)) return `Session ${cleaned}`;
     
     // If it contains "theme" or other descriptive text, use as-is
@@ -53,7 +60,7 @@ export function OpenQuestionHeader({ questionText, questionNumber, session, lect
       parts.push('QROC');
     }
     
-    // Add formatted session if available
+    // Add session info if available
     const formattedSession = formatSession(session);
     if (formattedSession) {
       parts.push(formattedSession);
@@ -66,10 +73,29 @@ export function OpenQuestionHeader({ questionText, questionNumber, session, lect
   
   return (
     <div className="space-y-2">
+      {/* Show metadata only when hideMeta is false */}
       {!hideMeta && (
         <>
-          <div className="text-sm sm:text-base font-semibold text-foreground dark:text-gray-100">
-            {metadataLine}
+          <div className="flex items-center justify-between">
+            <div className="text-sm sm:text-base font-semibold text-foreground dark:text-gray-100">
+              {metadataLine}
+            </div>
+            {/* Eye button positioned to the far right of the question number */}
+            {showEyeButton && correctAnswers && correctAnswers.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowAnswer(!showAnswer)}
+                className="h-8 w-8 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/20 rounded-md"
+                title={showAnswer ? "Masquer la réponse" : "Voir la réponse"}
+              >
+                {showAnswer ? (
+                  <EyeOff className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                ) : (
+                  <Eye className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                )}
+              </Button>
+            )}
           </div>
           {(specialtyName || lectureTitle) && (
             <div className="text-xs sm:text-sm text-muted-foreground">
@@ -78,7 +104,43 @@ export function OpenQuestionHeader({ questionText, questionNumber, session, lect
           )}
         </>
       )}
-      {questionId ? (
+      
+      {/* Show eye button for clinical contexts even when hideMeta is true */}
+      {hideMeta && showEyeButton && correctAnswers && correctAnswers.length > 0 && (
+        <div className="flex items-center justify-end gap-3 mb-3">
+          {/* Eye button on the right */}
+          <div className="flex-shrink-0">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowAnswer(!showAnswer)}
+              className="h-8 w-8 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/20 rounded-md shadow-sm"
+              title={showAnswer ? "Masquer la réponse" : "Voir la réponse"}
+            >
+              {showAnswer ? (
+                <EyeOff className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              ) : (
+                <Eye className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
+      
+      {/* Show correct answer when eye button is clicked */}
+      {showAnswer && showEyeButton && correctAnswers && correctAnswers.length > 0 && (
+        <div className="mb-3 rounded-xl border border-green-200 bg-green-50 p-3 dark:border-green-800 dark:bg-green-950">
+          <div className="text-sm font-medium text-green-800 dark:text-green-200 mb-2">
+            Réponse attendue :
+          </div>
+          <div className="text-sm text-green-700 dark:text-green-300">
+            <RichTextDisplay content={correctAnswers.join(', ')} />
+          </div>
+        </div>
+      )}
+      
+      {/* Show question text when hideMeta is false (for regular contexts) */}
+      {!hideMeta && questionId ? (
         <div data-question-text={questionId}>
           <HighlightableQuestionText
             questionId={questionId}
@@ -87,9 +149,9 @@ export function OpenQuestionHeader({ questionText, questionNumber, session, lect
             confirmMode={highlightConfirm}
           />
         </div>
-      ) : (
+      ) : !hideMeta ? (
         <h3 className="mt-3 text-base sm:text-lg font-medium text-foreground dark:text-gray-200 break-words whitespace-pre-wrap">{questionText}</h3>
-      )}
+      ) : null}
     </div>
   );
 }

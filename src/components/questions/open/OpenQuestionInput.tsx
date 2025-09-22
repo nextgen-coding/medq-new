@@ -72,7 +72,7 @@ export function OpenQuestionInput({ answer, setAnswer, isSubmitted, onSubmit, on
         rows={3}
         disabled={isSubmitted}
         className={`
-          resize-none transition-all duration-200 w-full max-w-full min-h-[60px] text-sm
+          resize-none transition-all duration-200 w-full max-w-none min-h-[60px] text-sm
           ${isSubmitted ? 'bg-muted' : ''}
         `}
       />

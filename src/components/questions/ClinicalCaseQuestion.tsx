@@ -425,12 +425,25 @@ export function ClinicalCaseQuestion({
       .filter(q => (q.type as any) === 'clinic_croq')
       .map(q => q.id);
     setEvaluationOrder(openIds);
-    setEvaluationIndex(0);
+    
+    // For multi-QROC cases, always start evaluation from the first QROC
+    // For mixed clinical cases, start from current QROC if applicable
+    if (displayMode === 'multi_qroc') {
+      setEvaluationIndex(0); // Always start from first QROC in multi-QROC cases
+    } else {
+      // For clinical cases with mixed question types, try to stay on current QROC
+      const currentQuestion = clinicalCase.questions[activeIndex];
+      const currentQrocIndex = currentQuestion && (currentQuestion.type as any) === 'clinic_croq' 
+        ? openIds.indexOf(currentQuestion.id) 
+        : -1;
+      setEvaluationIndex(currentQrocIndex !== -1 ? currentQrocIndex : 0);
+    }
+    
     // In revision mode, auto-complete evaluation to align with "show correct and move on"
     setEvaluationComplete(revisionMode ? true : openIds.length === 0);
     onSubmit(clinicalCase.caseNumber, answers, questionResults); // results will be updated as user evaluates
-    // Always scroll to top after submit per request (then user can scroll down to evaluate)
-    setTimeout(() => { window.scrollTo({ top: 0, behavior: 'smooth' }); }, 120);
+    
+    // Don't manually scroll here - let the evaluation effect handle scrolling to the correct question
   };
   // Allow resubmission: keep current answers, hide results, reset evaluation state and per-question results
   const handleResubmit = () => {
@@ -480,8 +493,6 @@ export function ClinicalCaseQuestion({
 
   // Simplified Enter key navigation for clinical cases
   useEffect(() => {
-    if (revisionMode) return; // Don't handle Enter in revision mode
-    
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Enter' || e.ctrlKey || e.metaKey) return;
       
@@ -491,6 +502,17 @@ export function ClinicalCaseQuestion({
       const isEditable = !!target && ((target as any).isContentEditable === true);
       const isTextarea = tag === 'TEXTAREA';
       const isTextInput = isTextarea || (tag === 'INPUT' && type && !['radio','checkbox','button','submit'].includes(type!));
+
+      // In revision mode, only allow navigation, not submission
+      if (revisionMode) {
+        // For text inputs in revision mode, don't navigate (let parent handle)
+        if (isTextInput || isEditable) return;
+        
+        // For non-text elements (like MCQ options), allow navigation
+        e.preventDefault();
+        navigateToNextQuestion();
+        return;
+      }
 
       // Results phase: Enter advances to next case when evaluation complete
       if (showResults) {
@@ -518,12 +540,16 @@ export function ClinicalCaseQuestion({
 
       // For MCQ: Enter navigates only if current question is answered
       if (!isTextInput && !isEditable) {
-        if (!isCurrentAnswered) {
-          // Don't navigate if MCQ is not answered
-          return;
-        }
+        // Use setTimeout to ensure answer state has been updated before checking
+        setTimeout(() => {
+          const isNowAnswered = currentQuestion ? isQuestionAnswered(currentQuestion) : false;
+          if (!isNowAnswered) {
+            // Don't navigate if MCQ is not answered
+            return;
+          }
+          navigateToNextQuestion();
+        }, 10);
         e.preventDefault();
-        navigateToNextQuestion();
         return;
       }
     };
@@ -640,7 +666,7 @@ export function ClinicalCaseQuestion({
           (isInlineLayout && showResults)
             ? 'transition-all duration-200 rounded-none border-0 p-0 bg-transparent shadow-none'
             : 'border rounded-xl p-3 bg-card shadow-sm transition-all duration-200'
-        } ${(isCurrentEvaluationTarget || isActiveAnswerTarget) ? 'ring-2 ring-blue-500 shadow-md' : ''}`}
+        } ${(isCurrentEvaluationTarget || isActiveAnswerTarget) ? 'ring-2 ring-blue-500 shadow-md rounded-xl' : ''}`}
         data-question-id={question.id}
         tabIndex={0}
         onClick={() => {
@@ -675,7 +701,6 @@ export function ClinicalCaseQuestion({
                 }
               } else {
                 handleCompleteCase();
-                setTimeout(() => { window.scrollTo({ top: 0, behavior: 'smooth' }); }, 120);
               }
             } else {
               // In results phase, Enter moves to next when allowed
@@ -689,7 +714,7 @@ export function ClinicalCaseQuestion({
       >
         {isInlineLayout ? (
           // Inline layout for compact questions: question number and question content on same line
-          <div className="flex items-start gap-3 mb-1">
+          <div className="flex items-start gap-3 mb-1 mx-2">
             <span
               className={
                 'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold tracking-wide flex-shrink-0 ' +
@@ -825,7 +850,7 @@ export function ClinicalCaseQuestion({
         ) : (
           // Standard layout for MCQ questions: question number above, content below  
           <>
-            <div className="flex items-center mb-2">
+            <div className="flex items-center mb-2 mx-2">
               <span
                 className={
                   'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold tracking-wide ' +
@@ -1109,8 +1134,8 @@ export function ClinicalCaseQuestion({
                       <span className="hidden sm:inline">{showNotesArea ? 'Fermer les notes' : 'Mes notes'}</span>
                     </Button>
 
-                    {/* Next button: only show when evaluation is complete for open questions */}
-                    {(!hasOpen || evaluationComplete) && (
+                    {/* Next button: show immediately when case is complete or no open questions, and show after evaluation for multi-mode with open questions */}
+                    {(isCaseComplete || (!hasOpen || evaluationComplete)) && (
                       <Button onClick={onNext} size="sm" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold">
                         Question suivante
                         <ChevronRight className="h-4 w-4 ml-2" />

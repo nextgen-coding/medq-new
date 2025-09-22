@@ -868,11 +868,6 @@ export function QuestionControlPanel({
                       )}
                       <span className="text-left text-xs text-gray-600 dark:text-gray-400 truncate flex items-center gap-1 w-full">
                         {`${getTypeLabel(question.type)} ${(question as any).displayNumber ?? question.number ?? (question.originalIndex + 1)}`}
-                        {(groupMeta?.multiQroc || groupMeta?.multiMcq) && (
-                          <span className="inline-flex items-center text-[10px] px-1.5 py-0.5 rounded-md bg-medblue-100 text-medblue-700 dark:bg-medblue-900/40 dark:text-medblue-300 font-medium">
-                            {groupMeta.total}x
-                          </span>
-                        )}
                         {extraLabel && (
                           <span className="text-[10px] uppercase tracking-wide text-blue-600 dark:text-blue-300 font-medium">{extraLabel}</span>
                         )}
