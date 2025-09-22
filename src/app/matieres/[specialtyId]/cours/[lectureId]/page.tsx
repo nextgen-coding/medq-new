@@ -309,22 +309,22 @@ export default function CoursPageRoute() {
         if (response.ok) {
           setIsPinned(true);
           toast({
-            title: "Question Pinned",
-            description: "This question has been pinned to your collection.",
+            title: "Question épinglée",
+            description: "Cette question a été ajoutée à votre collection épinglée.",
           });
           window.dispatchEvent(new Event('pinned-updated'));
         } else {
           toast({
-            title: "Error",
-            description: "Failed to pin question.",
+            title: "Erreur",
+            description: "Impossible d'épingler la question.",
             variant: "destructive",
           });
         }
       } catch (error) {
         console.error('Error pinning question:', error);
         toast({
-          title: "Error",
-          description: "Failed to pin question.",
+          title: "Erreur",
+          description: "Impossible d'épingler la question.",
           variant: "destructive",
         });
       }
@@ -346,22 +346,22 @@ export default function CoursPageRoute() {
         if (response.ok) {
           setIsPinned(true);
           toast({
-            title: "Question Pinned",
-            description: "This question has been pinned to your collection.",
+            title: "Question épinglée",
+            description: "Cette question a été ajoutée à votre collection épinglée.",
           });
           window.dispatchEvent(new Event('pinned-updated'));
         } else {
           toast({
-            title: "Error",
-            description: "Failed to pin question.",
+            title: "Erreur",
+            description: "Impossible d'épingler la question.",
             variant: "destructive",
           });
         }
       } catch (error) {
         console.error('Error pinning question:', error);
         toast({
-          title: "Error",
-          description: "Failed to pin question.",
+          title: "Erreur",
+          description: "Impossible d'épingler la question.",
           variant: "destructive",
         });
       }
@@ -385,22 +385,22 @@ export default function CoursPageRoute() {
         if (response.ok) {
           setIsPinned(false);
           toast({
-            title: "Question Unpinned",
-            description: "This question has been removed from your pinned collection.",
+            title: "Question désépinglée",
+            description: "Cette question a été retirée de votre collection épinglée.",
           });
           window.dispatchEvent(new Event('pinned-updated'));
         } else {
           toast({
-            title: "Error",
-            description: "Failed to unpin question.",
+            title: "Erreur",
+            description: "Impossible de désépingler la question.",
             variant: "destructive",
           });
         }
       } catch (error) {
         console.error('Error unpinning question:', error);
         toast({
-          title: "Error",
-          description: "Failed to unpin question.",
+          title: "Erreur",
+          description: "Impossible de désépingler la question.",
           variant: "destructive",
         });
       }
@@ -415,22 +415,22 @@ export default function CoursPageRoute() {
         if (response.ok) {
           setIsPinned(false);
           toast({
-            title: "Question Unpinned",
-            description: "This question has been removed from your pinned collection.",
+            title: "Question désépinglée",
+            description: "Cette question a été retirée de votre collection épinglée.",
           });
           window.dispatchEvent(new Event('pinned-updated'));
         } else {
           toast({
-            title: "Error",
-            description: "Failed to unpin question.",
+            title: "Erreur",
+            description: "Impossible de désépingler la question.",
             variant: "destructive",
           });
         }
       } catch (error) {
         console.error('Error unpinning question:', error);
         toast({
-          title: "Error",
-          description: "Failed to unpin question.",
+          title: "Erreur",
+          description: "Impossible de désépingler la question.",
           variant: "destructive",
         });
       }
