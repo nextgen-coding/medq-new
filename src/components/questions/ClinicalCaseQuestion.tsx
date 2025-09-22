@@ -39,6 +39,56 @@ function generateDeterministicUUID(input: string): string {
   return `${hashStr.slice(0, 8)}-${hashStr.slice(8, 12)}-4${hashStr.slice(12, 15)}-a${hashStr.slice(15, 18)}-${hashStr.slice(18, 30)}`;
 }
 
+// Helper function to calculate proper scroll offset accounting for sticky headers and UI elements
+function calculateScrollOffset(): number {
+  if (typeof window === 'undefined') return 0;
+  
+  let totalOffset = 0;
+  
+  // Account for sticky headers and navigation elements
+  const stickyElements = [
+    // App header (from AppHeader component)
+    'header[class*="sticky"][class*="top-0"]',
+    // Admin header if present
+    '[class*="admin-header"]',
+    // Lecture metadata header (sticky in multi-question mode)
+    '[class*="sticky"][class*="top-"][class*="backdrop-blur"]',
+    // Universal header
+    '[data-universal-header]',
+    // Question metadata bar
+    '[class*="metadata"][class*="sticky"]'
+  ];
+
+  stickyElements.forEach(selector => {
+    const element = document.querySelector(selector);
+    if (element) {
+      const rect = element.getBoundingClientRect();
+      if (rect.height > 0) {
+        totalOffset += rect.height;
+      }
+    }
+  });
+
+  // Add some buffer for visual breathing room
+  totalOffset += 20;
+  
+  return totalOffset;
+}
+
+// Enhanced scroll into view function with proper offset calculation
+function scrollIntoViewWithOffset(element: HTMLElement, behavior: ScrollBehavior = 'smooth') {
+  if (!element) return;
+  
+  const offset = calculateScrollOffset();
+  const elementTop = element.getBoundingClientRect().top + window.pageYOffset;
+  const targetPosition = Math.max(0, elementTop - offset);
+  
+  window.scrollTo({
+    top: targetPosition,
+    behavior
+  });
+}
+
 interface ClinicalCaseQuestionProps {
   clinicalCase: ClinicalCase;
   onSubmit: (caseNumber: number, answers: Record<string, any>, results: Record<string, boolean | 'partial'>) => void;
@@ -135,6 +185,7 @@ export function ClinicalCaseQuestion({
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false);
   const [reportTargetQuestion, setReportTargetQuestion] = useState<Question | null>(null);
   const questionRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const caseTextRef = useRef<HTMLDivElement | null>(null);
 
   // Debug logging for displayMode and question type detection
   console.log('ClinicalCaseQuestion - Props:', {
@@ -144,6 +195,15 @@ export function ClinicalCaseQuestion({
       questions: clinicalCase.questions.map(q => ({ id: q.id, type: (q as any).type }))
     }
   });
+
+  // Initial focus on case text when component loads (non-revision mode)
+  useEffect(() => {
+    if (!revisionMode && caseTextRef.current) {
+      // Focus the case text initially so user reads it first
+      caseTextRef.current.focus();
+      scrollIntoViewWithOffset(caseTextRef.current, 'smooth');
+    }
+  }, [clinicalCase.caseNumber, revisionMode]);
 
   // Count only non-empty answers for progress (arrays with length, non-empty strings, or truthy values)
   const answeredQuestions = clinicalCase.questions.reduce((count, q) => {
@@ -245,7 +305,7 @@ export function ClinicalCaseQuestion({
       if (updatedAnswers[nextQuestion.id] === undefined) {
         const element = questionRefs.current[nextQuestion.id];
         if (element) {
-          element.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
+          scrollIntoViewWithOffset(element, 'smooth');
           // Focus the first input in the next question after scrolling
           setTimeout(() => {
             const firstInput = element.querySelector('input[type="radio"], textarea') as HTMLElement;
@@ -257,6 +317,21 @@ export function ClinicalCaseQuestion({
         break;
       }
     }
+  };
+
+  // Helper function to check if a question is answered
+  const isQuestionAnswered = (question: Question): boolean => {
+    const answer = answers[question.id];
+    if (answer === undefined || answer === null) return false;
+    
+    // For array answers (MCQ), check if any options selected
+    if (Array.isArray(answer)) return answer.length > 0;
+    
+    // For string answers (QROC), check if non-empty after trimming
+    if (typeof answer === 'string') return answer.trim().length > 0;
+    
+    // For other types, just check truthiness
+    return Boolean(answer);
   };
 
   // Utility: focus first input of a question (only for QROC, not MCQ)
@@ -298,7 +373,7 @@ export function ClinicalCaseQuestion({
     }
   };
 
-  // On mount (or case change) set active index but don't auto-scroll to first question
+  // On mount (or case change) set active index and scroll to case text first
   // This allows users to read the case statement first
   useEffect(() => {
     if (clinicalCase.questions.length > 0 && !showResults) {
@@ -307,9 +382,12 @@ export function ClinicalCaseQuestion({
       const targetIndex = firstUnanswered ? clinicalCase.questions.findIndex(q => q.id === firstUnanswered.id) : 0;
       setActiveIndex(targetIndex);
 
-      // Don't auto-scroll - let users read the case statement first
-      // Users can manually scroll to questions or use keyboard navigation
-
+      // Scroll to case text first so user can read it
+      setTimeout(() => {
+        if (caseTextRef.current) {
+          scrollIntoViewWithOffset(caseTextRef.current, 'smooth');
+        }
+      }, 100);
     }
   }, [clinicalCase.caseNumber, showResults]); // Remove answers dep to prevent auto-shifting active frame on each answer
 
@@ -364,15 +442,15 @@ export function ClinicalCaseQuestion({
     // Clear previous results AND answers so restart is clean (no pre-picked options)
     setQuestionResults({});
     setAnswers({});
-    // Scroll to first unanswered (or first question if all answered) but don't focus input
+    // Scroll to case text first so user can read it again
     setTimeout(() => {
-      const firstUnanswered = clinicalCase.questions.find(q => answers[q.id] === undefined);
-      const targetId = firstUnanswered?.id || clinicalCase.questions[0]?.id;
-      if (targetId) {
-        const el = questionRefs.current[targetId];
-        el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        // Don't auto-focus input - let user manually focus when ready
+      if (caseTextRef.current) {
+        scrollIntoViewWithOffset(caseTextRef.current, 'smooth');
       }
+      // Set active index to first question but don't scroll to it yet
+      const firstUnanswered = clinicalCase.questions.find(q => answers[q.id] === undefined);
+      const targetIndex = firstUnanswered ? clinicalCase.questions.findIndex(q => q.id === firstUnanswered.id) : 0;
+      setActiveIndex(targetIndex);
     }, 50);
   };
   const handleShowResults = () => setShowResults(true);
@@ -400,11 +478,13 @@ export function ClinicalCaseQuestion({
     }
   };
 
-  // Keyboard: Enter navigates to next sub-question during answering (only if current is answered);
-  // on results, Enter goes to next main item
+  // Simplified Enter key navigation for clinical cases
   useEffect(() => {
+    if (revisionMode) return; // Don't handle Enter in revision mode
+    
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Enter' || e.ctrlKey || e.metaKey) return;
+      
       const target = e.target as HTMLElement | null;
       const tag = target?.tagName;
       const type = (target as HTMLInputElement | undefined)?.type;
@@ -412,7 +492,7 @@ export function ClinicalCaseQuestion({
       const isTextarea = tag === 'TEXTAREA';
       const isTextInput = isTextarea || (tag === 'INPUT' && type && !['radio','checkbox','button','submit'].includes(type!));
 
-      // Results phase: allow Enter to advance to next item when permitted
+      // Results phase: Enter advances to next case when evaluation complete
       if (showResults) {
         if (evaluationComplete || evaluationOrder.length === 0) {
           e.preventDefault();
@@ -421,47 +501,70 @@ export function ClinicalCaseQuestion({
         return;
       }
 
-      // Answering phase - simplified logic like old versions
-      const currentQ = clinicalCase.questions[activeIndex];
+      // Answering phase - smooth navigation logic
+      const currentQuestion = clinicalCase.questions[activeIndex];
+      const isCurrentAnswered = currentQuestion ? isQuestionAnswered(currentQuestion) : false;
 
-      // For QROC (textarea): Enter always navigates to next, Shift+Enter adds newline
+      // For QROC (textarea): Enter always navigates (Shift+Enter for newlines)
       if (isTextarea && !e.shiftKey) {
         e.preventDefault();
-        // Blur the current textarea so MCQ shortcuts work on next question
+        // Blur current textarea to ensure focus moves properly
         if (target) {
           (target as HTMLElement).blur();
         }
-        // Always navigate on Enter in QROC, like old versions
-      } else if (!isTextInput && !isEditable) {
-        // For MCQ/other inputs: check if answered before navigating
-        const currentAnswered = currentQ ? isQuestionAnswered(currentQ) : false;
-        if (!currentAnswered) {
-          // Unanswered MCQ: do nothing (no navigation)
+        navigateToNextQuestion();
+        return;
+      }
+
+      // For MCQ: Enter navigates only if current question is answered
+      if (!isTextInput && !isEditable) {
+        if (!isCurrentAnswered) {
+          // Don't navigate if MCQ is not answered
           return;
         }
-        if (nextIdx !== -1) {
-          setActiveIndex(nextIdx);
-          const targetQuestion = clinicalCase.questions[nextIdx];
-          const el = questionRefs.current[targetQuestion.id];
-          if (el) {
-            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            // Focus the first input in the target question after scrolling
-            setTimeout(() => {
-              focusFirstInput(targetQuestion.id);
-            }, 500);
-          }
-        } else {
-          // All questions answered, submit
-          handleCompleteCase();
+        e.preventDefault();
+        navigateToNextQuestion();
+        return;
+      }
+    };
+
+    // Helper function for smooth navigation to next question
+    const navigateToNextQuestion = () => {
+      const nextIndex = findNextUnansweredQuestion();
+      
+      if (nextIndex !== -1) {
+        // Move to next question
+        setActiveIndex(nextIndex);
+        const nextQuestion = clinicalCase.questions[nextIndex];
+        const element = questionRefs.current[nextQuestion.id];
+        
+        if (element) {
+          scrollIntoViewWithOffset(element, 'smooth');
+          
+          // Focus appropriate input after scrolling
+          setTimeout(() => {
+            focusFirstInput(nextQuestion.id);
+          }, 300);
         }
       } else {
-        // Last sub-question: submit the whole group (regardless of unanswered), as in the old behavior
+        // All questions answered - submit the case
         handleCompleteCase();
       }
     };
+
+    // Find next unanswered question starting from current active index
+    const findNextUnansweredQuestion = (): number => {
+      for (let i = activeIndex + 1; i < clinicalCase.questions.length; i++) {
+        if (!isQuestionAnswered(clinicalCase.questions[i])) {
+          return i;
+        }
+      }
+      return -1; // All questions answered
+    };
+
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [showResults, evaluationComplete, evaluationOrder, onNext, activeIndex, clinicalCase.questions, answers]);
+  }, [showResults, evaluationComplete, evaluationOrder, onNext, activeIndex, clinicalCase.questions, answers, revisionMode]);
 
   // Scroll to current evaluation question when evaluation index changes
   useEffect(() => {
@@ -470,10 +573,21 @@ export function ClinicalCaseQuestion({
     if (!currentEvalId) return;
     const element = questionRefs.current[currentEvalId];
     if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      scrollIntoViewWithOffset(element, 'smooth');
       // Focus nothing specific to avoid accidental typing; user uses 1/2/3
     }
   }, [evaluationIndex, evaluationOrder, showResults, evaluationComplete]);
+
+  // Scroll to case text when evaluation is complete
+  useEffect(() => {
+    if (evaluationComplete && showResults) {
+      setTimeout(() => {
+        if (caseTextRef.current) {
+          scrollIntoViewWithOffset(caseTextRef.current, 'smooth');
+        }
+      }, 500); // Small delay to let the UI update
+    }
+  }, [evaluationComplete, showResults]);
 
   // Removed document-level Enter handler; Enter navigation is managed globally on the page.
   const getQuestionStatus = (question: Question) => {
@@ -532,9 +646,13 @@ export function ClinicalCaseQuestion({
         onClick={() => {
           if (!showResults) {
             setActiveIndex(index);
-            // Focus the container only - don't auto-focus input
+            // Focus the container and the input for QROC questions
             setTimeout(() => {
               questionRefs.current[question.id]?.focus?.();
+              // If it's a QROC question, also focus the textarea
+              if (question.type === 'clinic_croq') {
+                focusFirstInput(question.id);
+              }
             }, 50);
           }
         }}
@@ -549,7 +667,7 @@ export function ClinicalCaseQuestion({
                 const targetQuestion = clinicalCase.questions[firstUnansweredIndex];
                 const element = questionRefs.current[targetQuestion.id];
                 if (element) {
-                  element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  scrollIntoViewWithOffset(element, 'smooth');
                   // Focus the first input in the target question after scrolling
                   setTimeout(() => {
                     focusFirstInput(targetQuestion.id);
@@ -577,6 +695,7 @@ export function ClinicalCaseQuestion({
                 'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold tracking-wide flex-shrink-0 ' +
                 (!showResults
                   ? (isAnsweredQ ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : 
+                     isActiveAnswerTarget ? 'bg-blue-600 text-white ring-2 ring-blue-300' :
                      'bg-muted text-muted-foreground')
                   : isAnsweredQ
                     ? answerResultQ === true
@@ -590,6 +709,9 @@ export function ClinicalCaseQuestion({
               }
             >
               {index + 1}
+              {isActiveAnswerTarget && !showResults && (
+                <span className="ml-1 text-xs">👈</span>
+              )}
             </span>
             <div className="w-full">
               {/* Question text line with natural width and evaluation indicator */}
@@ -674,6 +796,14 @@ export function ClinicalCaseQuestion({
                     enableAnswerHighlighting={true}
                     // In grouped mode, let the container manage Enter for navigation
                     disableEnterHandlers={true}
+                    // Auto-focus when this question is active
+                    autoFocus={index === activeIndex && !showResults}
+                    // Handle focus events to set active index
+                    onFocus={() => {
+                      if (activeIndex !== index) {
+                        setActiveIndex(index);
+                      }
+                    }}
                   />
                 )}
               </div>
@@ -701,6 +831,7 @@ export function ClinicalCaseQuestion({
                   'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold tracking-wide ' +
                   (!showResults
                     ? (isAnsweredQ ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' : 
+                       isActiveAnswerTarget ? 'bg-blue-600 text-white ring-2 ring-blue-300' :
                        'bg-muted text-muted-foreground')
                     : isAnsweredQ
                       ? answerResultQ === true
@@ -714,6 +845,9 @@ export function ClinicalCaseQuestion({
                 }
               >
                 Question {index + 1}
+                {isActiveAnswerTarget && !showResults && (
+                  <span className="ml-1 text-xs">👈</span>
+                )}
               </span>
               {isAnsweredQ && (
                 <span className="ml-auto inline-flex items-center">
@@ -812,10 +946,19 @@ export function ClinicalCaseQuestion({
       <Card>
         <CardContent className="pt-6">
           {clinicalCase.caseText && (
-            <div className="mb-4">
-              <div className="text-lg sm:text-xl leading-relaxed whitespace-pre-wrap text-foreground font-medium">
+            <div 
+              ref={caseTextRef}
+              className="mb-6 p-4 bg-gray-50 dark:bg-gray-900/20 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-400 transition-all"
+              tabIndex={0}
+            >
+              <div className="text-base sm:text-lg leading-relaxed whitespace-pre-wrap text-foreground font-medium">
                 <HighlightableCaseText lectureId={lectureId} text={clinicalCase.caseText} className="break-words" />
               </div>
+              {!showResults && (
+                <div className="mt-3 text-sm text-gray-600 dark:text-gray-400 font-medium">
+                  📋 Lisez attentivement ce cas clinique puis répondez aux questions ci-dessous
+                </div>
+              )}
             </div>
           )}
           <div className="flex flex-wrap gap-2 mb-4">
@@ -953,7 +1096,10 @@ export function ClinicalCaseQuestion({
                         setNotesManuallyControlled(true);
                         if (newShowNotesArea) {
                           setTimeout(() => {
-                            document.getElementById(`clinical-case-notes-${clinicalCase.caseNumber}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            const notesElement = document.getElementById(`clinical-case-notes-${clinicalCase.caseNumber}`);
+                            if (notesElement) {
+                              scrollIntoViewWithOffset(notesElement, 'smooth');
+                            }
                           }, 30);
                         }
                       }}

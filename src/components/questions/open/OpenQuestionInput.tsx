@@ -10,9 +10,10 @@ interface OpenQuestionInputProps {
   onSubmit?: () => void; // optional submit handler for Enter key
   onBlur?: (answer: string) => void; // callback when leaving input field
   isActive?: boolean; // whether this question is currently active/focused
+  disableEnterKey?: boolean; // when true, defer Enter handling to parent
 }
 
-export function OpenQuestionInput({ answer, setAnswer, isSubmitted, onSubmit, onBlur, isActive = false }: OpenQuestionInputProps) {
+export function OpenQuestionInput({ answer, setAnswer, isSubmitted, onSubmit, onBlur, isActive = false, disableEnterKey = false }: OpenQuestionInputProps) {
   const { t } = useTranslation();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -38,8 +39,14 @@ export function OpenQuestionInput({ answer, setAnswer, isSubmitted, onSubmit, on
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (isSubmitted) return; // textarea is typically disabled when submitted, but guard anyway
     
-    // In grouped mode, completely defer Enter handling to parent
+    // In grouped mode (clinical cases), defer Enter handling to parent
     if (disableEnterKey && e.key === 'Enter') {
+      if (!e.shiftKey) {
+        // Blur the textarea to allow smooth navigation to next question
+        if (textareaRef.current) {
+          textareaRef.current.blur();
+        }
+      }
       return; // let event bubble up to parent handlers
     }
     

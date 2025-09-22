@@ -721,10 +721,10 @@ export function OpenQuestion({
         <OpenQuestionInput
           answer={answer}
           setAnswer={setAnswer}
-      isSubmitted={submitted && !keepInputAfterSubmit}
+          isSubmitted={submitted && !keepInputAfterSubmit}
           onSubmit={handleSubmit}
           onBlur={handleBlur}
-          autoFocusEnabled={autoFocus}
+          isActive={autoFocus}
           disableEnterKey={disableEnterHandlers}
         />
       )}
