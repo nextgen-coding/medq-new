@@ -752,7 +752,7 @@ export function ClinicalCaseQuestion({
                     userAnswer={userAnswerQ as any}
                     hideImmediateResults={!showResults}
                     hideActions
-                    hideNotes={!showResults}
+                    hideNotes={true} // Always hide individual question notes in clinical cases
                     hideComments={true}
                     highlightConfirm
                     hideMeta
@@ -885,7 +885,7 @@ export function ClinicalCaseQuestion({
                 hideImmediateResults={!showResults}
                 // Hide per-question actions; we submit once for all
                 hideActions
-                hideNotes={!showResults}
+                hideNotes={true} // Always hide individual question notes in clinical cases
                 hideComments={true} // Always hide individual question comments in clinical cases
                 highlightConfirm
                 hideMeta

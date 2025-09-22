@@ -300,6 +300,7 @@ model ClinicalCaseNotes {
   notes       String?
   // Personal note image attachments (stored as uploaded URLs or small data URIs)
   notesImageUrls String[] @map("notes_image_urls") @default([])
+  highlights  Json?    // Add highlights field for case text highlighting
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)

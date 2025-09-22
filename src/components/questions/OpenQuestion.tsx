@@ -622,7 +622,7 @@ export function OpenQuestion({
 
             {/* Reference answer inside same card */}
             {canShowReferenceInline && (
-              <div className="rounded-md bg-emerald-50/80 dark:bg-emerald-900/40 px-4 sm:px-5 py-3">
+              <div className="rounded-xl border border-emerald-300/60 dark:border-emerald-600/70 bg-emerald-50/80 dark:bg-emerald-900/40 px-4 sm:px-5 py-3 shadow-sm">
                 <div className="mb-1.5">
                   <h3 className="text-base md:text-lg font-semibold tracking-tight text-emerald-800 dark:text-emerald-50">Réponse</h3>
                 </div>
