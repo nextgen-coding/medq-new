@@ -104,6 +104,7 @@ export function OpenQuestion({
   const [shouldShowUserAnswer, setShouldShowUserAnswer] = useState(false); // Flag to control what to display
   const [notesHasContent, setNotesHasContent] = useState(false); // track if notes have content
   const [notesManuallyControlled, setNotesManuallyControlled] = useState(false); // track if user manually opened/closed notes
+  const [showInlineAnswer, setShowInlineAnswer] = useState(false); // Control inline answer visibility
 
   // Helper function to get color classes based on evaluation result
   const getEvaluationColors = (result: boolean | 'partial' | null | undefined) => {
@@ -371,9 +372,13 @@ export function OpenQuestion({
           setShouldShowUserAnswer(true); // Show user's answer when evaluation is completed
         }
       } else {
-        // Immediate mode
+        // Immediate mode or clinical case after refresh
         setAssessmentCompleted(answerResult !== undefined);
         setShowSelfAssessment(false);
+        // In clinical cases (identified by hideActions + hideMeta), always show user answer if evaluation is complete
+        if (hideActions && hideMeta && answerResult !== undefined) {
+          setShouldShowUserAnswer(true);
+        }
       }
     } else {
       if (!userAnswer) setAnswer('');
@@ -382,8 +387,9 @@ export function OpenQuestion({
       setAssessmentCompleted(false);
       setHasSubmitted(false);
       hasSubmittedRef.current = false;
+      setShouldShowUserAnswer(false); // Reset flag when not answered
     }
-  }, [question.id, isAnswered, answerResult, showDeferredSelfAssessment, userAnswer]);
+  }, [question.id, isAnswered, answerResult, showDeferredSelfAssessment, userAnswer, hideActions, hideMeta]);
 
   const handleSubmit = async () => {
     // In grouped clinical case mode we disable individual submission until parent submits
@@ -736,33 +742,53 @@ export function OpenQuestion({
           {/* Show inline question text when hideMeta is true - with optional eye button */}
           {hideMeta && 
            !(submitted && !hideImmediateResults && !disableIndividualSubmit) && (
-            <div className="flex items-start gap-3 mb-2">
-              {question.number && (
-                <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold tracking-wide flex-shrink-0 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                  Question {question.number}
-                </span>
-              )}
-              <div className="flex-1 min-w-0">
-                <HighlightableQuestionText
-                  questionId={question.id}
-                  text={question.text}
-                  className="mt-0 text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100 leading-relaxed break-words whitespace-pre-wrap"
-                  confirmMode={highlightConfirm}
-                  images={question.images}
-                />
-              </div>
-              {showEyeButton && (question.correct_answers || question.correctAnswers) && ((question.correct_answers && question.correct_answers.length > 0) || (question.correctAnswers && question.correctAnswers.length > 0)) && (
-                <div className="flex-shrink-0 mt-1">
-                  <OpenQuestionHeader 
-                    questionText=""
-                    questionId={undefined}
-                    hideMeta={true}
-                    correctAnswers={question.correct_answers || question.correctAnswers}
-                    showEyeButton={true}
+            <>
+              <div className="flex items-start gap-3 mb-2">
+                {question.number && (
+                  <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold tracking-wide flex-shrink-0 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                    Question {question.number}
+                  </span>
+                )}
+                <div className="flex-1 min-w-0">
+                  <HighlightableQuestionText
+                    questionId={question.id}
+                    text={question.text}
+                    className="mt-0 text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100 leading-relaxed break-words whitespace-pre-wrap"
+                    confirmMode={highlightConfirm}
+                    images={question.images}
                   />
                 </div>
+                {showEyeButton && (question.correct_answers || question.correctAnswers) && ((question.correct_answers && question.correct_answers.length > 0) || (question.correctAnswers && question.correctAnswers.length > 0)) && (
+                  <div className="flex-shrink-0 mt-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowInlineAnswer(!showInlineAnswer)}
+                      className="h-8 w-8 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/20 rounded-md shadow-sm"
+                      title={showInlineAnswer ? "Masquer la réponse" : "Voir la réponse"}
+                    >
+                      {showInlineAnswer ? (
+                        <EyeOff className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      )}
+                    </Button>
+                  </div>
+                )}
+              </div>
+              
+              {/* Show correct answer when eye button is clicked */}
+              {showInlineAnswer && showEyeButton && (question.correct_answers || question.correctAnswers) && ((question.correct_answers && question.correct_answers.length > 0) || (question.correctAnswers && question.correctAnswers.length > 0)) && (
+                <div className="mb-3 rounded-xl border border-green-200 bg-green-50 p-3 dark:border-green-800 dark:bg-green-950">
+                  <div className="text-sm font-medium text-green-800 dark:text-green-200 mb-2">
+                    Réponse attendue :
+                  </div>
+                  <div className="text-sm text-green-700 dark:text-green-300">
+                    <RichTextDisplay content={(question.correct_answers || question.correctAnswers || []).join(', ')} />
+                  </div>
+                </div>
               )}
-            </div>
+            </>
           )}
           {/* Inline media attached to the question (not the reminder) */}
           {(() => {
@@ -798,6 +824,22 @@ export function OpenQuestion({
           </div>
           <div className={`prose prose-sm md:prose-base dark:prose-invert max-w-none leading-relaxed ${shouldShowUserAnswer ? getEvaluationColors(deferredAssessmentResult || answerResult).text : 'text-emerald-800 dark:text-emerald-50'}`}>
             <RichTextDisplay text={shouldShowUserAnswer ? (submittedAnswer || answer || "Aucune réponse saisie") : ((question.correct_answers || question.correctAnswers || []).join(', ') || question.explanation || '')} enableImageZoom={true} />
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Show user answer in clinical/grouped mode after self-assessment */}
+    {hideActions && isAnswered && userAnswer && disableIndividualSubmit && hideImmediateResults && (assessmentCompleted || shouldShowUserAnswer) && (
+      <div className="mt-4">
+        <div className={`rounded-xl border ${shouldShowUserAnswer ? getEvaluationColors(deferredAssessmentResult || answerResult).border : 'border-emerald-300/60 dark:border-emerald-600/70'} ${shouldShowUserAnswer ? getEvaluationColors(deferredAssessmentResult || answerResult).background : 'bg-emerald-50/80 dark:bg-emerald-900/50'} px-6 py-3 shadow-sm`}>
+          <div className="mb-2">
+            <h3 className={`text-base md:text-lg font-bold tracking-tight ${shouldShowUserAnswer ? getEvaluationColors(deferredAssessmentResult || answerResult).text : 'text-emerald-800 dark:text-emerald-50'}`}>
+              Votre réponse
+            </h3>
+          </div>
+          <div className={`prose prose-sm md:prose-base dark:prose-invert max-w-none leading-relaxed ${shouldShowUserAnswer ? getEvaluationColors(deferredAssessmentResult || answerResult).text : 'text-emerald-800 dark:text-emerald-50'}`}>
+            <RichTextDisplay text={submittedAnswer || answer || "Aucune réponse saisie"} enableImageZoom={true} />
           </div>
         </div>
       </div>

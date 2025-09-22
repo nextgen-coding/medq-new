@@ -24,6 +24,27 @@ export function OpenQuestionInput({ answer, setAnswer, isSubmitted, onSubmit, on
       textareaRef.current.focus();
     }
   }, [isSubmitted, isActive]);
+
+  // Add click-outside functionality to blur the textarea when clicking elsewhere
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (textareaRef.current && !textareaRef.current.contains(event.target as Node)) {
+        // Only blur if the textarea is currently focused
+        if (document.activeElement === textareaRef.current) {
+          textareaRef.current.blur();
+        }
+      }
+    };
+
+    // Only add listener when not submitted
+    if (!isSubmitted) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isSubmitted]);
   
   const handleAnswerChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
     if (isSubmitted) return;

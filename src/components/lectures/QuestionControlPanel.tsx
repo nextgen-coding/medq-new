@@ -792,7 +792,18 @@ export function QuestionControlPanel({
               ? groupChildren.every(q => answers[q.id] !== undefined)
               : answers[question.id] !== undefined;
             const isCurrent = question.originalIndex === currentQuestionIndex && !isComplete;
-            const isCorrect = answerResults[question.id];
+            
+            // Calculate isCorrect for groups (similar to clinical cases)
+            let isCorrect: boolean | 'partial' | undefined;
+            if (isGroup && isAnswered) {
+              // For groups (multi QROC/MCQ), calculate result based on individual question results
+              const allCorrect = groupChildren.every(q => answerResults[q.id] === true);
+              const someCorrect = groupChildren.some(q => answerResults[q.id] === true || answerResults[q.id] === 'partial');
+              isCorrect = allCorrect ? true : (someCorrect ? 'partial' : false);
+            } else if (!isGroup) {
+              // For individual questions, use direct result
+              isCorrect = answerResults[question.id];
+            }
             
             // Determine the correct note ID to check
             let noteId = question.id;

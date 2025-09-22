@@ -205,6 +205,50 @@ export function ClinicalCaseQuestion({
     }
   }, [clinicalCase.caseNumber, revisionMode]);
 
+  // Initialize evaluation completion state based on existing results
+  useEffect(() => {
+    if (isAnswered && showResults) {
+      const openIds = clinicalCase.questions
+        .filter(q => (q.type as any) === 'clinic_croq')
+        .map(q => q.id);
+      
+      // Check if all QROC questions have evaluation results
+      const allEvaluated = openIds.length > 0 && openIds.every(id => questionResults[id] !== undefined);
+      
+      if (allEvaluated) {
+        setEvaluationComplete(true);
+        setEvaluationOrder(openIds);
+      } else if (openIds.length === 0) {
+        // No QROC questions, evaluation is complete by default
+        setEvaluationComplete(true);
+      }
+    }
+  }, [isAnswered, showResults, clinicalCase.questions, questionResults]);
+
+  // Separate effect to synchronize parent state with existing evaluation results (run only once on mount)
+  const hasSyncedParent = useRef(false);
+  useEffect(() => {
+    if (isAnswered && showResults && onAnswerUpdate && !hasSyncedParent.current) {
+      const openIds = clinicalCase.questions
+        .filter(q => (q.type as any) === 'clinic_croq')
+        .map(q => q.id);
+      
+      // Check if we have evaluation results that need to be synced with parent
+      const hasResults = openIds.some(id => questionResults[id] !== undefined);
+      
+      if (hasResults) {
+        openIds.forEach(id => {
+          const result = questionResults[id];
+          const userAnswer = answers[id];
+          if (result !== undefined && userAnswer !== undefined) {
+            onAnswerUpdate(id, userAnswer, result);
+          }
+        });
+        hasSyncedParent.current = true;
+      }
+    }
+  }, [isAnswered, showResults, clinicalCase.questions, questionResults, answers, onAnswerUpdate]);
+
   // Count only non-empty answers for progress (arrays with length, non-empty strings, or truthy values)
   const answeredQuestions = clinicalCase.questions.reduce((count, q) => {
     const a = answers[q.id];
@@ -416,6 +460,51 @@ export function ClinicalCaseQuestion({
     // Don't auto-focus next question immediately - wait for Enter key to navigate
     // This allows users to press 1/2 for QCM without jumping to QROC
   };
+
+  // Auto-submit when all questions are answered (for multi QROC mode)
+  const autoSubmitTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  useEffect(() => {
+    // Clear any existing timeout
+    if (autoSubmitTimeoutRef.current) {
+      clearTimeout(autoSubmitTimeoutRef.current);
+      autoSubmitTimeoutRef.current = null;
+    }
+
+    // Only auto-submit if not already completed and not in results mode
+    if (isCaseComplete || showResults) return;
+
+    // For auto-submission, use a more conservative check: require meaningful answers
+    const allMeaningfullyAnswered = clinicalCase.questions.every(question => {
+      const answer = answers[question.id];
+      if (answer === undefined || answer === null) return false;
+      
+      // For array answers (MCQ), check if any options selected
+      if (Array.isArray(answer)) return answer.length > 0;
+      
+      // For string answers (QROC), require at least 3 characters to avoid auto-submission on single keystrokes
+      if (typeof answer === 'string') return answer.trim().length >= 3;
+      
+      // For other types, just check truthiness
+      return Boolean(answer);
+    });
+    
+    if (allMeaningfullyAnswered && clinicalCase.questions.length > 0) {
+      console.log('All questions meaningfully answered, scheduling auto-submission');
+      // Debounced auto-submission - only submit if user stops typing for 1 second
+      autoSubmitTimeoutRef.current = setTimeout(() => {
+        console.log('Auto-submitting case after user stopped typing');
+        handleCompleteCase();
+      }, 1000);
+    }
+
+    // Cleanup function
+    return () => {
+      if (autoSubmitTimeoutRef.current) {
+        clearTimeout(autoSubmitTimeoutRef.current);
+        autoSubmitTimeoutRef.current = null;
+      }
+    };
+  }, [answers, isCaseComplete, showResults, clinicalCase.questions]);
 
   const handleCompleteCase = () => {
     setIsCaseComplete(true);
