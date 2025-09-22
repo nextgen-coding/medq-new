@@ -8,12 +8,13 @@ interface OpenQuestionInputProps {
   setAnswer: (answer: string) => void;
   isSubmitted: boolean;
   onSubmit?: () => void; // optional submit handler for Enter key
+  onSkip?: () => void; // optional skip handler for Enter key when answer is empty
   onBlur?: (answer: string) => void; // callback when leaving input field
   isActive?: boolean; // whether this question is currently active/focused
   disableEnterKey?: boolean; // when true, defer Enter handling to parent
 }
 
-export function OpenQuestionInput({ answer, setAnswer, isSubmitted, onSubmit, onBlur, isActive = false, disableEnterKey = false }: OpenQuestionInputProps) {
+export function OpenQuestionInput({ answer, setAnswer, isSubmitted, onSubmit, onSkip, onBlur, isActive = false, disableEnterKey = false }: OpenQuestionInputProps) {
   const { t } = useTranslation();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -56,7 +57,20 @@ export function OpenQuestionInput({ answer, setAnswer, isSubmitted, onSubmit, on
         return; // allow newline
       }
       e.preventDefault();
-      onSubmit?.();
+      
+      // If answer is empty and onSkip is available, skip instead of submitting
+      if (!answer.trim() && onSkip) {
+        if (textareaRef.current) {
+          textareaRef.current.blur();
+        }
+        // Small delay to ensure blur happens before navigation
+        setTimeout(() => {
+          onSkip();
+        }, 10);
+      } else {
+        // Call onSubmit for actual submission with answer
+        onSubmit?.();
+      }
     }
   };
   

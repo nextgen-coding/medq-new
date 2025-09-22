@@ -80,21 +80,23 @@ export function OpenQuestionHeader({ questionText, questionNumber, session, lect
             <div className="text-sm sm:text-base font-semibold text-foreground dark:text-gray-100">
               {metadataLine}
             </div>
-            {/* Eye button positioned to the far right of the question number */}
+            {/* Eye button positioned to align with question number circle */}
             {showEyeButton && correctAnswers && correctAnswers.length > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowAnswer(!showAnswer)}
-                className="h-8 w-8 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/20 rounded-md"
-                title={showAnswer ? "Masquer la réponse" : "Voir la réponse"}
-              >
-                {showAnswer ? (
-                  <EyeOff className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                ) : (
-                  <Eye className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                )}
-              </Button>
+              <div className="flex-shrink-0">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAnswer(!showAnswer)}
+                  className="h-8 w-8 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/20 rounded-md"
+                  title={showAnswer ? "Masquer la réponse" : "Voir la réponse"}
+                >
+                  {showAnswer ? (
+                    <EyeOff className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  ) : (
+                    <Eye className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  )}
+                </Button>
+              </div>
             )}
           </div>
           {(specialtyName || lectureTitle) && (
@@ -107,8 +109,7 @@ export function OpenQuestionHeader({ questionText, questionNumber, session, lect
       
       {/* Show eye button for clinical contexts even when hideMeta is true */}
       {hideMeta && showEyeButton && correctAnswers && correctAnswers.length > 0 && (
-        <div className="flex items-center justify-end gap-3 mb-3">
-          {/* Eye button on the right */}
+        <div className="flex items-center justify-end mb-2">
           <div className="flex-shrink-0">
             <Button
               variant="ghost"
@@ -139,19 +140,19 @@ export function OpenQuestionHeader({ questionText, questionNumber, session, lect
         </div>
       )}
       
-      {/* Show question text when hideMeta is false (for regular contexts) */}
-      {!hideMeta && questionId ? (
+      {/* Show question text - always show when component is used as main header */}
+      {questionId ? (
         <div data-question-text={questionId}>
           <HighlightableQuestionText
             questionId={questionId}
             text={questionText}
-            className="mt-3 text-base sm:text-lg font-medium text-foreground dark:text-gray-200 break-words whitespace-pre-wrap"
+            className={`${hideMeta ? 'mt-0' : 'mt-3'} text-base sm:text-lg font-medium text-foreground dark:text-gray-200 break-words whitespace-pre-wrap`}
             confirmMode={highlightConfirm}
           />
         </div>
-      ) : !hideMeta ? (
-        <h3 className="mt-3 text-base sm:text-lg font-medium text-foreground dark:text-gray-200 break-words whitespace-pre-wrap">{questionText}</h3>
-      ) : null}
+      ) : (
+        <h3 className={`${hideMeta ? 'mt-0' : 'mt-3'} text-base sm:text-lg font-medium text-foreground dark:text-gray-200 break-words whitespace-pre-wrap`}>{questionText}</h3>
+      )}
     </div>
   );
 }

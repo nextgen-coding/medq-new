@@ -714,7 +714,7 @@ export function ClinicalCaseQuestion({
       >
         {isInlineLayout ? (
           // Inline layout for compact questions: question number and question content on same line
-          <div className="flex items-start gap-3 mb-1 mx-2">
+          <div className="relative flex items-start gap-3 mb-1 mx-2">
             <span
               className={
                 'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold tracking-wide flex-shrink-0 ' +
@@ -818,6 +818,7 @@ export function ClinicalCaseQuestion({
                     highlightConfirm
                     hideMeta={true}
                     suppressReminder={true}
+                    showEyeButton={displayMode !== 'multi_qroc'}
                     enableAnswerHighlighting={true}
                     // In grouped mode, let the container manage Enter for navigation
                     disableEnterHandlers={true}
@@ -834,7 +835,7 @@ export function ClinicalCaseQuestion({
               </div>
             </div>
             {isAnsweredQ && (
-              <span className="inline-flex items-center flex-shrink-0">
+              <span className="absolute top-3 right-3 inline-flex items-center">
                 {showResults ? (
                   <>
                     {answerResultQ === true && <CheckCircle className="h-4 w-4 text-green-600" />}
@@ -850,7 +851,7 @@ export function ClinicalCaseQuestion({
         ) : (
           // Standard layout for MCQ questions: question number above, content below  
           <>
-            <div className="flex items-center mb-2 mx-2">
+            <div className="relative flex items-center mb-2 mx-2">
               <span
                 className={
                   'inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold tracking-wide ' +
@@ -875,7 +876,7 @@ export function ClinicalCaseQuestion({
                 )}
               </span>
               {isAnsweredQ && (
-                <span className="ml-auto inline-flex items-center">
+                <span className="absolute top-2 right-2 inline-flex items-center">
                   {showResults ? (
                     <>
                       {answerResultQ === true && <CheckCircle className="h-4 w-4 text-green-600" />}
@@ -956,6 +957,7 @@ export function ClinicalCaseQuestion({
                 disableEnterHandlers={true}
                 onFocus={() => { if (activeIndex !== index) setActiveIndex(index); }}
                 autoFocus={index === activeIndex}
+                showEyeButton={displayMode !== 'multi_qroc'}
               />
             )}
           </>

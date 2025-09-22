@@ -376,11 +376,41 @@ export default function QuestionsEpingleesTestPage() {
   }
 
   const handleNextQuestion = () => {
-    if (currentQuestionIndex < questions.length - 1) {
-      setCurrentQuestionIndex(prev => prev + 1)
-      setQuestionStartTime(new Date())
+    const currentQuestion = questions[currentQuestionIndex];
+    const isCurrentAnswered = currentQuestion ? answeredQuestions.has(currentQuestion.id) : false;
+    
+    // If current question is not answered, find next unanswered question
+    if (!isCurrentAnswered) {
+      // First, try to find next unanswered question going down
+      for (let i = currentQuestionIndex + 1; i < questions.length; i++) {
+        const question = questions[i];
+        if (!answeredQuestions.has(question.id)) {
+          setCurrentQuestionIndex(i);
+          setQuestionStartTime(new Date());
+          return;
+        }
+      }
+      
+      // If we reached the end going down, go back up to find first unanswered
+      for (let i = 0; i < currentQuestionIndex; i++) {
+        const question = questions[i];
+        if (!answeredQuestions.has(question.id)) {
+          setCurrentQuestionIndex(i);
+          setQuestionStartTime(new Date());
+          return;
+        }
+      }
+      
+      // If all questions are answered, mark as complete
+      setIsTestComplete(true);
     } else {
-      setIsTestComplete(true)
+      // Current question is answered, use normal next behavior
+      if (currentQuestionIndex < questions.length - 1) {
+        setCurrentQuestionIndex(prev => prev + 1);
+        setQuestionStartTime(new Date());
+      } else {
+        setIsTestComplete(true);
+      }
     }
   }
 

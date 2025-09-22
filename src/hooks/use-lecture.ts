@@ -589,17 +589,87 @@ export function useLecture(lectureId: string | undefined, mode?: string | null) 
   }, [lectureId, trackQuestionProgress]);
 
   const handleNext = useCallback(() => {
-    if (currentQuestionIndex < groupedQuestions.length - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
-    } else {
+    // Check if current question is answered
+    const currentQuestion = groupedQuestions[currentQuestionIndex];
+    let isCurrentAnswered = false;
+    
+    if (currentQuestion) {
+      if ('questions' in currentQuestion) {
+        // Clinical case - check if all sub-questions are answered
+        const clinicalCase = currentQuestion as ClinicalCase;
+        isCurrentAnswered = clinicalCase.questions.every(q => answers[q.id] !== undefined);
+      } else {
+        // Regular question - check if it's answered
+        const question = currentQuestion as Question;
+        isCurrentAnswered = answers[question.id] !== undefined;
+      }
+    }
+
+    // If current question is not answered, find next unanswered question
+    if (!isCurrentAnswered) {
+      // First, try to find next unanswered question going down
+      for (let i = currentQuestionIndex + 1; i < groupedQuestions.length; i++) {
+        const question = groupedQuestions[i];
+        let questionAnswered = false;
+        
+        if ('questions' in question) {
+          // Clinical case
+          const clinicalCase = question as ClinicalCase;
+          questionAnswered = clinicalCase.questions.every(q => answers[q.id] !== undefined);
+        } else {
+          // Regular question
+          const regularQuestion = question as Question;
+          questionAnswered = answers[regularQuestion.id] !== undefined;
+        }
+        
+        if (!questionAnswered) {
+          setCurrentQuestionIndex(i);
+          return;
+        }
+      }
+      
+      // If we reached the end going down, go back up to find first unanswered
+      for (let i = 0; i < currentQuestionIndex; i++) {
+        const question = groupedQuestions[i];
+        let questionAnswered = false;
+        
+        if ('questions' in question) {
+          // Clinical case
+          const clinicalCase = question as ClinicalCase;
+          questionAnswered = clinicalCase.questions.every(q => answers[q.id] !== undefined);
+        } else {
+          // Regular question
+          const regularQuestion = question as Question;
+          questionAnswered = answers[regularQuestion.id] !== undefined;
+        }
+        
+        if (!questionAnswered) {
+          setCurrentQuestionIndex(i);
+          return;
+        }
+      }
+      
+      // If all questions are answered, mark as complete
       setIsComplete(true);
       
       // Track lecture completion in database
       if (lectureId) {
         trackLectureProgress(lectureId, true);
       }
+    } else {
+      // Current question is answered, use normal next behavior
+      if (currentQuestionIndex < groupedQuestions.length - 1) {
+        setCurrentQuestionIndex(currentQuestionIndex + 1);
+      } else {
+        setIsComplete(true);
+        
+        // Track lecture completion in database
+        if (lectureId) {
+          trackLectureProgress(lectureId, true);
+        }
+      }
     }
-  }, [currentQuestionIndex, groupedQuestions.length, setCurrentQuestionIndex, lectureId, trackLectureProgress]);
+  }, [currentQuestionIndex, groupedQuestions, answers, setCurrentQuestionIndex, lectureId, trackLectureProgress]);
 
   const handleRestart = useCallback(() => {
     setCurrentQuestionIndex(0);

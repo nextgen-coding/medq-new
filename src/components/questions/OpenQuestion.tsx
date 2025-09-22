@@ -56,6 +56,7 @@ interface OpenQuestionProps {
   disableEnterHandlers?: boolean; // when true, OpenQuestion won't handle Enter; parent handles it
   onFocus?: () => void; // callback when any part of the question receives focus
   autoFocus?: boolean; // control initial autofocus of textarea when active
+  showEyeButton?: boolean; // control whether to show the eye button in header
 }
 
 export function OpenQuestion({ 
@@ -87,6 +88,7 @@ export function OpenQuestion({
   disableEnterHandlers = false,
   onFocus,
   autoFocus = true,
+  showEyeButton = false,
 }: OpenQuestionProps) {
   const [answer, setAnswer] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -616,6 +618,9 @@ export function OpenQuestion({
         event.preventDefault();
         if (answer.trim()) {
           handleSubmit();
+        } else {
+          // Allow skipping to next question even if no answer provided
+          onNext();
         }
         return;
       }
@@ -712,12 +717,8 @@ export function OpenQuestion({
       
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
         <div className="flex-1 min-w-0 max-w-5xl">
-          {/* In simple QROC post-submit wrapper we already show the question text inside the container */}
-          {/* Show header when meta is not hidden OR when we need to show eye button */}
-          {(!hideMeta || ((hideMeta || disableIndividualSubmit) && 
-             (question.correct_answers || question.correctAnswers) && 
-             ((question.correct_answers && question.correct_answers.length > 0) || 
-              (question.correctAnswers && question.correctAnswers.length > 0)))) && 
+          {/* Always ensure question text is visible - either in header or inline */}
+          {!hideMeta && 
            !(submitted && !hideImmediateResults && !disableIndividualSubmit) && (
             <OpenQuestionHeader 
               questionText={question.text} 
@@ -729,23 +730,38 @@ export function OpenQuestion({
               highlightConfirm={highlightConfirm}
               hideMeta={hideMeta}
               correctAnswers={question.correct_answers || question.correctAnswers}
-              showEyeButton={hideMeta || disableIndividualSubmit}
+              showEyeButton={showEyeButton}
             />
           )}
-          {/* Show inline question text only when hideMeta is true AND we're not showing the header */}
-          {hideMeta && !((hideMeta || disableIndividualSubmit) && 
-             (question.correct_answers || question.correctAnswers) && 
-             ((question.correct_answers && question.correct_answers.length > 0) || 
-              (question.correctAnswers && question.correctAnswers.length > 0))) && 
+          {/* Show inline question text when hideMeta is true - with optional eye button */}
+          {hideMeta && 
            !(submitted && !hideImmediateResults && !disableIndividualSubmit) && (
-            <div className="inline-block">
-              <HighlightableQuestionText
-                questionId={question.id}
-                text={question.text}
-                className="mt-0 text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100 leading-relaxed break-words whitespace-pre-wrap inline"
-                confirmMode={highlightConfirm}
-                images={question.images}
-              />
+            <div className="flex items-start gap-3 mb-2">
+              {question.number && (
+                <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold tracking-wide flex-shrink-0 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                  Question {question.number}
+                </span>
+              )}
+              <div className="flex-1 min-w-0">
+                <HighlightableQuestionText
+                  questionId={question.id}
+                  text={question.text}
+                  className="mt-0 text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100 leading-relaxed break-words whitespace-pre-wrap"
+                  confirmMode={highlightConfirm}
+                  images={question.images}
+                />
+              </div>
+              {showEyeButton && (question.correct_answers || question.correctAnswers) && ((question.correct_answers && question.correct_answers.length > 0) || (question.correctAnswers && question.correctAnswers.length > 0)) && (
+                <div className="flex-shrink-0 mt-1">
+                  <OpenQuestionHeader 
+                    questionText=""
+                    questionId={undefined}
+                    hideMeta={true}
+                    correctAnswers={question.correct_answers || question.correctAnswers}
+                    showEyeButton={true}
+                  />
+                </div>
+              )}
             </div>
           )}
           {/* Inline media attached to the question (not the reminder) */}
@@ -798,6 +814,7 @@ export function OpenQuestion({
           setAnswer={setAnswer}
           isSubmitted={submitted && !keepInputAfterSubmit}
           onSubmit={handleSubmit}
+          onSkip={onNext}
           onBlur={handleBlur}
           isActive={autoFocus}
           disableEnterKey={disableEnterHandlers}
