@@ -134,6 +134,60 @@ async function handler(request: AuthenticatedRequest) {
     }
   }
 
+  // DELETE - Delete voucher code
+  if (request.method === 'DELETE') {
+    try {
+      const { searchParams } = new URL(request.url)
+      const voucherId = searchParams.get('id')
+
+      if (!voucherId) {
+        return NextResponse.json(
+          { error: 'Voucher ID is required' },
+          { status: 400 }
+        )
+      }
+
+      // Check if voucher exists and is not used
+      const voucher = await prisma.voucherCode.findUnique({
+        where: { id: voucherId },
+        include: {
+          usage: true
+        }
+      })
+
+      if (!voucher) {
+        return NextResponse.json(
+          { error: 'Voucher not found' },
+          { status: 404 }
+        )
+      }
+
+      if (voucher.isUsed) {
+        return NextResponse.json(
+          { error: 'Cannot delete used voucher' },
+          { status: 400 }
+        )
+      }
+
+      // Delete the voucher
+      await prisma.voucherCode.delete({
+        where: { id: voucherId }
+      })
+
+      return NextResponse.json({
+        success: true,
+        message: 'Voucher deleted successfully'
+      })
+
+    } catch (error) {
+      console.error('Voucher deletion error:', error)
+      return NextResponse.json(
+        { error: 'Internal server error' },
+        { status: 500 }
+      )
+    }
+  }
+
   return NextResponse.json({ error: 'Method not allowed' }, { status: 405 })
 }
 
@@ -146,3 +200,4 @@ function generateVoucherCode(subscriptionType: SubscriptionType): string {
 
 export const GET = requireAuth(handler)
 export const POST = requireAuth(handler)
+export const DELETE = requireAuth(handler)

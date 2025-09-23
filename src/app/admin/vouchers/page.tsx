@@ -21,7 +21,8 @@ import {
   CheckCircle,
   XCircle,
   Filter,
-  Download
+  Download,
+  Trash2
 } from 'lucide-react';
 
 interface VoucherCode {
@@ -49,6 +50,7 @@ export default function AdminVouchersPage() {
   const [vouchers, setVouchers] = useState<VoucherCode[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   
   // Create voucher form state
   const [createForm, setCreateForm] = useState({
@@ -134,6 +136,41 @@ export default function AdminVouchersPage() {
       description: 'Code copié dans le presse-papiers',
       variant: 'default',
     });
+  };
+
+  const handleDeleteVoucher = async (voucherId: string) => {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer ce code de bon ?')) {
+      return;
+    }
+
+    setDeletingId(voucherId);
+    try {
+      const response = await fetch(`/api/admin/vouchers?id=${voucherId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete voucher');
+      }
+
+      toast({
+        title: 'Succès',
+        description: 'Code de bon supprimé avec succès',
+        variant: 'default',
+      });
+
+      fetchVouchers();
+    } catch (error) {
+      console.error('Error deleting voucher:', error);
+      toast({
+        title: 'Erreur',
+        description: error instanceof Error ? error.message : 'Impossible de supprimer le code de bon',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const filteredVouchers = vouchers.filter(voucher => {
@@ -458,16 +495,30 @@ export default function AdminVouchersPage() {
                             </div>
                           </TableCell>
                           <TableCell>
-                            {!voucher.isUsed && !isExpired && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleCopyCode(voucher.code)}
-                              >
-                                <Copy className="h-4 w-4 mr-1" />
-                                Copier
-                              </Button>
-                            )}
+                            <div className="flex items-center gap-2">
+                              {!voucher.isUsed && !isExpired && (
+                                <>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleCopyCode(voucher.code)}
+                                  >
+                                    <Copy className="h-4 w-4 mr-1" />
+                                    Copier
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleDeleteVoucher(voucher.id)}
+                                    disabled={deletingId === voucher.id}
+                                    className="text-red-600 hover:text-red-700"
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-1" />
+                                    {deletingId === voucher.id ? 'Suppression...' : 'Supprimer'}
+                                  </Button>
+                                </>
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
