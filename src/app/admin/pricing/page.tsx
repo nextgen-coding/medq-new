@@ -18,7 +18,9 @@ import {
   Save,
   AlertCircle,
   Eye,
-  EyeOff
+  EyeOff,
+  CreditCard,
+  Phone
 } from 'lucide-react'
 
 interface PricingSettings {
@@ -29,6 +31,8 @@ interface PricingSettings {
   discountPercentage: number | null
   discountStartDate: string | null
   discountEndDate: string | null
+  ribNumber: string | null
+  d17PhoneNumber: string | null
   currency: string
   updatedAt: string
   updater: {
@@ -64,6 +68,8 @@ export default function AdminPricingPage() {
     discountPercentage: 0,
     discountStartDate: '',
     discountEndDate: '',
+    ribNumber: '1234567890',
+    d17PhoneNumber: '+216 12 345 678',
     currency: 'TND'
   })
 
@@ -83,6 +89,8 @@ export default function AdminPricingPage() {
             new Date(data.data.discountStartDate).toISOString().split('T')[0] : '',
           discountEndDate: data.data.discountEndDate ? 
             new Date(data.data.discountEndDate).toISOString().split('T')[0] : '',
+          ribNumber: data.data.ribNumber || '1234567890',
+          d17PhoneNumber: data.data.d17PhoneNumber || '+216 12 345 678',
           currency: data.data.currency
         })
       } else {
@@ -386,6 +394,57 @@ export default function AdminPricingPage() {
           </Card>
 
         </div>
+
+        {/* Payment Details Configuration */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5" />
+              Détails de Paiement
+            </CardTitle>
+            <CardDescription>
+              Configurez les informations de paiement affichées aux utilisateurs
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            
+            <div>
+              <Label htmlFor="ribNumber">Numéro RIB</Label>
+              <Input
+                id="ribNumber"
+                value={formData.ribNumber}
+                onChange={(e) => setFormData(prev => ({ 
+                  ...prev, 
+                  ribNumber: e.target.value 
+                }))}
+                placeholder="1234567890"
+              />
+              <p className="text-sm text-gray-500 mt-1">
+                Numéro de compte bancaire pour les virements
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor="d17PhoneNumber" className="flex items-center gap-2">
+                <Phone className="h-4 w-4" />
+                Numéro D17
+              </Label>
+              <Input
+                id="d17PhoneNumber"
+                value={formData.d17PhoneNumber}
+                onChange={(e) => setFormData(prev => ({ 
+                  ...prev, 
+                  d17PhoneNumber: e.target.value 
+                }))}
+                placeholder="+216 12 345 678"
+              />
+              <p className="text-sm text-gray-500 mt-1">
+                Numéro de téléphone tunisien pour les paiements D17
+              </p>
+            </div>
+
+          </CardContent>
+        </Card>
 
         {/* Preview Prices */}
         {previewMode && (

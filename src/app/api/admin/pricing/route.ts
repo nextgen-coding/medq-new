@@ -34,6 +34,8 @@ export async function GET(request: NextRequest) {
           semesterPrice: 50,
           annualPrice: 120,
           discountEnabled: false,
+          ribNumber: '1234567890',
+          d17PhoneNumber: '+216 12 345 678',
           currency: 'TND',
           updatedBy: authenticatedRequest.user.userId
         },
@@ -114,6 +116,8 @@ export async function PUT(request: NextRequest) {
       discountPercentage,
       discountStartDate,
       discountEndDate,
+      ribNumber,
+      d17PhoneNumber,
       currency
     } = body
 
@@ -162,6 +166,8 @@ export async function PUT(request: NextRequest) {
         discountPercentage: discountEnabled ? discountPercentage : null,
         discountStartDate: discountEnabled && discountStartDate ? new Date(discountStartDate) : null,
         discountEndDate: discountEnabled && discountEndDate ? new Date(discountEndDate) : null,
+        ribNumber: ribNumber || '1234567890',
+        d17PhoneNumber: d17PhoneNumber || '+216 12 345 678',
         currency: currency || 'TND',
         updatedBy: authenticatedRequest.user.userId
       },

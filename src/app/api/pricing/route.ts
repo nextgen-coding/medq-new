@@ -14,6 +14,8 @@ export async function GET() {
         discountPercentage: true,
         discountStartDate: true,
         discountEndDate: true,
+        ribNumber: true,
+        d17PhoneNumber: true,
         currency: true
       }
     })
@@ -27,6 +29,8 @@ export async function GET() {
         discountPercentage: null,
         discountStartDate: null,
         discountEndDate: null,
+        ribNumber: '1234567890',
+        d17PhoneNumber: '+216 12 345 678',
         currency: 'TND'
       }
     }
@@ -67,7 +71,11 @@ export async function GET() {
         },
         currency: pricingSettings.currency,
         isDiscountActive,
-        discountPercentage: isDiscountActive ? pricingSettings.discountPercentage : null
+        discountPercentage: isDiscountActive ? pricingSettings.discountPercentage : null,
+        paymentDetails: {
+          ribNumber: pricingSettings.ribNumber || '1234567890',
+          d17PhoneNumber: pricingSettings.d17PhoneNumber || '+216 12 345 678'
+        }
       }
     }
 
@@ -95,7 +103,11 @@ export async function GET() {
         },
         currency: 'TND',
         isDiscountActive: false,
-        discountPercentage: null
+        discountPercentage: null,
+        paymentDetails: {
+          ribNumber: '1234567890',
+          d17PhoneNumber: '+216 12 345 678'
+        }
       }
     })
   }

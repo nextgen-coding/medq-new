@@ -684,6 +684,10 @@ model PricingSettings {
   discountStartDate     DateTime?      @map("discount_start_date") @db.Timestamptz(6)
   discountEndDate       DateTime?      @map("discount_end_date") @db.Timestamptz(6)
   
+  // Payment details
+  ribNumber             String?        @map("rib_number") @default("1234567890")
+  d17PhoneNumber        String?        @map("d17_phone_number") @default("+216 12 345 678")
+  
   // Currency
   currency              String         @default("TND")
   

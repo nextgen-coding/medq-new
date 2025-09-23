@@ -65,6 +65,10 @@ interface PricingData {
   currency: string
   isDiscountActive: boolean
   discountPercentage: number | null
+  paymentDetails: {
+    ribNumber: string
+    d17PhoneNumber: string
+  }
 }
 
 export default function PaymentPage() {
@@ -104,7 +108,11 @@ export default function PaymentPage() {
           annual: { originalPrice: 120, finalPrice: 120, discountAmount: 0, duration: '12 mois', savings: 20 },
           currency: 'TND',
           isDiscountActive: false,
-          discountPercentage: null
+          discountPercentage: null,
+          paymentDetails: {
+            ribNumber: '1234567890',
+            d17PhoneNumber: '+216 12 345 678'
+          }
         })
       }
     } catch (error) {
@@ -115,7 +123,11 @@ export default function PaymentPage() {
         annual: { originalPrice: 120, finalPrice: 120, discountAmount: 0, duration: '12 mois', savings: 20 },
         currency: 'TND',
         isDiscountActive: false,
-        discountPercentage: null
+        discountPercentage: null,
+        paymentDetails: {
+          ribNumber: '1234567890',
+          d17PhoneNumber: '+216 12 345 678'
+        }
       })
     } finally {
       setIsPricingLoading(false)
@@ -125,6 +137,18 @@ export default function PaymentPage() {
   useEffect(() => {
     fetchPricing()
   }, [])
+
+  // Redirect users with active subscriptions to dashboard
+  useEffect(() => {
+    if (user && user.hasActiveSubscription) {
+      toast({
+        title: "Abonnement actif",
+        description: "Vous avez déjà un abonnement actif. Vous pouvez accéder à tous les contenus premium.",
+        variant: "default"
+      })
+      router.push('/dashboard')
+    }
+  }, [user, router])
 
   // Show loading while pricing is being fetched
   if (isPricingLoading || !pricing) {
@@ -159,6 +183,11 @@ export default function PaymentPage() {
         </AppSidebarProvider>
       </ProtectedRoute>
     )
+  }
+
+  // Don't show upgrade page if user already has an active subscription
+  if (user && user.hasActiveSubscription) {
+    return null // The useEffect will handle the redirect
   }
 
   const handleMethodSelect = (method: PaymentMethod) => {
@@ -313,9 +342,9 @@ export default function PaymentPage() {
   return (
     <ProtectedRoute>
       <AppSidebarProvider>
-        <div className="flex min-h-screen w-full bg-gray-50 dark:bg-gray-900">
+        <div className="flex w-full h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden">
           <AppSidebar />
-          <SidebarInset className="flex-1 flex flex-col">
+          <SidebarInset className="flex flex-col h-full bg-gray-50 dark:bg-gray-900">
             <UniversalHeader
               title="Mise à niveau"
               rightActions={
@@ -330,7 +359,7 @@ export default function PaymentPage() {
               }
             />
 
-            <main className="flex-1 overflow-y-auto">
+            <main className="flex-1 min-h-0 overflow-y-auto">
               <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 
                 {/* Header */}
@@ -519,7 +548,7 @@ export default function PaymentPage() {
                           </div>
                           <CardTitle className="text-lg">Paiement personnalisé</CardTitle>
                           <CardDescription>
-                            Virement ou mobile money
+                            Virement ou D17
                           </CardDescription>
                         </CardHeader>
                         <CardContent>
@@ -534,7 +563,7 @@ export default function PaymentPage() {
                             </li>
                             <li className="flex items-center gap-2">
                               <Check className="h-4 w-4 text-green-500" />
-                              Virement bancaire/mobile
+                              Virement bancaire
                             </li>
                           </ul>
                         </CardContent>
@@ -570,8 +599,8 @@ export default function PaymentPage() {
                                 <AlertCircle className="h-4 w-4" />
                                 <AlertDescription>
                                   <strong>Instructions de paiement :</strong><br />
-                                  • Virement bancaire : RIB 1234567890<br />
-                                  • Mobile Money : +216 12 345 678<br />
+                                  • Virement bancaire : RIB {pricing.paymentDetails.ribNumber}<br />
+                                  • D17 : {pricing.paymentDetails.d17PhoneNumber}<br />
                                   • Montant : {pricing[state.subscriptionType].finalPrice} {pricing.currency}<br />
                                   • Référence : Votre email d'inscription
                                 </AlertDescription>
