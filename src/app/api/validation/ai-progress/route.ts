@@ -3,16 +3,92 @@ import { requireMaintainerOrAdmin, AuthenticatedRequest } from '@/lib/auth-middl
 import { analyzeMcqInChunks } from '@/lib/services/aiImport';
 import { isAzureConfigured, chatCompletion, chatCompletionStructured } from '@/lib/ai/azureAiSdk';
 import { prisma } from '@/lib/prisma';
-// Remove canonicalizeHeader import for now
-function canonicalizeHeader(h: string): string {
-  return String(h || '')
+// Canonicalize headers exactly like the import endpoint
+const normalizeHeader = (h: string): string =>
+  String(h || '')
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\s+/g, ' ')
+    .replace(/[\u0300-\u036f]/g, '') // remove accents
+    .replace(/[^\w\s]/g, ' ') // punctuation to spaces
+    .replace(/\s+/g, ' ') // collapse
     .trim();
+
+const headerAliases: Record<string, string> = {
+  // canonical keys
+  'matiere': 'matiere',
+  'cours': 'cours',
+  'question n': 'question n',
+  'question no': 'question n',
+  'question n°': 'question n',
+  'source': 'source',
+  'texte de la question': 'texte de la question',
+  'texte question': 'texte de la question',
+  'texte de question': 'texte de la question',
+  'texte du cas': 'texte du cas',
+  'texte cas': 'texte du cas',
+  'option a': 'option a',
+  'option b': 'option b',
+  'option c': 'option c',
+  'option d': 'option d',
+  'option e': 'option e',
+  'reponse': 'reponse',
+  'reponse(s)': 'reponse',
+  'cas n': 'cas n',
+  'cas no': 'cas n',
+  'cas n°': 'cas n',
+  // optional columns
+  'explication': 'explication',
+  'explication de la reponse': 'explication',
+  'explication de la réponse': 'explication',
+  'explication reponse': 'explication',
+  'explanation': 'explication',
+  'correction': 'explication',
+  // per-option explanations
+  'explication a': 'explication a',
+  'explication b': 'explication b',
+  'explication c': 'explication c',
+  'explication d': 'explication d',
+  'explication e': 'explication e',
+  // sometimes with option letter capitalized
+  'explication A': 'explication a',
+  'explication B': 'explication b',
+  'explication C': 'explication c',
+  'explication D': 'explication d',
+  'explication E': 'explication e',
+  'niveau': 'niveau',
+  'level': 'niveau',
+  'semestre': 'semestre',
+  'semester': 'semestre',
+  // course reminder (rappel) columns
+  'rappel': 'rappel',
+  'rappel du cours': 'rappel',
+  'rappel cours': 'rappel',
+  'course reminder': 'rappel',
+  'rappel_cours': 'rappel',
+  // explicit media/image columns
+  'image': 'image',
+  'image url': 'image',
+  'image_url': 'image',
+  'media': 'image',
+  'media url': 'image',
+  'media_url': 'image',
+  'illustration': 'image',
+  'illustration url': 'image'
+};
+
+function canonicalizeHeader(h: string): string {
+  const n = normalizeHeader(h);
+  return headerAliases[n] ?? n;
 }
 import { read, utils, write } from 'xlsx';
+
+// Canonical import headers expected by /api/questions/bulk-import-progress
+const IMPORT_HEADERS = [
+  'matiere', 'cours', 'question n', 'cas n', 'texte du cas', 'texte de la question',
+  'reponse', 'option a', 'option b', 'option c', 'option d', 'option e',
+  'rappel', 'explication', 'explication a', 'explication b', 'explication c', 'explication d', 'explication e',
+  'image', 'niveau', 'semestre'
+] as const;
 
 type SheetName = 'qcm' | 'cas_qcm' | 'qroc' | 'cas_qroc';
 
@@ -146,16 +222,20 @@ function mapSheetName(s: string): SheetName | null {
 // - clear if it becomes only a bare niveau without year/session
 function cleanSource(raw?: string | null): string {
   if (!raw) return '';
-  let cleaned = String(raw).trim();
-  // Remove brackets and parentheses
-  cleaned = cleaned.replace(/[()[\]]/g, ' ');
-  // Remove surrounding quotes
-  cleaned = cleaned.replace(/^["']|["']$/g, '');
-  // Collapse multiple spaces/commas
-  cleaned = cleaned.replace(/[,\s]+/g, ' ').trim();
-  // If result is just a niveau pattern without year/session info, clear it
-  if (/^(PCEM|DCEM)\s*\d*$/i.test(cleaned)) return '';
-  return cleaned;
+  let s = String(raw).trim();
+  // Remove bracketed segments entirely (including their contents)
+  s = s.replace(/\[[^\]]*\]/g, ' ').replace(/\([^)]*\)/g, ' ');
+  // Remove surrounding quotes once
+  s = s.replace(/^['"]|['"]$/g, '');
+  // Remove niveau/grade tokens (PCEM/DCEM + number, and 'Niveau 1/2/...')
+  s = s.replace(/\b(?:PCEM|DCEM)\s*\d\b/gi, ' ');
+  s = s.replace(/\bniveau\s*\d+\b/gi, ' ');
+  // Collapse multiple separators and trim
+  s = s.replace(/[;,\s]+/g, ' ').trim();
+  // If remains only a bare niveau keyword, drop it
+  if (/^(PCEM|DCEM)\s*\d*$/i.test(s)) return '';
+  if (/^NIVEAU\s*\d+$/i.test(s)) return '';
+  return s;
 }
 
 async function runAiSession(file: File, instructions: string | undefined, aiId: string) {
@@ -245,17 +325,28 @@ async function runAiSession(file: File, instructions: string | undefined, aiId: 
       letters.sort((a,b) => order.indexOf(a) - order.indexOf(b));
       return letters.join(', ');
     };
+    const splitSentences = (t: string) => String(t || '')
+      .replace(/\s+/g, ' ')
+      .split(/(?<=[\.!?])\s+/)
+      .map(x => x.trim())
+      .filter(Boolean);
+    const clamp2to4Sentences = (t: string) => {
+      let arr = splitSentences(t);
+      if (arr.length === 0) return '';
+      if (arr.length > 4) arr = arr.slice(0, 4);
+      // Ensure each sentence ends with a period
+      arr = arr.map(x => /[\.!?]$/.test(x) ? x : x + '.');
+      return arr.join(' ');
+    };
     const explanationTooShort = (s: string) => {
       const txt = String(s || '').trim();
       if (!txt) return true;
-      // Count sentences by punctuation and also tolerate newline-structured segments
-      const punct = (txt.match(/[\.\!?]/g) || []).length;
-      const lines = txt.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-      const lineCount = lines.length;
-      // Accept if either >=3 punct sentences OR >=4 non-empty lines and length >= 120
-      if (punct >= 3 && txt.length >= 120) return false;
-      if (lineCount >= 4 && txt.length >= 120) return false;
-      return true;
+      const sentences = splitSentences(txt);
+      // Require 2–4 sentences and reasonable length
+      if (sentences.length < 2) return true;
+      if (sentences.length > 4) return false; // we'll trim later
+      const totalLen = txt.replace(/\s+/g, ' ').length;
+      return totalLen < 80; // minimal content requirement
     };
     // Choose varied openers deterministically without randomness
     const pickOpener = (isCorrect: boolean, seed: number) => {
@@ -273,21 +364,17 @@ async function runAiSession(file: File, instructions: string | undefined, aiId: 
     const fallbackExplanation = (isCorrect: boolean, optionText?: string, stem?: string) => {
       const seed = strSeed((optionText || '') + '|' + (stem || ''));
       const opener = pickOpener(isCorrect, seed);
-      const lines: string[] = [];
       const optLead = String(optionText || '').trim();
-      if (optLead) {
-        lines.push(`${opener}: ${isCorrect ? 'proposition correcte' : 'proposition incorrecte'} — ${optLead}.`);
-      } else {
-        lines.push(`${opener}: ${isCorrect ? 'proposition correcte' : 'proposition incorrecte'} — justification clinique.`);
-      }
-      if (stem) lines.push(`Contexte: ${stem}.`);
-      lines.push(isCorrect
-        ? 'Physiopathologie: mécanisme clé et critère décisif (clinique/paraclinique) avec conséquence attendue.'
-        : 'Correction: énonce la bonne notion attendue et distingue le piège fréquent/diagnostic différentiel.');
-      lines.push('Repère clinique: seuil chiffré raisonnable ou signe discriminant à retenir.');
-      lines.push('Exemple: mini‑vignette (âge, déclencheur, signe cardinal) et l’élément qui tranche.');
-      if (optionText) lines.push(`Option considérée: ${optionText}.`);
-      return lines.join('\n');
+      const intro = optLead
+        ? `${opener}: ${isCorrect ? 'proposition correcte' : 'proposition incorrecte'} — ${optLead}.`
+        : `${opener}: ${isCorrect ? 'proposition correcte' : 'proposition incorrecte'} — justification clinique.`;
+      const ctx = stem ? `Contexte: ${stem}.` : '';
+      const core = isCorrect
+        ? 'Argumentation clinique: critère diagnostique clé et élément différentiel avec un exemple chiffré.'
+        : 'Correction ciblée: rectifie l’idée et précise le piège fréquent avec l’élément discriminant.';
+      const tip = 'Repère à retenir: seuil ou signe précis utile en pratique.';
+      const para = [intro, ctx, core, tip].filter(Boolean).join(' ');
+      return clamp2to4Sentences(para);
     };
     const fallbackRappel = (stem?: string) => {
       const lines: string[] = [];
@@ -341,9 +428,15 @@ async function runAiSession(file: File, instructions: string | undefined, aiId: 
     const t0 = Date.now();
     let processed = 0;
     const SINGLE = String(process.env.AI_QCM_SINGLE || '').trim() === '1' || String(process.env.AI_QCM_MODE || '').trim().toLowerCase() === 'single';
-  // Ultra-reliable batch: small size prevents JSON truncation, high concurrency maintains speed
-  const BATCH_SIZE = SINGLE ? 1 : Number(process.env.AI_IMPORT_BATCH_SIZE || process.env.AI_BATCH_SIZE || 8);
-  const CONCURRENCY = SINGLE ? 1 : Number(process.env.AI_IMPORT_CONCURRENCY || process.env.AI_CONCURRENCY || 12);
+  // TURBO MODE BY DEFAULT: Maximum speed with 50 batch size + 50 concurrency
+  // Set AI_SLOW_MODE=1 to use conservative settings (20 batch, 30 concurrency)
+  const slowMode = process.env.AI_SLOW_MODE === '1';
+  const envBatchSize = process.env.AI_IMPORT_BATCH_SIZE || process.env.AI_BATCH_SIZE;
+  const envConcurrency = process.env.AI_IMPORT_CONCURRENCY || process.env.AI_CONCURRENCY;
+  const BATCH_SIZE = SINGLE ? 1 : (slowMode ? 20 : (envBatchSize ? Number(envBatchSize) : 50));
+  const CONCURRENCY = SINGLE ? 1 : (slowMode ? 30 : (envConcurrency ? Number(envConcurrency) : 50));
+  
+  console.log(`[AI] Configured: BATCH_SIZE=${BATCH_SIZE}, CONCURRENCY=${CONCURRENCY}, SINGLE=${SINGLE}, slowMode=${slowMode}`);
     let resultMap: Map<string, any> = new Map();
     try {
       const arr = await analyzeMcqInChunks(items, {
@@ -401,10 +494,24 @@ Format:
   async function analyzeQrocBatch(batch: QrocItem[]): Promise<Map<string, QrocOK>> {
       if (!batch.length) return new Map();
       const user = JSON.stringify({ task: 'qroc_explanations', items: batch });
-      const { content } = await chatCompletion([
-        { role: 'system', content: qrocSystemPrompt },
-        { role: 'user', content: user }
-  ], { maxTokens: 800 }); // Faster responses for QROC and avoid truncation
+      
+      // Use structured generation for QROC to avoid JSON parse failures
+      let content = '';
+      try {
+        const result = await chatCompletionStructured([
+          { role: 'system', content: qrocSystemPrompt },
+          { role: 'user', content: user }
+        ], { maxTokens: 800 });
+        content = result.content;
+      } catch (err: any) {
+        console.warn('[AI] QROC structured failed, falling back to REST:', err?.message || err);
+        const restResult = await chatCompletion([
+          { role: 'system', content: qrocSystemPrompt },
+          { role: 'user', content: user }
+        ], { maxTokens: 800 });
+        content = restResult.content;
+      }
+      
       let parsed: any = null;
       try { parsed = JSON.parse(content); } catch { parsed = { results: [] }; }
   const out = new Map<string, QrocOK>();
@@ -418,7 +525,7 @@ Format:
       return out;
     }
 
-  async function analyzeQrocInChunks(items: QrocItem[], batchSize = 8): Promise<Map<string, QrocOK>> {
+  async function analyzeQrocInChunks(items: QrocItem[], batchSize = 50): Promise<Map<string, QrocOK>> {
       const map = new Map<string, QrocOK>();
       let batchIndex = 0;
       for (let i = 0; i < items.length; i += batchSize) {
@@ -571,14 +678,21 @@ Format:
           let needsEnhance = false;
           for (let j = 0; j < options.length; j++) {
             const k = `explication ${letters[j]}`;
-            const val = String(aiExpl[j] || '').trim();
-            const tooShort = (!val || explanationTooShort(val));
+            const raw = String(aiExpl[j] || '').trim();
+            let val = raw;
+            let tooShort = (!val || explanationTooShort(val));
+            if (!tooShort) {
+              // Enforce 2–4 sentences
+              val = clamp2to4Sentences(val);
+              tooShort = explanationTooShort(val);
+            }
             rec[k] = tooShort ? fallbackExplanation(correctSet.has(j), options[j], rec['texte de la question'] || rec['texte du cas']) : val;
             if (tooShort) needsEnhance = true;
           }
-          const rpl = String(ai.globalExplanation || '').trim();
-          const rappelTooShort = !(rpl && !explanationTooShort(rpl));
-          rec['rappel'] = rappelTooShort ? fallbackRappel(rec['texte de la question'] || rec['texte du cas']) : rpl;
+          const rplRaw = String(ai.globalExplanation || '').trim();
+          const rplNorm = rplRaw ? clamp2to4Sentences(rplRaw) : '';
+          const rappelTooShort = !(rplNorm && !explanationTooShort(rplNorm));
+          rec['rappel'] = rappelTooShort ? fallbackRappel(rec['texte de la question'] || rec['texte du cas']) : rplNorm;
           if (rappelTooShort) needsEnhance = true;
           if (needsEnhance) {
             enhanceTargets.push({
@@ -619,7 +733,7 @@ Format:
         if (hasAnswer) rec['reponse'] = cleanAnswerText(rec['reponse']);
         if (ai && ai.explanation) {
           if (!hasAnswer && ai.answer) rec['reponse'] = cleanAnswerText(String(ai.answer).trim()) || 'À préciser';
-          const expl = String(ai.explanation).trim();
+          const expl = clamp2to4Sentences(String(ai.explanation).trim());
           if (expl && !explanationTooShort(expl)) rec['rappel'] = expl; // use rappel only for QROC
         }
         // Guarantee rappel
@@ -656,10 +770,12 @@ Format:
 
       // Sanitize matiere: letters/digits/spaces only
       const sanitizeMatiere = (m?: string) => String(m || '').normalize('NFC').replace(/[^A-Za-zÀ-ÖØ-öø-ÿ0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+      const computedMatiere = sanitizeMatiere(outMatiere);
+      const computedCours = (String(rec['cours'] ?? '').trim()) || computedMatiere || '';
       const obj: any = {
         niveau: outNiveau ?? '',
-        matiere: sanitizeMatiere(outMatiere),
-        cours: rec['cours'] ?? '',
+        matiere: computedMatiere,
+        cours: computedCours,
         source: cleanSource(rec['source'] ?? ''),
         'question n': rec['question n'] ?? '',
         'cas n': rec['cas n'] ?? '',
@@ -694,7 +810,7 @@ Format:
         const keys = ['explication a','explication b','explication c','explication d','explication e'];
         for (let i = 0; i < keys.length; i++) {
           const k = keys[i];
-          let txt = String((obj as any)[k] || '').trim();
+          let txt = clamp2to4Sentences(String((obj as any)[k] || '').trim());
           if (!txt) continue;
           const isCorr = correctIdx.has(i);
           const arr = isCorr ? POS : NEG;
@@ -718,41 +834,49 @@ Format:
   async function enhanceMcqRows(targets: typeof enhanceTargets) {
       const items = targets.map(t => ({ id: t.id, questionText: t.questionText, options: t.options }));
       if (!items.length) return new Map<string, any>();
-  const system = `Tu es PROFESSEUR de médecine expérimenté qui génère des explications DÉTAILLÉES et PARFAITES pour chaque option de QCM.
+  const system = `Tu es PROFESSEUR de médecine expérimenté qui génère des explications CLAIRES et PRATIQUES pour chaque option de QCM.
 
 EXIGENCES IMPÉRATIVES:
-1. DIVERSITÉ ABSOLUE des connecteurs d'ouverture - JAMAIS de répétition.
-2. CONTENU SPÉCIFIQUE OBLIGATOIRE par option (4–6 phrases COMPLÈTES) : 
-   - Mécanisme physiopathologique DÉTAILLÉ
-   - Critères diagnostiques PRÉCIS avec seuils chiffrés EXACTS
-   - Diagnostic différentiel COMPLET
-   - Exemple clinique CONCRET (âge/contexte/signes spécifiques)
-   - Nuances cliniques IMPORTANTES
+1. DIVERSITÉ ABSOLUE des connecteurs d'ouverture — JAMAIS de répétition.
+2. CONTENU SPÉCIFIQUE OBLIGATOIRE par option (2–4 phrases COMPLÈTES) :
+   - Référence explicite à l’option considérée
+   - Mécanisme/critère CLINIQUE pertinent avec un chiffre ou repère
+   - Mini exemple clinique CONCRET (âge/contexte/signe clef)
 3. Chaque phrase se termine OBLIGATOIREMENT par un point.
-4. RAPPEL DU COURS (3–5 phrases COMPLÈTES) clair et PARFAITEMENT détaillé.
+4. RAPPEL DU COURS (3–5 phrases COMPLÈTES) clair, structuré et sans redondance.
 
 LONGUEUR OBLIGATOIRE:
-- Chaque explication: MINIMUM 4 phrases, MAXIMUM 6 phrases
+- Chaque explication: MINIMUM 2 phrases, MAXIMUM 4 phrases
 - Rappel: MINIMUM 3 phrases, MAXIMUM 5 phrases
-- TOUT doit être COMPLET, DÉTAILLÉ, SANS AMBIGUÏTÉ
+- TOUT doit être CLAIR, PRÉCIS, SANS AMBIGUÏTÉ
 
 SORTIE JSON STRICTE:
-{ "results": [ { "id":"<id>", "optionExplanations":["explication A complète 4-6 phrases", "explication B complète 4-6 phrases", ...], "globalExplanation":"rappel complet 3-5 phrases" } ] }`;
+{ "results": [ { "id":"<id>", "optionExplanations":["explication A 2-4 phrases", "explication B 2-4 phrases", ...], "globalExplanation":"rappel 3-5 phrases" } ] }`;
 
       const out = new Map<string, any>();
-      const BATCH = 8; // ultra-reliable size - no truncation, fast processing
+      const BATCH = 50; // maximum speed processing - large batches for ultimate throughput
       for (let i = 0; i < items.length; i += BATCH) {
         const slice = items.slice(i, i + BATCH);
         const user = JSON.stringify({ task: 'enhance_mcq_rows', items: slice });
         let content = '';
         try {
-          const res = await chatCompletion([
+          // Use structured generation for enhancement to avoid JSON parse failures
+          const res = await chatCompletionStructured([
             { role: 'system', content: system },
             { role: 'user', content: user }
-          ], { maxTokens: 800 }); // Ultra-fast with shorter responses
+          ], { maxTokens: 800 });
           content = res.content;
-        } catch {
-          continue;
+        } catch (err: any) {
+          console.warn('[AI] Enhancement structured failed, falling back to REST:', err?.message || err);
+          try {
+            const res = await chatCompletion([
+              { role: 'system', content: system },
+              { role: 'user', content: user }
+            ], { maxTokens: 800 });
+            content = res.content;
+          } catch {
+            continue;
+          }
         }
         try {
           const parsed = JSON.parse(content);
@@ -792,13 +916,12 @@ SORTIE JSON STRICTE:
       }
     }
 
-    // Build workbook: per-type corrected sheets + Erreurs sheet
-  const header = ['niveau','matiere','cours','source','question n','cas n','texte du cas','texte de la question','reponse','option a','option b','option c','option d','option e','rappel','explication a','explication b','explication c','explication d','explication e','ai_status','ai_reason'];
+    // Build workbook: per-type corrected sheets using import-ready headers
     const wb = utils.book_new();
     (['qcm','qroc','cas_qcm','cas_qroc'] as SheetName[]).forEach(s => {
       const arr = correctedBySheet[s];
       if (arr && arr.length) {
-        const ws = utils.json_to_sheet(arr, { header });
+        const ws = utils.json_to_sheet(arr, { header: [...IMPORT_HEADERS] as any });
         utils.book_append_sheet(wb, ws, s);
       }
     });

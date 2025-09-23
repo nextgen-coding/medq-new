@@ -493,3 +493,17 @@ The system uses a background job manager that:
 - Stores processing results and metadata
 
 This comprehensive validation system provides a robust, user-friendly interface for managing AI-powered medical question validation with real-time progress tracking and efficient job management.
+
+## 📥 Export compatible avec l'import
+
+Depuis cette mise à jour, quand vous téléchargez le fichier des « Valides » dans la page Admin → Validation, le fichier Excel généré est directement prêt pour l'import:
+
+- 4 onglets canoniques: `qcm`, `qroc`, `cas_qcm`, `cas_qroc`
+- En-têtes strictement identiques à ceux attendus par l'import:
+  - `matiere`, `cours`, `question n`, `cas n`, `texte du cas`, `texte de la question`,
+  - `reponse`, `option a`, `option b`, `option c`, `option d`, `option e`,
+  - `rappel`, `explication`, `explication a`, `explication b`, `explication c`, `explication d`, `explication e`,
+  - `image`, `niveau`, `semestre`
+- Les onglets vides ne sont pas créés (l'import les accepte absents)
+
+Le fichier « Erreurs » reste en un seul onglet `Erreurs` à visée diagnostique et n'est pas destiné à l'import direct.
