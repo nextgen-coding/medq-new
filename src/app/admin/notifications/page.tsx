@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { ArrowLeft } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -149,9 +150,21 @@ export default function AdminNotificationsPage() {
       <AdminRoute>
         <AdminLayout>
           <div className="space-y-6">
-            <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">Notifications</h1>
-              <p className="text-muted-foreground text-sm">Envoyer des notifications ciblées aux utilisateurs.</p>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <Button
+                  variant="outline"
+                  onClick={() => window.location.href = '/admin/inbox'}
+                  className="text-sm border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-950/50 shadow-sm transition-all duration-200"
+                >
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Retour à la boîte de réception
+                </Button>
+                <div>
+                  <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">Notifications</h1>
+                  <p className="text-muted-foreground text-sm">Envoyer des notifications ciblées aux utilisateurs.</p>
+                </div>
+              </div>
             </div>
 
             <div className="grid gap-6 lg:grid-cols-3">

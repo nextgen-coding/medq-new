@@ -39,6 +39,13 @@ export default function ProfilePageRoute() {
     setIsClient(true);
   }, []);
 
+  // Always fetch fresh user data when the profile page loads
+  useEffect(() => {
+    if (isClient) {
+      refreshUser();
+    }
+  }, [isClient, refreshUser]);
+
   // Niveaux state
   const [niveaux, setNiveaux] = useState<{ id: string; name: string }[]>([])
 
@@ -333,7 +340,10 @@ export default function ProfilePageRoute() {
                           </div>
                           {!user?.hasActiveSubscription && (
                             <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-                              <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105">
+                              <Button 
+                                onClick={() => window.location.href = '/upgrade'}
+                                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+                              >
                                 <Crown className="h-4 w-4 mr-2" />
                                 Passer au Plan Pro
                               </Button>

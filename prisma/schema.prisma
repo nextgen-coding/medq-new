@@ -20,6 +20,28 @@ enum ReportType {
   correction_erronee    // Correction erronée
 }
 
+// Payment system enums
+enum PaymentMethod {
+  konnect_gateway
+  voucher_code
+  custom_payment
+}
+
+enum PaymentStatus {
+  pending
+  completed
+  failed
+  cancelled
+  awaiting_verification
+  verified
+  rejected
+}
+
+enum SubscriptionType {
+  semester
+  annual
+}
+
 model User {
   id                    String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   email                 String         @unique(map: "profiles_email_idx")
@@ -68,6 +90,12 @@ model User {
   clinicalCaseNotes             ClinicalCaseNotes[]
   // Clinical case comments relation
   clinicalCaseComments          ClinicalCaseComment[]
+  // Payment system relations
+  payments                      Payment[]
+  usedVoucherCodes             VoucherCodeUsage[]
+  verifiedPayments             Payment[]        @relation("PaymentVerifier")
+  createdVoucherCodes          VoucherCode[]    @relation("VoucherCreator")
+  updatedPricingSettings       PricingSettings[]
 
   @@map("profiles")
 }
@@ -571,3 +599,106 @@ model RagChunk {
   @@index([indexId], map: "idx_ragchunk_index")
   @@map("rag_chunks")
 }
+
+// Payment system models
+model Payment {
+  id                    String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId                String         @map("user_id") @db.Uuid
+  amount                Float
+  currency              String         @default("TND")
+  method                PaymentMethod
+  status                PaymentStatus  @default(pending)
+  subscriptionType      SubscriptionType
+  
+  // Konnect gateway fields
+  konnectPaymentRef     String?        @map("konnect_payment_ref")
+  konnectPayUrl         String?        @map("konnect_pay_url")
+  
+  // Voucher code fields
+  voucherCodeId         String?        @map("voucher_code_id") @db.Uuid
+  
+  // Custom payment fields
+  customPaymentDetails  String?        @map("custom_payment_details") // Phone number, bank details, etc.
+  proofImageUrl         String?        @map("proof_image_url")
+  adminNotes            String?        @map("admin_notes")
+  verifiedBy            String?        @map("verified_by") @db.Uuid
+  verifiedAt            DateTime?      @map("verified_at") @db.Timestamptz(6)
+  
+  createdAt             DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  
+  // Relations
+  user                  User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  voucherCode           VoucherCode?   @relation(fields: [voucherCodeId], references: [id])
+  verifier              User?          @relation("PaymentVerifier", fields: [verifiedBy], references: [id])
+
+  @@index([userId], map: "idx_payments_user")
+  @@index([status], map: "idx_payments_status")
+  @@map("payments")
+}
+
+model VoucherCode {
+  id               String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code             String         @unique
+  subscriptionType SubscriptionType
+  isUsed           Boolean        @default(false) @map("is_used")
+  usedAt           DateTime?      @map("used_at") @db.Timestamptz(6)
+  expiresAt        DateTime?      @map("expires_at") @db.Timestamptz(6)
+  createdBy        String         @map("created_by") @db.Uuid
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  
+  // Relations
+  creator          User           @relation("VoucherCreator", fields: [createdBy], references: [id])
+  payments         Payment[]
+  usage            VoucherCodeUsage[]
+
+  @@index([code], map: "idx_voucher_code")
+  @@index([isUsed], map: "idx_voucher_used")
+  @@map("voucher_codes")
+}
+
+model VoucherCodeUsage {
+  id            String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId        String      @map("user_id") @db.Uuid
+  voucherCodeId String      @map("voucher_code_id") @db.Uuid
+  usedAt        DateTime    @default(now()) @map("used_at") @db.Timestamptz(6)
+  
+  // Relations
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  voucherCode   VoucherCode @relation(fields: [voucherCodeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, voucherCodeId], map: "unique_user_voucher")
+  @@map("voucher_code_usage")
+}
+
+model PricingSettings {
+  id                    String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  
+  // Subscription prices
+  semesterPrice         Float          @map("semester_price") @default(50)
+  annualPrice           Float          @map("annual_price") @default(120)
+  
+  // Discount settings
+  discountEnabled       Boolean        @default(false) @map("discount_enabled")
+  discountPercentage    Float?         @map("discount_percentage") // Percentage (0-100)
+  discountStartDate     DateTime?      @map("discount_start_date") @db.Timestamptz(6)
+  discountEndDate       DateTime?      @map("discount_end_date") @db.Timestamptz(6)
+  
+  // Payment details
+  ribNumber             String?        @map("rib_number") @default("1234567890")
+  d17PhoneNumber        String?        @map("d17_phone_number") @default("+216 12 345 678")
+  
+  // Currency
+  currency              String         @default("TND")
+  
+  // Metadata
+  updatedBy             String         @map("updated_by") @db.Uuid
+  updatedAt             DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdAt             DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  
+  // Relations
+  updater               User           @relation(fields: [updatedBy], references: [id])
+
+  @@map("pricing_settings")
+}
+

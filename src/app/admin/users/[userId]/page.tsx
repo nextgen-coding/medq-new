@@ -35,6 +35,11 @@ import {
   CheckCircle,
   XCircle,
   Clock,
+  CreditCard,
+  Gift,
+  Upload,
+  Eye,
+  UserCheck,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -46,6 +51,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { UploadDropzone } from '@/utils/uploadthing';
+import { Input } from '@/components/ui/input';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 interface User {
   id: string;
@@ -55,20 +63,33 @@ interface User {
   status: 'active' | 'inactive' | 'banned' | 'pending' | string;
   createdAt: string;
   lastLoginAt?: string;
+  hasActiveSubscription: boolean;
+  subscriptionExpiresAt?: string | null;
   _count: {
     progress: number;
     reports: number;
+    payments: number;
   };
   profile?: {
     specialty?: string;
     niveau?: string;
     university?: string;
   };
-  subscription?: {
-    type: string;
-    status: string;
-    expiresAt?: string;
-  };
+  paymentHistory?: Array<{
+    id: string;
+    amount: number;
+    currency: string;
+    method: 'konnect_gateway' | 'voucher_code' | 'custom_payment';
+    status: 'pending' | 'completed' | 'failed' | 'cancelled' | 'awaiting_verification' | 'verified' | 'rejected';
+    subscriptionType: 'semester' | 'annual';
+    customPaymentDetails?: string;
+    proofImageUrl?: string;
+    adminNotes?: string;
+    createdAt: string;
+    voucherCode?: {
+      code: string;
+    };
+  }>;
 }
 
 export default function UserDetailPage() {
@@ -84,6 +105,17 @@ export default function UserDetailPage() {
   const [sendingNotification, setSendingNotification] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [removeSubscriptionDialogOpen, setRemoveSubscriptionDialogOpen] = useState(false);
+  const [removingSubscription, setRemovingSubscription] = useState(false);
+  const [removalReason, setRemovalReason] = useState('');
+  const [activateSubscriptionDialogOpen, setActivateSubscriptionDialogOpen] = useState(false);
+  const [activatingSubscription, setActivatingSubscription] = useState(false);
+  const [activationSubscriptionType, setActivationSubscriptionType] = useState<'semester' | 'annual'>('semester');
+  const [activationPaymentMethod, setActivationPaymentMethod] = useState<'konnect_gateway' | 'voucher_code' | 'custom_payment'>('konnect_gateway');
+  const [activationVoucherCode, setActivationVoucherCode] = useState('');
+  const [activationCustomDetails, setActivationCustomDetails] = useState('');
+  const [activationProofFileUrl, setActivationProofFileUrl] = useState<string | null>(null);
+  const [activationIsUploading, setActivationIsUploading] = useState(false);
 
   useEffect(() => {
     fetchUser();
@@ -207,14 +239,128 @@ export default function UserDetailPage() {
       router.push('/admin/users');
     } catch (error) {
       console.error('Error deleting user:', error);
-  toast.error(t('admin.deleteError', { defaultValue: 'Échec de la suppression de l’utilisateur' }));
+  toast.error(t('admin.deleteError', { defaultValue: 'Échec de la suppression de l\'utilisateur' }));
     } finally {
       setDeleting(false);
       setDeleteDialogOpen(false);
     }
   };
 
-  const getRoleColor = (role: string) => {
+  const handleRemoveSubscription = async () => {
+    if (!user) return;
+
+    setRemovingSubscription(true);
+    try {
+      const response = await fetch('/api/admin/users/remove-subscription', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: user.id,
+          reason: removalReason.trim() || 'No reason provided'
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to remove subscription');
+      }
+
+      // Update local user state
+      setUser({ 
+        ...user, 
+        hasActiveSubscription: false,
+        subscriptionExpiresAt: null
+      });
+      
+      setRemovalReason('');
+      setRemoveSubscriptionDialogOpen(false);
+      toast.success('Abonnement supprimé avec succès');
+      
+      // Refresh user data to get updated information
+      fetchUser();
+    } catch (error) {
+      console.error('Error removing subscription:', error);
+      toast.error(error instanceof Error ? error.message : 'Échec de la suppression de l\'abonnement');
+    } finally {
+      setRemovingSubscription(false);
+    }
+  };
+
+  const handleActivateSubscription = async () => {
+    if (!user) return;
+
+    // Validation
+    if (activationPaymentMethod === 'voucher_code' && !activationVoucherCode.trim()) {
+      toast.error('Veuillez entrer un code de bon');
+      return;
+    }
+
+    if (activationPaymentMethod === 'custom_payment' && !activationCustomDetails.trim()) {
+      toast.error('Veuillez entrer les détails du paiement personnalisé');
+      return;
+    }
+
+    if (activationPaymentMethod === 'custom_payment' && !activationProofFileUrl) {
+      toast.error('Veuillez télécharger une preuve de paiement');
+      return;
+    }
+
+    setActivatingSubscription(true);
+    try {
+      // Create payment record instead of directly activating subscription
+      const response = await fetch('/api/admin/payments/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: user.id,
+          method: activationPaymentMethod,
+          subscriptionType: activationSubscriptionType,
+          voucherCode: activationPaymentMethod === 'voucher_code' ? activationVoucherCode : undefined,
+          customPaymentDetails: activationPaymentMethod === 'custom_payment' ? activationCustomDetails : undefined,
+          proofImageUrl: activationPaymentMethod === 'custom_payment' ? activationProofFileUrl : undefined,
+          adminCreated: true // Flag to indicate this was created by admin
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create payment record');
+      }
+
+      const result = await response.json();
+      
+      // Reset form fields
+      setActivationVoucherCode('');
+      setActivationCustomDetails('');
+      setActivationProofFileUrl(null);
+      setActivationPaymentMethod('konnect_gateway');
+      setActivationSubscriptionType('semester');
+      
+      setActivateSubscriptionDialogOpen(false);
+      
+      const methodText = activationPaymentMethod === 'voucher_code' ? 'avec code de bon' :
+                        activationPaymentMethod === 'custom_payment' ? 'avec paiement personnalisé' :
+                        'avec passerelle de paiement';
+      
+      toast.success(`Paiement ${activationSubscriptionType === 'annual' ? 'annuel' : 'semestriel'} ${methodText} créé avec succès. ${
+        activationPaymentMethod === 'voucher_code' ? 'Abonnement activé automatiquement.' :
+        activationPaymentMethod === 'custom_payment' ? 'En attente de vérification.' :
+        'Traitement en cours.'
+      }`);
+      
+      // Refresh user data to get updated information
+      fetchUser();
+    } catch (error) {
+      console.error('Error creating payment:', error);
+      toast.error(error instanceof Error ? error.message : 'Échec de la création du paiement');
+    } finally {
+      setActivatingSubscription(false);
+    }
+  };  const getRoleColor = (role: string) => {
     switch (role) {
       case 'admin':
         return 'bg-red-100 text-red-800 hover:bg-red-200';
@@ -473,6 +619,376 @@ export default function UserDetailPage() {
             </Card>
           )}
 
+          {/* Payment Information */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5" />
+                Informations de paiement
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">
+                    Statut d'abonnement
+                  </Label>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Badge className={user?.hasActiveSubscription ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
+                      {user?.hasActiveSubscription ? 'Actif' : 'Inactif'}
+                    </Badge>
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">
+                    Date d'expiration
+                  </Label>
+                  <p className="text-lg font-medium">
+                    {user?.subscriptionExpiresAt 
+                      ? new Date(user.subscriptionExpiresAt).toLocaleDateString()
+                      : 'N/A'
+                    }
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">
+                    Nombre de paiements
+                  </Label>
+                  <p className="text-lg font-medium">{user?._count?.payments || 0}</p>
+                </div>
+              </div>
+
+              {/* Subscription Management Buttons */}
+              <div className="mt-4 pt-4 border-t">
+                <div className="flex gap-2">
+                  {user?.hasActiveSubscription && (
+                    <Dialog open={removeSubscriptionDialogOpen} onOpenChange={setRemoveSubscriptionDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button variant="destructive" size="sm" className="flex items-center gap-2">
+                          <XCircle className="h-4 w-4" />
+                          Supprimer l'abonnement
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle className="flex items-center gap-2 text-red-600">
+                            <AlertTriangle className="h-5 w-5" />
+                            Supprimer l'abonnement
+                          </DialogTitle>
+                          <DialogDescription>
+                            Êtes-vous sûr de vouloir supprimer l'abonnement de cet utilisateur ? 
+                            Cette action retirera immédiatement l'accès aux contenus premium.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div>
+                            <Label htmlFor="removalReason">Raison de la suppression (optionnel)</Label>
+                            <Textarea
+                              id="removalReason"
+                              placeholder="Ex: Violation des conditions d'utilisation, demande de l'utilisateur..."
+                              value={removalReason}
+                              onChange={(e) => setRemovalReason(e.target.value)}
+                              rows={3}
+                            />
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setRemoveSubscriptionDialogOpen(false)}>
+                            Annuler
+                          </Button>
+                          <Button variant="destructive" onClick={handleRemoveSubscription} disabled={removingSubscription}>
+                            {removingSubscription ? (
+                              <div className="flex items-center gap-2">
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                Suppression...
+                              </div>
+                            ) : (
+                              'Supprimer l\'abonnement'
+                            )}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  )}
+
+                  {!user?.hasActiveSubscription && (
+                    <Dialog 
+                      open={activateSubscriptionDialogOpen} 
+                      onOpenChange={(open) => {
+                        setActivateSubscriptionDialogOpen(open);
+                        if (!open) {
+                          // Reset form when dialog closes
+                          setActivationVoucherCode('');
+                          setActivationCustomDetails('');
+                          setActivationProofFileUrl(null);
+                          setActivationPaymentMethod('konnect_gateway');
+                          setActivationSubscriptionType('semester');
+                        }
+                      }}
+                    >
+                      <DialogTrigger asChild>
+                        <Button variant="default" size="sm" className="flex items-center gap-2">
+                          <UserCheck className="h-4 w-4" />
+                          Créer un abonnement
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                        <DialogHeader>
+                          <DialogTitle className="flex items-center gap-2 text-green-600">
+                            <UserCheck className="h-5 w-5" />
+                            Créer un abonnement
+                          </DialogTitle>
+                          <DialogDescription>
+                            Créez un enregistrement de paiement et activez l'abonnement pour cet utilisateur.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-6">
+                          {/* Subscription Type */}
+                          <div>
+                            <Label htmlFor="subscriptionType">Type d'abonnement</Label>
+                            <Select value={activationSubscriptionType} onValueChange={(value: 'semester' | 'annual') => setActivationSubscriptionType(value)}>
+                              <SelectTrigger className="w-full">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="semester">
+                                  <div className="flex items-center gap-2">
+                                    <Clock className="h-4 w-4" />
+                                    Semestriel (6 mois)
+                                  </div>
+                                </SelectItem>
+                                <SelectItem value="annual">
+                                  <div className="flex items-center gap-2">
+                                    <Calendar className="h-4 w-4" />
+                                    Annuel (12 mois)
+                                  </div>
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          {/* Payment Method */}
+                          <div>
+                            <Label htmlFor="paymentMethod">Méthode de paiement</Label>
+                            <RadioGroup 
+                              value={activationPaymentMethod} 
+                              onValueChange={(value: 'konnect_gateway' | 'voucher_code' | 'custom_payment') => setActivationPaymentMethod(value)}
+                              className="mt-2"
+                            >
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="konnect_gateway" id="konnect" />
+                                <Label htmlFor="konnect" className="flex items-center gap-2 cursor-pointer">
+                                  <CreditCard className="h-4 w-4" />
+                                  Passerelle Konnect
+                                </Label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="voucher_code" id="voucher" />
+                                <Label htmlFor="voucher" className="flex items-center gap-2 cursor-pointer">
+                                  <Gift className="h-4 w-4" />
+                                  Code de bon
+                                </Label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="custom_payment" id="custom" />
+                                <Label htmlFor="custom" className="flex items-center gap-2 cursor-pointer">
+                                  <Upload className="h-4 w-4" />
+                                  Paiement personnalisé
+                                </Label>
+                              </div>
+                            </RadioGroup>
+                          </div>
+
+                          {/* Voucher Code Input */}
+                          {activationPaymentMethod === 'voucher_code' && (
+                            <div>
+                              <Label htmlFor="voucherCode">Code de bon</Label>
+                              <Input
+                                id="voucherCode"
+                                value={activationVoucherCode}
+                                onChange={(e) => setActivationVoucherCode(e.target.value)}
+                                placeholder="Entrez le code de bon"
+                                className="mt-1"
+                              />
+                            </div>
+                          )}
+
+                          {/* Custom Payment Details */}
+                          {activationPaymentMethod === 'custom_payment' && (
+                            <div className="space-y-4">
+                              <div>
+                                <Label htmlFor="customDetails">Détails du paiement personnalisé</Label>
+                                <Textarea
+                                  id="customDetails"
+                                  value={activationCustomDetails}
+                                  onChange={(e) => setActivationCustomDetails(e.target.value)}
+                                  placeholder="Décrivez les détails du paiement (ex: virement bancaire, paiement en espèces, etc.)"
+                                  className="mt-1"
+                                  rows={3}
+                                />
+                              </div>
+                              
+                              <div>
+                                <Label>Preuve de paiement (obligatoire)</Label>
+                                <div className="mt-2">
+                                  <UploadDropzone
+                                    endpoint="imageUploader"
+                                    onClientUploadComplete={(res) => {
+                                      if (res?.[0]) {
+                                        setActivationProofFileUrl(res[0].url);
+                                        setActivationIsUploading(false);
+                                        toast.success('Preuve de paiement téléchargée avec succès');
+                                      }
+                                    }}
+                                    onUploadError={(error) => {
+                                      console.error('Upload error:', error);
+                                      setActivationIsUploading(false);
+                                      toast.error('Erreur lors du téléchargement de la preuve');
+                                    }}
+                                    onUploadBegin={(name: string) => {
+                                      setActivationIsUploading(true);
+                                      toast.success(`Téléchargement de ${name} en cours...`);
+                                    }}
+                                  />
+                                  {activationProofFileUrl && (
+                                    <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-md">
+                                      <div className="flex items-center justify-between">
+                                        <div>
+                                          <p className="text-sm font-medium text-green-800">
+                                            ✓ Preuve de paiement téléchargée
+                                          </p>
+                                          <p className="text-xs text-green-600">
+                                            Fichier prêt pour vérification
+                                          </p>
+                                        </div>
+                                        <a 
+                                          href={activationProofFileUrl} 
+                                          target="_blank" 
+                                          rel="noopener noreferrer"
+                                          className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full hover:bg-blue-200 transition-colors"
+                                        >
+                                          <Eye className="h-3 w-3 mr-1" />
+                                          Voir
+                                        </a>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setActivateSubscriptionDialogOpen(false)}>
+                            Annuler
+                          </Button>
+                          <Button variant="default" onClick={handleActivateSubscription} disabled={activatingSubscription}>
+                            {activatingSubscription ? (
+                              <div className="flex items-center gap-2">
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                Création...
+                              </div>
+                            ) : (
+                              'Créer le paiement'
+                            )}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  )}
+                </div>
+              </div>
+
+              {/* Payment History */}
+              {user?.paymentHistory && user.paymentHistory.length > 0 && (
+                <div className="mt-6">
+                  <h4 className="text-sm font-medium text-muted-foreground mb-3">Historique des paiements</h4>
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
+                    {user.paymentHistory.map((payment) => (
+                      <div key={payment.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-gray-100 rounded-lg">
+                            {payment.method === 'konnect_gateway' && <CreditCard className="h-4 w-4" />}
+                            {payment.method === 'voucher_code' && <Gift className="h-4 w-4" />}
+                            {payment.method === 'custom_payment' && <Upload className="h-4 w-4" />}
+                          </div>
+                          <div>
+                            <div className="font-medium">
+                              {payment.amount} {payment.currency} - {payment.subscriptionType === 'annual' ? 'Annuel' : 'Semestriel'}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {payment.method === 'konnect_gateway' && 'Paiement en ligne'}
+                              {payment.method === 'voucher_code' && `Code: ${payment.voucherCode?.code}`}
+                              {payment.method === 'custom_payment' && 'Paiement personnalisé'}
+                            </div>
+                            <div className="text-xs text-gray-400">
+                              {new Date(payment.createdAt).toLocaleString()}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge className={
+                            payment.status === 'completed' || payment.status === 'verified' 
+                              ? 'bg-green-100 text-green-800'
+                              : payment.status === 'awaiting_verification'
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : payment.status === 'pending'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : 'bg-red-100 text-red-800'
+                          }>
+                            {payment.status}
+                          </Badge>
+                          {payment.method === 'custom_payment' && payment.proofImageUrl && (
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <Button variant="outline" size="sm">
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="max-w-2xl">
+                                <DialogHeader>
+                                  <DialogTitle>Preuve de paiement</DialogTitle>
+                                </DialogHeader>
+                                <div className="space-y-4">
+                                  {payment.customPaymentDetails && (
+                                    <div>
+                                      <Label className="text-sm font-medium">Détails</Label>
+                                      <p className="mt-1 p-2 bg-gray-50 rounded text-sm">
+                                        {payment.customPaymentDetails}
+                                      </p>
+                                    </div>
+                                  )}
+                                  <div>
+                                    <Label className="text-sm font-medium">Preuve de paiement</Label>
+                                    <div className="mt-2 border rounded-lg overflow-hidden">
+                                      <img
+                                        src={payment.proofImageUrl}
+                                        alt="Preuve de paiement"
+                                        className="w-full h-auto max-h-96 object-contain"
+                                      />
+                                    </div>
+                                  </div>
+                                  {payment.adminNotes && (
+                                    <div>
+                                      <Label className="text-sm font-medium">Notes admin</Label>
+                                      <p className="mt-1 p-2 bg-gray-50 rounded text-sm">
+                                        {payment.adminNotes}
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+                              </DialogContent>
+                            </Dialog>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Send Notification */}
           <Card>
             <CardHeader>
@@ -582,17 +1098,17 @@ export default function UserDetailPage() {
                   <p className="text-sm">{formatDate(user.lastLoginAt)}</p>
                 </div>
               )}
-              {user?.subscription && (
+              {user?.hasActiveSubscription && (
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">
                     {t('admin.subscription', { defaultValue: 'Abonnement' })}
                   </Label>
                   <p className="text-sm">
-                    {user.subscription.type} - {user.subscription.status}
+                    Actif
                   </p>
-                  {user.subscription.expiresAt && (
+                  {user.subscriptionExpiresAt && (
                     <p className="text-xs text-muted-foreground">
-                      {t('admin.expires', { defaultValue: 'Expire le' })}: {formatDate(user.subscription.expiresAt)}
+                      {t('admin.expires', { defaultValue: 'Expire le' })}: {formatDate(user.subscriptionExpiresAt)}
                     </p>
                   )}
                 </div>
