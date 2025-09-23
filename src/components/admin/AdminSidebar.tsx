@@ -31,7 +31,10 @@ import {
   Brain,
   CheckCircle,
   Bell,
-  Inbox
+  Inbox,
+  CreditCard,
+  Gift,
+  DollarSign
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useTranslation } from 'react-i18next';
@@ -71,6 +74,9 @@ export function AdminSidebar() {
     { label: 'Gestion Sessions', icon: FileText, href: '/admin/sessions', description: 'Gérer/importer les sessions' },
     { label: 'Validation', icon: CheckCircle, href: '/admin/validation', description: 'Système de validation IA' },
     { label: t('admin.importQuestions', { defaultValue: 'Importation' }), icon: Upload, href: '/admin/import', description: 'Importer des questions QROC' },
+    { label: 'Paiements', icon: CreditCard, href: '/admin/payments', description: 'Gérer les paiements et abonnements' },
+    { label: 'Codes de Bon', icon: Gift, href: '/admin/vouchers', description: 'Créer et gérer les codes de bon' },
+    { label: 'Prix et Remises', icon: DollarSign, href: '/admin/pricing', description: 'Configurer les prix et remises' },
     { label: 'Notifications', icon: Bell, href: '/admin/notifications', description: 'Envoyer des notifications ciblées aux utilisateurs' },
     { label: 'Mes Notifications', icon: Inbox, href: '/admin/inbox', description: 'Voir les notifications reçues' },
     { label: t('admin.reports', { defaultValue: 'Rapports' }), icon: AlertTriangle, href: '/admin/reports', description: 'Voir les signalements' },

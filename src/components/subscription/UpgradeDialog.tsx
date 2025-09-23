@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -24,13 +25,15 @@ const features = [
 
 export function UpgradeDialog({ isOpen, onOpenChange, onUpgrade }: UpgradeDialogProps) {
   const { t } = useTranslation();
+  const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
 
   const handleUpgrade = async () => {
     setIsLoading(true);
     try {
-      // Here you would integrate with your payment provider
-      // For now, we&apos;ll just call the onUpgrade callback
+      // Redirect to payment page
+      router.push('/upgrade');
+      onOpenChange(false);
       await onUpgrade();
     } catch (error) {
       console.error('Error during upgrade:', error);

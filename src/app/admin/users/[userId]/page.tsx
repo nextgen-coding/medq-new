@@ -35,6 +35,10 @@ import {
   CheckCircle,
   XCircle,
   Clock,
+  CreditCard,
+  Gift,
+  Upload,
+  Eye,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -58,6 +62,7 @@ interface User {
   _count: {
     progress: number;
     reports: number;
+    payments: number;
   };
   profile?: {
     specialty?: string;
@@ -69,6 +74,21 @@ interface User {
     status: string;
     expiresAt?: string;
   };
+  paymentHistory?: Array<{
+    id: string;
+    amount: number;
+    currency: string;
+    method: 'konnect_gateway' | 'voucher_code' | 'custom_payment';
+    status: 'pending' | 'completed' | 'failed' | 'cancelled' | 'awaiting_verification' | 'verified' | 'rejected';
+    subscriptionType: 'semester' | 'annual';
+    customPaymentDetails?: string;
+    proofImageUrl?: string;
+    adminNotes?: string;
+    createdAt: string;
+    voucherCode?: {
+      code: string;
+    };
+  }>;
 }
 
 export default function UserDetailPage() {
@@ -84,6 +104,9 @@ export default function UserDetailPage() {
   const [sendingNotification, setSendingNotification] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [removeSubscriptionDialogOpen, setRemoveSubscriptionDialogOpen] = useState(false);
+  const [removingSubscription, setRemovingSubscription] = useState(false);
+  const [removalReason, setRemovalReason] = useState('');
 
   useEffect(() => {
     fetchUser();
@@ -207,14 +230,57 @@ export default function UserDetailPage() {
       router.push('/admin/users');
     } catch (error) {
       console.error('Error deleting user:', error);
-  toast.error(t('admin.deleteError', { defaultValue: 'Échec de la suppression de l’utilisateur' }));
+  toast.error(t('admin.deleteError', { defaultValue: 'Échec de la suppression de l\'utilisateur' }));
     } finally {
       setDeleting(false);
       setDeleteDialogOpen(false);
     }
   };
 
-  const getRoleColor = (role: string) => {
+  const handleRemoveSubscription = async () => {
+    if (!user) return;
+
+    setRemovingSubscription(true);
+    try {
+      const response = await fetch('/api/admin/users/remove-subscription', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: user.id,
+          reason: removalReason.trim() || 'No reason provided'
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to remove subscription');
+      }
+
+      // Update local user state
+      setUser({ 
+        ...user, 
+        subscription: { 
+          type: user.subscription?.type || 'semester',
+          status: 'inactive',
+          expiresAt: undefined
+        } 
+      });
+      
+      setRemovalReason('');
+      setRemoveSubscriptionDialogOpen(false);
+      toast.success('Abonnement supprimé avec succès');
+      
+      // Refresh user data to get updated information
+      fetchUser();
+    } catch (error) {
+      console.error('Error removing subscription:', error);
+      toast.error(error instanceof Error ? error.message : 'Échec de la suppression de l\'abonnement');
+    } finally {
+      setRemovingSubscription(false);
+    }
+  };  const getRoleColor = (role: string) => {
     switch (role) {
       case 'admin':
         return 'bg-red-100 text-red-800 hover:bg-red-200';
@@ -472,6 +538,188 @@ export default function UserDetailPage() {
               </CardContent>
             </Card>
           )}
+
+          {/* Payment Information */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5" />
+                Informations de paiement
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">
+                    Statut d'abonnement
+                  </Label>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Badge className={user?.subscription?.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
+                      {user?.subscription?.status === 'active' ? 'Actif' : 'Inactif'}
+                    </Badge>
+                  </div>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">
+                    Date d'expiration
+                  </Label>
+                  <p className="text-lg font-medium">
+                    {user?.subscription?.expiresAt 
+                      ? new Date(user.subscription.expiresAt).toLocaleDateString()
+                      : 'N/A'
+                    }
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">
+                    Nombre de paiements
+                  </Label>
+                  <p className="text-lg font-medium">{user?._count?.payments || 0}</p>
+                </div>
+              </div>
+
+              {/* Remove Subscription Button */}
+              {user?.subscription?.status === 'active' && (
+                <div className="mt-4 pt-4 border-t">
+                  <Dialog open={removeSubscriptionDialogOpen} onOpenChange={setRemoveSubscriptionDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="destructive" size="sm" className="flex items-center gap-2">
+                        <XCircle className="h-4 w-4" />
+                        Supprimer l'abonnement
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-red-600">
+                          <AlertTriangle className="h-5 w-5" />
+                          Supprimer l'abonnement
+                        </DialogTitle>
+                        <DialogDescription>
+                          Êtes-vous sûr de vouloir supprimer l'abonnement de cet utilisateur ? 
+                          Cette action retirera immédiatement l'accès aux contenus premium.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div>
+                          <Label htmlFor="removalReason">Raison de la suppression (optionnel)</Label>
+                          <Textarea
+                            id="removalReason"
+                            placeholder="Ex: Violation des conditions d'utilisation, demande de l'utilisateur..."
+                            value={removalReason}
+                            onChange={(e) => setRemovalReason(e.target.value)}
+                            rows={3}
+                          />
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setRemoveSubscriptionDialogOpen(false)}>
+                          Annuler
+                        </Button>
+                        <Button variant="destructive" onClick={handleRemoveSubscription} disabled={removingSubscription}>
+                          {removingSubscription ? (
+                            <div className="flex items-center gap-2">
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                              Suppression...
+                            </div>
+                          ) : (
+                            'Supprimer l\'abonnement'
+                          )}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              )}
+
+              {/* Payment History */}
+              {user?.paymentHistory && user.paymentHistory.length > 0 && (
+                <div className="mt-6">
+                  <h4 className="text-sm font-medium text-muted-foreground mb-3">Historique des paiements</h4>
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
+                    {user.paymentHistory.map((payment) => (
+                      <div key={payment.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-gray-100 rounded-lg">
+                            {payment.method === 'konnect_gateway' && <CreditCard className="h-4 w-4" />}
+                            {payment.method === 'voucher_code' && <Gift className="h-4 w-4" />}
+                            {payment.method === 'custom_payment' && <Upload className="h-4 w-4" />}
+                          </div>
+                          <div>
+                            <div className="font-medium">
+                              {payment.amount} {payment.currency} - {payment.subscriptionType === 'annual' ? 'Annuel' : 'Semestriel'}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {payment.method === 'konnect_gateway' && 'Paiement en ligne'}
+                              {payment.method === 'voucher_code' && `Code: ${payment.voucherCode?.code}`}
+                              {payment.method === 'custom_payment' && 'Paiement personnalisé'}
+                            </div>
+                            <div className="text-xs text-gray-400">
+                              {new Date(payment.createdAt).toLocaleString()}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge className={
+                            payment.status === 'completed' || payment.status === 'verified' 
+                              ? 'bg-green-100 text-green-800'
+                              : payment.status === 'awaiting_verification'
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : payment.status === 'pending'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : 'bg-red-100 text-red-800'
+                          }>
+                            {payment.status}
+                          </Badge>
+                          {payment.method === 'custom_payment' && payment.proofImageUrl && (
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <Button variant="outline" size="sm">
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="max-w-2xl">
+                                <DialogHeader>
+                                  <DialogTitle>Preuve de paiement</DialogTitle>
+                                </DialogHeader>
+                                <div className="space-y-4">
+                                  {payment.customPaymentDetails && (
+                                    <div>
+                                      <Label className="text-sm font-medium">Détails</Label>
+                                      <p className="mt-1 p-2 bg-gray-50 rounded text-sm">
+                                        {payment.customPaymentDetails}
+                                      </p>
+                                    </div>
+                                  )}
+                                  <div>
+                                    <Label className="text-sm font-medium">Preuve de paiement</Label>
+                                    <div className="mt-2 border rounded-lg overflow-hidden">
+                                      <img
+                                        src={payment.proofImageUrl}
+                                        alt="Preuve de paiement"
+                                        className="w-full h-auto max-h-96 object-contain"
+                                      />
+                                    </div>
+                                  </div>
+                                  {payment.adminNotes && (
+                                    <div>
+                                      <Label className="text-sm font-medium">Notes admin</Label>
+                                      <p className="mt-1 p-2 bg-gray-50 rounded text-sm">
+                                        {payment.adminNotes}
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+                              </DialogContent>
+                            </Dialog>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Send Notification */}
           <Card>

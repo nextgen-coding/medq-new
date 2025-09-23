@@ -12,6 +12,7 @@ async function getHandler(request: AuthenticatedRequest, { params }: { params: P
         select: {
           progress: true,
           reports: true,
+          payments: true,
         },
       },
       niveau: {
@@ -22,6 +23,17 @@ async function getHandler(request: AuthenticatedRequest, { params }: { params: P
       semester: {
         select: {
           name: true,
+        },
+      },
+      payments: {
+        orderBy: { createdAt: 'desc' },
+        take: 10, // Get latest 10 payments
+        include: {
+          voucherCode: {
+            select: {
+              code: true,
+            },
+          },
         },
       },
     },
@@ -44,6 +56,7 @@ async function getHandler(request: AuthenticatedRequest, { params }: { params: P
       status: user.hasActiveSubscription ? 'active' : 'inactive',
       expiresAt: user.subscriptionExpiresAt,
     },
+    paymentHistory: user.payments,
   };
 
   return NextResponse.json(formattedUser);
