@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, AuthenticatedRequest } from '@/lib/auth-middleware';
 import { prisma } from '@/lib/prisma';
 
-async function handler(request: AuthenticatedRequest, { params }: { params: { paymentId: string } }) {
+async function handler(request: AuthenticatedRequest, context: { params: Promise<{ paymentId: string }> }) {
   try {
     // Check if user is admin
     if (request.user?.role !== 'admin') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
+    const params = await context.params;
     const { paymentId } = params;
     const body = await request.json();
     const { action, notes } = body;
