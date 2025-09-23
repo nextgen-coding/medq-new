@@ -39,6 +39,13 @@ export default function ProfilePageRoute() {
     setIsClient(true);
   }, []);
 
+  // Always fetch fresh user data when the profile page loads
+  useEffect(() => {
+    if (isClient) {
+      refreshUser();
+    }
+  }, [isClient, refreshUser]);
+
   // Niveaux state
   const [niveaux, setNiveaux] = useState<{ id: string; name: string }[]>([])
 

@@ -39,6 +39,7 @@ import {
   Gift,
   Upload,
   Eye,
+  UserCheck,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -59,6 +60,8 @@ interface User {
   status: 'active' | 'inactive' | 'banned' | 'pending' | string;
   createdAt: string;
   lastLoginAt?: string;
+  hasActiveSubscription: boolean;
+  subscriptionExpiresAt?: string | null;
   _count: {
     progress: number;
     reports: number;
@@ -68,11 +71,6 @@ interface User {
     specialty?: string;
     niveau?: string;
     university?: string;
-  };
-  subscription?: {
-    type: string;
-    status: string;
-    expiresAt?: string;
   };
   paymentHistory?: Array<{
     id: string;
@@ -107,6 +105,9 @@ export default function UserDetailPage() {
   const [removeSubscriptionDialogOpen, setRemoveSubscriptionDialogOpen] = useState(false);
   const [removingSubscription, setRemovingSubscription] = useState(false);
   const [removalReason, setRemovalReason] = useState('');
+  const [activateSubscriptionDialogOpen, setActivateSubscriptionDialogOpen] = useState(false);
+  const [activatingSubscription, setActivatingSubscription] = useState(false);
+  const [activationSubscriptionType, setActivationSubscriptionType] = useState<'semester' | 'annual'>('semester');
 
   useEffect(() => {
     fetchUser();
@@ -261,11 +262,8 @@ export default function UserDetailPage() {
       // Update local user state
       setUser({ 
         ...user, 
-        subscription: { 
-          type: user.subscription?.type || 'semester',
-          status: 'inactive',
-          expiresAt: undefined
-        } 
+        hasActiveSubscription: false,
+        subscriptionExpiresAt: null
       });
       
       setRemovalReason('');
@@ -279,6 +277,49 @@ export default function UserDetailPage() {
       toast.error(error instanceof Error ? error.message : 'Échec de la suppression de l\'abonnement');
     } finally {
       setRemovingSubscription(false);
+    }
+  };
+
+  const handleActivateSubscription = async () => {
+    if (!user) return;
+
+    setActivatingSubscription(true);
+    try {
+      const response = await fetch('/api/admin/users/activate-subscription', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: user.id,
+          subscriptionType: activationSubscriptionType
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to activate subscription');
+      }
+
+      const result = await response.json();
+      
+      // Update local user state
+      setUser({ 
+        ...user, 
+        hasActiveSubscription: true,
+        subscriptionExpiresAt: result.subscription.expiresAt
+      });
+      
+      setActivateSubscriptionDialogOpen(false);
+      toast.success(`Abonnement ${activationSubscriptionType === 'annual' ? 'annuel' : 'semestriel'} activé avec succès`);
+      
+      // Refresh user data to get updated information
+      fetchUser();
+    } catch (error) {
+      console.error('Error activating subscription:', error);
+      toast.error(error instanceof Error ? error.message : 'Échec de l\'activation de l\'abonnement');
+    } finally {
+      setActivatingSubscription(false);
     }
   };  const getRoleColor = (role: string) => {
     switch (role) {
@@ -554,8 +595,8 @@ export default function UserDetailPage() {
                     Statut d'abonnement
                   </Label>
                   <div className="flex items-center gap-2 mt-1">
-                    <Badge className={user?.subscription?.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
-                      {user?.subscription?.status === 'active' ? 'Actif' : 'Inactif'}
+                    <Badge className={user?.hasActiveSubscription ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
+                      {user?.hasActiveSubscription ? 'Actif' : 'Inactif'}
                     </Badge>
                   </div>
                 </div>
@@ -564,8 +605,8 @@ export default function UserDetailPage() {
                     Date d'expiration
                   </Label>
                   <p className="text-lg font-medium">
-                    {user?.subscription?.expiresAt 
-                      ? new Date(user.subscription.expiresAt).toLocaleDateString()
+                    {user?.subscriptionExpiresAt 
+                      ? new Date(user.subscriptionExpiresAt).toLocaleDateString()
                       : 'N/A'
                     }
                   </p>
@@ -578,58 +619,121 @@ export default function UserDetailPage() {
                 </div>
               </div>
 
-              {/* Remove Subscription Button */}
-              {user?.subscription?.status === 'active' && (
-                <div className="mt-4 pt-4 border-t">
-                  <Dialog open={removeSubscriptionDialogOpen} onOpenChange={setRemoveSubscriptionDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button variant="destructive" size="sm" className="flex items-center gap-2">
-                        <XCircle className="h-4 w-4" />
-                        Supprimer l'abonnement
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2 text-red-600">
-                          <AlertTriangle className="h-5 w-5" />
+              {/* Subscription Management Buttons */}
+              <div className="mt-4 pt-4 border-t">
+                <div className="flex gap-2">
+                  {user?.hasActiveSubscription && (
+                    <Dialog open={removeSubscriptionDialogOpen} onOpenChange={setRemoveSubscriptionDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button variant="destructive" size="sm" className="flex items-center gap-2">
+                          <XCircle className="h-4 w-4" />
                           Supprimer l'abonnement
-                        </DialogTitle>
-                        <DialogDescription>
-                          Êtes-vous sûr de vouloir supprimer l'abonnement de cet utilisateur ? 
-                          Cette action retirera immédiatement l'accès aux contenus premium.
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="space-y-4">
-                        <div>
-                          <Label htmlFor="removalReason">Raison de la suppression (optionnel)</Label>
-                          <Textarea
-                            id="removalReason"
-                            placeholder="Ex: Violation des conditions d'utilisation, demande de l'utilisateur..."
-                            value={removalReason}
-                            onChange={(e) => setRemovalReason(e.target.value)}
-                            rows={3}
-                          />
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle className="flex items-center gap-2 text-red-600">
+                            <AlertTriangle className="h-5 w-5" />
+                            Supprimer l'abonnement
+                          </DialogTitle>
+                          <DialogDescription>
+                            Êtes-vous sûr de vouloir supprimer l'abonnement de cet utilisateur ? 
+                            Cette action retirera immédiatement l'accès aux contenus premium.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div>
+                            <Label htmlFor="removalReason">Raison de la suppression (optionnel)</Label>
+                            <Textarea
+                              id="removalReason"
+                              placeholder="Ex: Violation des conditions d'utilisation, demande de l'utilisateur..."
+                              value={removalReason}
+                              onChange={(e) => setRemovalReason(e.target.value)}
+                              rows={3}
+                            />
+                          </div>
                         </div>
-                      </div>
-                      <DialogFooter>
-                        <Button variant="outline" onClick={() => setRemoveSubscriptionDialogOpen(false)}>
-                          Annuler
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setRemoveSubscriptionDialogOpen(false)}>
+                            Annuler
+                          </Button>
+                          <Button variant="destructive" onClick={handleRemoveSubscription} disabled={removingSubscription}>
+                            {removingSubscription ? (
+                              <div className="flex items-center gap-2">
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                Suppression...
+                              </div>
+                            ) : (
+                              'Supprimer l\'abonnement'
+                            )}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  )}
+
+                  {!user?.hasActiveSubscription && (
+                    <Dialog open={activateSubscriptionDialogOpen} onOpenChange={setActivateSubscriptionDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button variant="default" size="sm" className="flex items-center gap-2">
+                          <UserCheck className="h-4 w-4" />
+                          Activer l'abonnement
                         </Button>
-                        <Button variant="destructive" onClick={handleRemoveSubscription} disabled={removingSubscription}>
-                          {removingSubscription ? (
-                            <div className="flex items-center gap-2">
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                              Suppression...
-                            </div>
-                          ) : (
-                            'Supprimer l\'abonnement'
-                          )}
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle className="flex items-center gap-2 text-green-600">
+                            <UserCheck className="h-5 w-5" />
+                            Activer l'abonnement
+                          </DialogTitle>
+                          <DialogDescription>
+                            Choisissez le type d'abonnement à activer pour cet utilisateur.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div>
+                            <Label htmlFor="subscriptionType">Type d'abonnement</Label>
+                            <Select value={activationSubscriptionType} onValueChange={(value: 'semester' | 'annual') => setActivationSubscriptionType(value)}>
+                              <SelectTrigger className="w-full">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="semester">
+                                  <div className="flex items-center gap-2">
+                                    <Clock className="h-4 w-4" />
+                                    Semestriel (6 mois)
+                                  </div>
+                                </SelectItem>
+                                <SelectItem value="annual">
+                                  <div className="flex items-center gap-2">
+                                    <Calendar className="h-4 w-4" />
+                                    Annuel (12 mois)
+                                  </div>
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setActivateSubscriptionDialogOpen(false)}>
+                            Annuler
+                          </Button>
+                          <Button variant="default" onClick={handleActivateSubscription} disabled={activatingSubscription}>
+                            {activatingSubscription ? (
+                              <div className="flex items-center gap-2">
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                Activation...
+                              </div>
+                            ) : (
+                              'Activer l\'abonnement'
+                            )}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  )}
                 </div>
-              )}
+              </div>
 
               {/* Payment History */}
               {user?.paymentHistory && user.paymentHistory.length > 0 && (
@@ -830,17 +934,17 @@ export default function UserDetailPage() {
                   <p className="text-sm">{formatDate(user.lastLoginAt)}</p>
                 </div>
               )}
-              {user?.subscription && (
+              {user?.hasActiveSubscription && (
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">
                     {t('admin.subscription', { defaultValue: 'Abonnement' })}
                   </Label>
                   <p className="text-sm">
-                    {user.subscription.type} - {user.subscription.status}
+                    Actif
                   </p>
-                  {user.subscription.expiresAt && (
+                  {user.subscriptionExpiresAt && (
                     <p className="text-xs text-muted-foreground">
-                      {t('admin.expires', { defaultValue: 'Expire le' })}: {formatDate(user.subscription.expiresAt)}
+                      {t('admin.expires', { defaultValue: 'Expire le' })}: {formatDate(user.subscriptionExpiresAt)}
                     </p>
                   )}
                 </div>
