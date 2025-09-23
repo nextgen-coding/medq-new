@@ -926,7 +926,7 @@ export function ClinicalCaseQuestion({
               </div>
             </div>
             {isAnsweredQ && (
-              <span className="absolute top-3 right-3 inline-flex items-center">
+              <span className={`absolute inline-flex items-center ${isInlineLayout ? 'top-2 right-2' : 'top-3 right-3'}`}>
                 {showResults ? (
                   <>
                     {answerResultQ === true && <CheckCircle className="h-4 w-4 text-green-600" />}
