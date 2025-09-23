@@ -51,6 +51,9 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { UploadDropzone } from '@/utils/uploadthing';
+import { Input } from '@/components/ui/input';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 interface User {
   id: string;
@@ -108,6 +111,11 @@ export default function UserDetailPage() {
   const [activateSubscriptionDialogOpen, setActivateSubscriptionDialogOpen] = useState(false);
   const [activatingSubscription, setActivatingSubscription] = useState(false);
   const [activationSubscriptionType, setActivationSubscriptionType] = useState<'semester' | 'annual'>('semester');
+  const [activationPaymentMethod, setActivationPaymentMethod] = useState<'konnect_gateway' | 'voucher_code' | 'custom_payment'>('konnect_gateway');
+  const [activationVoucherCode, setActivationVoucherCode] = useState('');
+  const [activationCustomDetails, setActivationCustomDetails] = useState('');
+  const [activationProofFileUrl, setActivationProofFileUrl] = useState<string | null>(null);
+  const [activationIsUploading, setActivationIsUploading] = useState(false);
 
   useEffect(() => {
     fetchUser();
@@ -283,41 +291,72 @@ export default function UserDetailPage() {
   const handleActivateSubscription = async () => {
     if (!user) return;
 
+    // Validation
+    if (activationPaymentMethod === 'voucher_code' && !activationVoucherCode.trim()) {
+      toast.error('Veuillez entrer un code de bon');
+      return;
+    }
+
+    if (activationPaymentMethod === 'custom_payment' && !activationCustomDetails.trim()) {
+      toast.error('Veuillez entrer les détails du paiement personnalisé');
+      return;
+    }
+
+    if (activationPaymentMethod === 'custom_payment' && !activationProofFileUrl) {
+      toast.error('Veuillez télécharger une preuve de paiement');
+      return;
+    }
+
     setActivatingSubscription(true);
     try {
-      const response = await fetch('/api/admin/users/activate-subscription', {
+      // Create payment record instead of directly activating subscription
+      const response = await fetch('/api/admin/payments/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           userId: user.id,
-          subscriptionType: activationSubscriptionType
+          method: activationPaymentMethod,
+          subscriptionType: activationSubscriptionType,
+          voucherCode: activationPaymentMethod === 'voucher_code' ? activationVoucherCode : undefined,
+          customPaymentDetails: activationPaymentMethod === 'custom_payment' ? activationCustomDetails : undefined,
+          proofImageUrl: activationPaymentMethod === 'custom_payment' ? activationProofFileUrl : undefined,
+          adminCreated: true // Flag to indicate this was created by admin
         }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to activate subscription');
+        throw new Error(errorData.error || 'Failed to create payment record');
       }
 
       const result = await response.json();
       
-      // Update local user state
-      setUser({ 
-        ...user, 
-        hasActiveSubscription: true,
-        subscriptionExpiresAt: result.subscription.expiresAt
-      });
+      // Reset form fields
+      setActivationVoucherCode('');
+      setActivationCustomDetails('');
+      setActivationProofFileUrl(null);
+      setActivationPaymentMethod('konnect_gateway');
+      setActivationSubscriptionType('semester');
       
       setActivateSubscriptionDialogOpen(false);
-      toast.success(`Abonnement ${activationSubscriptionType === 'annual' ? 'annuel' : 'semestriel'} activé avec succès`);
+      
+      const methodText = activationPaymentMethod === 'voucher_code' ? 'avec code de bon' :
+                        activationPaymentMethod === 'custom_payment' ? 'avec paiement personnalisé' :
+                        'avec passerelle de paiement';
+      
+      toast.success(`Paiement ${activationSubscriptionType === 'annual' ? 'annuel' : 'semestriel'} ${methodText} créé avec succès. ${
+        activationPaymentMethod === 'voucher_code' ? 'Abonnement activé automatiquement.' :
+        activationPaymentMethod === 'custom_payment' ? 'En attente de vérification.' :
+        'Traitement en cours.'
+      }`);
       
       // Refresh user data to get updated information
       fetchUser();
     } catch (error) {
-      console.error('Error activating subscription:', error);
-      toast.error(error instanceof Error ? error.message : 'Échec de l\'activation de l\'abonnement');
+      console.error('Error creating payment:', error);
+      toast.error(error instanceof Error ? error.message : 'Échec de la création du paiement');
     } finally {
       setActivatingSubscription(false);
     }
@@ -673,24 +712,38 @@ export default function UserDetailPage() {
                   )}
 
                   {!user?.hasActiveSubscription && (
-                    <Dialog open={activateSubscriptionDialogOpen} onOpenChange={setActivateSubscriptionDialogOpen}>
+                    <Dialog 
+                      open={activateSubscriptionDialogOpen} 
+                      onOpenChange={(open) => {
+                        setActivateSubscriptionDialogOpen(open);
+                        if (!open) {
+                          // Reset form when dialog closes
+                          setActivationVoucherCode('');
+                          setActivationCustomDetails('');
+                          setActivationProofFileUrl(null);
+                          setActivationPaymentMethod('konnect_gateway');
+                          setActivationSubscriptionType('semester');
+                        }
+                      }}
+                    >
                       <DialogTrigger asChild>
                         <Button variant="default" size="sm" className="flex items-center gap-2">
                           <UserCheck className="h-4 w-4" />
-                          Activer l'abonnement
+                          Créer un abonnement
                         </Button>
                       </DialogTrigger>
-                      <DialogContent>
+                      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
                         <DialogHeader>
                           <DialogTitle className="flex items-center gap-2 text-green-600">
                             <UserCheck className="h-5 w-5" />
-                            Activer l'abonnement
+                            Créer un abonnement
                           </DialogTitle>
                           <DialogDescription>
-                            Choisissez le type d'abonnement à activer pour cet utilisateur.
+                            Créez un enregistrement de paiement et activez l'abonnement pour cet utilisateur.
                           </DialogDescription>
                         </DialogHeader>
-                        <div className="space-y-4">
+                        <div className="space-y-6">
+                          {/* Subscription Type */}
                           <div>
                             <Label htmlFor="subscriptionType">Type d'abonnement</Label>
                             <Select value={activationSubscriptionType} onValueChange={(value: 'semester' | 'annual') => setActivationSubscriptionType(value)}>
@@ -713,6 +766,117 @@ export default function UserDetailPage() {
                               </SelectContent>
                             </Select>
                           </div>
+
+                          {/* Payment Method */}
+                          <div>
+                            <Label htmlFor="paymentMethod">Méthode de paiement</Label>
+                            <RadioGroup 
+                              value={activationPaymentMethod} 
+                              onValueChange={(value: 'konnect_gateway' | 'voucher_code' | 'custom_payment') => setActivationPaymentMethod(value)}
+                              className="mt-2"
+                            >
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="konnect_gateway" id="konnect" />
+                                <Label htmlFor="konnect" className="flex items-center gap-2 cursor-pointer">
+                                  <CreditCard className="h-4 w-4" />
+                                  Passerelle Konnect
+                                </Label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="voucher_code" id="voucher" />
+                                <Label htmlFor="voucher" className="flex items-center gap-2 cursor-pointer">
+                                  <Gift className="h-4 w-4" />
+                                  Code de bon
+                                </Label>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <RadioGroupItem value="custom_payment" id="custom" />
+                                <Label htmlFor="custom" className="flex items-center gap-2 cursor-pointer">
+                                  <Upload className="h-4 w-4" />
+                                  Paiement personnalisé
+                                </Label>
+                              </div>
+                            </RadioGroup>
+                          </div>
+
+                          {/* Voucher Code Input */}
+                          {activationPaymentMethod === 'voucher_code' && (
+                            <div>
+                              <Label htmlFor="voucherCode">Code de bon</Label>
+                              <Input
+                                id="voucherCode"
+                                value={activationVoucherCode}
+                                onChange={(e) => setActivationVoucherCode(e.target.value)}
+                                placeholder="Entrez le code de bon"
+                                className="mt-1"
+                              />
+                            </div>
+                          )}
+
+                          {/* Custom Payment Details */}
+                          {activationPaymentMethod === 'custom_payment' && (
+                            <div className="space-y-4">
+                              <div>
+                                <Label htmlFor="customDetails">Détails du paiement personnalisé</Label>
+                                <Textarea
+                                  id="customDetails"
+                                  value={activationCustomDetails}
+                                  onChange={(e) => setActivationCustomDetails(e.target.value)}
+                                  placeholder="Décrivez les détails du paiement (ex: virement bancaire, paiement en espèces, etc.)"
+                                  className="mt-1"
+                                  rows={3}
+                                />
+                              </div>
+                              
+                              <div>
+                                <Label>Preuve de paiement (obligatoire)</Label>
+                                <div className="mt-2">
+                                  <UploadDropzone
+                                    endpoint="imageUploader"
+                                    onClientUploadComplete={(res) => {
+                                      if (res?.[0]) {
+                                        setActivationProofFileUrl(res[0].url);
+                                        setActivationIsUploading(false);
+                                        toast.success('Preuve de paiement téléchargée avec succès');
+                                      }
+                                    }}
+                                    onUploadError={(error) => {
+                                      console.error('Upload error:', error);
+                                      setActivationIsUploading(false);
+                                      toast.error('Erreur lors du téléchargement de la preuve');
+                                    }}
+                                    onUploadBegin={(name: string) => {
+                                      setActivationIsUploading(true);
+                                      toast.success(`Téléchargement de ${name} en cours...`);
+                                    }}
+                                  />
+                                  {activationProofFileUrl && (
+                                    <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-md">
+                                      <div className="flex items-center justify-between">
+                                        <div>
+                                          <p className="text-sm font-medium text-green-800">
+                                            ✓ Preuve de paiement téléchargée
+                                          </p>
+                                          <p className="text-xs text-green-600">
+                                            Fichier prêt pour vérification
+                                          </p>
+                                        </div>
+                                        <a 
+                                          href={activationProofFileUrl} 
+                                          target="_blank" 
+                                          rel="noopener noreferrer"
+                                          className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full hover:bg-blue-200 transition-colors"
+                                        >
+                                          <Eye className="h-3 w-3 mr-1" />
+                                          Voir
+                                        </a>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
                         <DialogFooter>
                           <Button variant="outline" onClick={() => setActivateSubscriptionDialogOpen(false)}>
@@ -722,10 +886,10 @@ export default function UserDetailPage() {
                             {activatingSubscription ? (
                               <div className="flex items-center gap-2">
                                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                                Activation...
+                                Création...
                               </div>
                             ) : (
-                              'Activer l\'abonnement'
+                              'Créer le paiement'
                             )}
                           </Button>
                         </DialogFooter>
