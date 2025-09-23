@@ -102,6 +102,20 @@ function safeParseJson(content: string): any | null {
   if (resIdx >= 0) {
     const sub = raw.slice(resIdx);
     try { return JSON.parse(sub); } catch {}
+    
+    // Try to complete truncated JSON by finding the last complete object
+    let braceCount = 0;
+    let lastValidPos = -1;
+    for (let i = 0; i < sub.length; i++) {
+      if (sub[i] === '{') braceCount++;
+      else if (sub[i] === '}') {
+        braceCount--;
+        if (braceCount === 0) lastValidPos = i;
+      }
+    }
+    if (lastValidPos > 0) {
+      try { return JSON.parse(sub.slice(0, lastValidPos + 1)); } catch {}
+    }
   }
   
   // 2c) Look for any object start and try parsing from there
@@ -111,7 +125,7 @@ function safeParseJson(content: string): any | null {
     try { return JSON.parse(sub); } catch {}
   }
   
-  // 3) Slice to last closing brace
+  // 3) Slice to last closing brace with better logic
   const lastBrace = raw.lastIndexOf('}');
   if (lastBrace > 0) {
     const sliced = raw.slice(0, lastBrace + 1);
@@ -188,24 +202,29 @@ ${systemPrompt}
   let lastErr: any = null;
   let content: string = '';
 
-  // Try AI SDK structured approach first for better reliability if enabled
-  const useStructuredSDK = process.env.USE_STRUCTURED_AI_SDK === 'true';
+  // Use AI SDK structured approach by default for guaranteed JSON reliability
+  // Can be disabled with USE_STRUCTURED_AI_SDK=false if needed for debugging
+  const useStructuredSDK = process.env.USE_STRUCTURED_AI_SDK !== 'false';
   
   if (useStructuredSDK) {
     try {
-      console.log('[AI] Using structured AI SDK approach for JSON reliability');
+      console.log('[AI] Using structured AI SDK approach with generateObject for guaranteed JSON reliability');
       const result = await chatCompletionStructured([
         { role: 'system', content: sys },
         { role: 'user', content: user }
       ], { 
-        maxTokens: 800  // Ultra-fast responses
+        maxTokens: 800  // Optimal tokens for complete responses
       });
       content = result.content;
       lastErr = null;
+      console.log('[AI] Structured SDK succeeded, content length:', content?.length || 0);
     } catch (err: any) {
-      console.warn('[AI] Structured SDK failed, falling back to REST:', err?.message);
+      console.warn('[AI] Structured SDK failed, falling back to REST:', err?.message || err);
+      console.warn('[AI] Structured SDK error details:', err);
       lastErr = err;
     }
+  } else {
+    console.log('[AI] Using REST approach (structured SDK explicitly disabled)');
   }
 
   // Use REST approach if structured SDK disabled or failed
@@ -218,7 +237,7 @@ ${systemPrompt}
           { role: 'system', content: sys },
           { role: 'user', content: user }
         ], {
-          maxTokens: 800  // Ultra-fast responses
+          maxTokens: 800  // Increased back to 800 for better JSON completion
         });
         content = result.content;
         lastErr = null;
@@ -243,7 +262,11 @@ ${systemPrompt}
   }
   let parsed: any = safeParseJson(content);
   if (!parsed) {
-    console.error(`[AI] JSON parse failed (batch); trying single salvage. content:`, content?.slice(0, 500));
+    console.error(`[AI] JSON parse failed (batch); using single-item salvage (structured retry disabled). content:`, content?.slice(0, 500));
+    // Skip structured retry since it's failing with "Resource not found" - go straight to single salvage
+  }
+
+  if (!parsed) {
     // Fallback: try per-item analysis to salvage results when batch JSON fails
     const results: MCQAiResult[] = [];
     for (const it of items) {
@@ -342,7 +365,7 @@ export async function analyzeMcqInChunks(
     systemPrompt?: string;
   } = {}
 ): Promise<MCQAiResult[]> {
-  const { batchSize = 8, concurrency = 12, onProgress, systemPrompt } = options;
+  const { batchSize = 50, concurrency = 50, onProgress, systemPrompt } = options;
   
   const allResults: MCQAiResult[] = [];
   const chunks: MCQAiItem[][] = [];

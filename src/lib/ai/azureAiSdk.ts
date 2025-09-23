@@ -1,5 +1,4 @@
 import { createAzure } from '@ai-sdk/azure';
-import { generateText } from 'ai';
 import { z } from 'zod';
 
 export type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string };
@@ -21,9 +20,19 @@ export async function chatCompletionStructured(messages: ChatMessage[], options:
     return { content: '', finishReason: 'azure-not-configured' } as { content: string; finishReason?: string };
   }
 
-  const azure = createAzure({
-    apiKey: getEnv('AZURE_OPENAI_API_KEY'),
-    baseURL: getEnv('AZURE_OPENAI_TARGET') || getEnv('AZURE_OPENAI_ENDPOINT')
+  const apiKey = getEnv('AZURE_OPENAI_API_KEY');
+  const endpointRaw = getEnv('AZURE_OPENAI_TARGET') || getEnv('AZURE_OPENAI_ENDPOINT');
+  const endpointRoot = String(endpointRaw || '').replace(/\/+$/, '');
+  const apiVersion = getEnv('AZURE_OPENAI_API_VERSION') || '2024-08-01-preview';
+  
+  // IMPORTANT: Use deployment-based URLs to match working REST path:
+  // https://<resource>.openai.azure.com/openai/deployments/<deployment>/chat/completions?api-version=...
+  // With baseURL set to <root>/openai and useDeploymentBasedUrls=true.
+  const azure = (createAzure as any)({
+    apiKey,
+    baseURL: `${endpointRoot}/openai`,
+    apiVersion,
+    useDeploymentBasedUrls: true,
   });
 
   const deployment = getEnv('AZURE_OPENAI_CHAT_DEPLOYMENT') || getEnv('AZURE_OPENAI_DEPLOYMENT_NAME') || getEnv('AZURE_OPENAI_DEPLOYMENT');
@@ -54,6 +63,9 @@ export async function chatCompletionStructured(messages: ChatMessage[], options:
     if (typeof aiPkg.generateObject !== 'function') {
       throw new Error('generateObject not available in ai package');
     }
+    
+  console.log(`[AzureAI SDK] Attempting generateObject with baseURL: ${endpointRoot}/openai (deployment-based), deployment: ${deployment}, apiVersion: ${apiVersion}`);
+    
     const result = await aiPkg.generateObject({
       model,
       messages: all,
@@ -63,24 +75,12 @@ export async function chatCompletionStructured(messages: ChatMessage[], options:
     // Return stringified JSON to keep compatibility with callers expecting .content text
     return { content: JSON.stringify(result.object), finishReason: result.finishReason };
   } catch (err: any) {
-    console.warn('[AzureAI SDK] generateObject failed, falling back to generateText:', err?.message || err);
-    // Fallback: append extra detailed instruction to system prompt and retry with text generation
-    const extraDetail = 'explication more detailed , make it professor level and more detailed aka the student understand everything';
-    const sysFallback = options.systemPrompt ? [{ role: 'system' as const, content: `${options.systemPrompt}\n\n${extraDetail}` }] : [{ role: 'system' as const, content: extraDetail }];
-    const hasJsonFb = [...sysFallback, ...messages].some(m => /json/i.test(String((m as any).content || '')));
-    const prependFb = hasJsonFb ? [] : [{ role: 'system' as const, content: 'Return a strict JSON object only. Reply in json. No prose.' }];
-    const allFb = [...prependFb, ...sysFallback, ...messages];
-    try {
-      const resultText = await generateText({
-        model,
-        messages: allFb,
-        maxTokens: options.maxTokens ?? 8000
-      });
-      return { content: resultText.text, finishReason: resultText.finishReason };
-    } catch (err2: any) {
-      console.error('[AzureAI SDK] Fallback generateText failed:', err2);
-      throw new Error(`Azure AI SDK structured+text fallback failed: ${err2?.message || err2}`);
-    }
+    console.warn('[AzureAI SDK] generateObject failed:', err?.message || err);
+  console.warn('[AzureAI SDK] baseURL used:', `${endpointRoot}/openai`);
+    console.warn('[AzureAI SDK] deployment used:', deployment);
+    console.warn('[AzureAI SDK] apiVersion used:', apiVersion);
+    // Do not fallback to generateText to avoid non-JSON outputs; let caller use REST fallback.
+    throw new Error(`Azure AI SDK generateObject failed: ${err?.message || err}`);
   }
 }
 
@@ -93,7 +93,7 @@ export async function chatCompletion(messages: ChatMessage[], options: { maxToke
   const apiKey = getEnv('AZURE_OPENAI_API_KEY');
   const endpoint = getEnv('AZURE_OPENAI_TARGET') || getEnv('AZURE_OPENAI_ENDPOINT');
   const deployment = getEnv('AZURE_OPENAI_CHAT_DEPLOYMENT') || getEnv('AZURE_OPENAI_DEPLOYMENT_NAME') || getEnv('AZURE_OPENAI_DEPLOYMENT');
-  const apiVersion = getEnv('AZURE_OPENAI_API_VERSION') || '2024-05-01-preview';
+  const apiVersion = getEnv('AZURE_OPENAI_API_VERSION') || '2024-08-01-preview';
 
   // Normalize endpoint - remove trailing slash
   const normalizedEndpoint = endpoint.replace(/\/$/, '');
