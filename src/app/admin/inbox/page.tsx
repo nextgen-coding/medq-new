@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Inbox, Check, Trash2, Clock, CheckCircle2, AlertTriangle, Info, X, Shield, Users, Settings, Activity } from 'lucide-react';
+import { Inbox, Check, Trash2, Clock, CheckCircle2, AlertTriangle, Info, X, Shield, Users, Settings, Activity, Bell } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 interface Notification {
@@ -266,16 +266,26 @@ export default function AdminInboxPage() {
               </p>
             </div>
           </div>
-          {hasUnreadNotifications && (
+          <div className="flex items-center gap-3">
             <Button
               variant="outline"
-              onClick={markAllAsRead}
-              className="text-sm border-green-200 text-green-700 hover:bg-green-50 dark:border-green-800 dark:text-green-300 dark:hover:bg-green-950/50 shadow-sm"
+              onClick={() => window.location.href = '/admin/notifications'}
+              className="text-sm border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-300 dark:hover:bg-blue-950/50 shadow-sm transition-all duration-200"
             >
-              <CheckCircle2 className="h-4 w-4 mr-2" />
-              Tout marquer comme lu
+              <Bell className="h-4 w-4 mr-2" />
+              Créer une notification
             </Button>
-          )}
+            {hasUnreadNotifications && (
+              <Button
+                variant="outline"
+                onClick={markAllAsRead}
+                className="text-sm border-green-200 text-green-700 hover:bg-green-50 dark:border-green-800 dark:text-green-300 dark:hover:bg-green-950/50 shadow-sm"
+              >
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                Tout marquer comme lu
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Stats Cards */}

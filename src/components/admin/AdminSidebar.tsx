@@ -31,10 +31,11 @@ import {
   Brain,
   CheckCircle,
   Bell,
-  Inbox,
   CreditCard,
   Gift,
-  DollarSign
+  DollarSign,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useTranslation } from 'react-i18next';
@@ -51,6 +52,25 @@ export function AdminSidebar() {
   const { state, setOpen, setOpenMobile, isMobile: sidebarIsMobile, open, openMobile, toggleSidebar } = useSidebar();
   const { t } = useTranslation();
   const isMobile = useIsMobile();
+  
+  const [paymentMenuOpen, setPaymentMenuOpen] = React.useState(() => {
+    // Initialize dropdown as open if user is on a payment-related page
+    return ['/admin/payments', '/admin/vouchers', '/admin/pricing'].some(path => 
+      pathname === path || pathname.startsWith(path + '/')
+    );
+  });
+
+  // Auto-open payment menu when navigating to payment pages (but don't force it if manually closed)
+  React.useEffect(() => {
+    const isOnPaymentPage = ['/admin/payments', '/admin/vouchers', '/admin/pricing'].some(path => 
+      pathname === path || pathname.startsWith(path + '/')
+    );
+    // Only auto-open if we're on a payment page AND the menu is currently closed
+    // This prevents forcing it open if user manually closed it
+    if (isOnPaymentPage && !paymentMenuOpen) {
+      setPaymentMenuOpen(true);
+    }
+  }, [pathname]); // Removed paymentMenuOpen from dependencies to prevent forcing open
   
   // Memoize stable values to prevent re-renders
   const iconSize = React.useMemo(() => 
@@ -74,15 +94,17 @@ export function AdminSidebar() {
     { label: 'Gestion Sessions', icon: FileText, href: '/admin/sessions', description: 'Gérer/importer les sessions' },
     { label: 'Validation', icon: CheckCircle, href: '/admin/validation', description: 'Système de validation IA' },
     { label: t('admin.importQuestions', { defaultValue: 'Importation' }), icon: Upload, href: '/admin/import', description: 'Importer des questions QROC' },
-    { label: 'Paiements', icon: CreditCard, href: '/admin/payments', description: 'Gérer les paiements et abonnements' },
-    { label: 'Codes de Bon', icon: Gift, href: '/admin/vouchers', description: 'Créer et gérer les codes de bon' },
-    { label: 'Prix et Remises', icon: DollarSign, href: '/admin/pricing', description: 'Configurer les prix et remises' },
-    { label: 'Notifications', icon: Bell, href: '/admin/notifications', description: 'Envoyer des notifications ciblées aux utilisateurs' },
-    { label: 'Mes Notifications', icon: Inbox, href: '/admin/inbox', description: 'Voir les notifications reçues' },
+    { label: 'Notifications', icon: Bell, href: '/admin/inbox', description: 'Voir les notifications reçues' },
     { label: t('admin.reports', { defaultValue: 'Rapports' }), icon: AlertTriangle, href: '/admin/reports', description: 'Voir les signalements' },
     { label: t('admin.users', { defaultValue: 'Utilisateurs' }), icon: Users, href: '/admin/users', description: 'Gérer les utilisateurs' },
     studentPanelItem
   ], [t, studentPanelItem]);
+
+  const paymentMenuItems = React.useMemo(() => [
+    { label: 'Paiements', icon: CreditCard, href: '/admin/payments', description: 'Gérer les paiements et abonnements' },
+    { label: 'Codes de Bon', icon: Gift, href: '/admin/vouchers', description: 'Créer et gérer les codes de bon' },
+    { label: 'Prix et Remises', icon: DollarSign, href: '/admin/pricing', description: 'Configurer les prix et remises' }
+  ], []);
 
   const maintainerMenuItems = React.useMemo(() => [
     { label: 'Gestion Sessions', icon: FileText, href: '/maintainer/sessions', description: 'Créer des sessions' },
@@ -205,6 +227,78 @@ export function AdminSidebar() {
                       </SidebarMenuItem>
                     );
                   })}
+
+                  {/* Payment Management Dropdown */}
+                  {isAdmin && (
+                    <SidebarMenuItem>
+                      <SidebarMenuButton 
+                        className={`group transition-all duration-200 font-medium rounded-xl ${
+                          state === 'expanded' 
+                            ? 'px-3 py-3 min-h-[44px] flex items-center justify-between' 
+                            : 'p-0 min-h-[44px] w-full flex items-center justify-center'
+                        } ${
+                          paymentMenuItems.some(paymentItem => pathname === paymentItem.href || pathname.startsWith(paymentItem.href + '/'))
+                            ? 'bg-gradient-to-r from-blue-600 to-blue-800 text-white shadow-lg shadow-blue-500/25'
+                            : 'hover:bg-muted/80 text-foreground hover:text-blue-600'
+                        }`}
+                        onClick={() => {
+                          if (state === 'expanded') {
+                            // Always allow toggling regardless of active state
+                            setPaymentMenuOpen(!paymentMenuOpen);
+                          } else {
+                            // If collapsed, navigate to the first payment item
+                            router.push('/admin/payments');
+                          }
+                        }}
+                      >
+                        <div className="flex items-center">
+                          <CreditCard className={`${iconSize} ${
+                            paymentMenuItems.some(paymentItem => pathname === paymentItem.href || pathname.startsWith(paymentItem.href + '/'))
+                              ? 'text-white' 
+                              : 'text-blue-500 group-hover:text-blue-600'
+                          } transition-all flex-shrink-0`} />
+                          {state === 'expanded' && (
+                            <span className="font-medium text-sm ml-3">Gestion des Paiements</span>
+                          )}
+                        </div>
+                        {state === 'expanded' && (
+                          <div className="ml-auto">
+                            {paymentMenuOpen ? (
+                              <ChevronDown className="h-4 w-4 transition-transform" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4 transition-transform" />
+                            )}
+                          </div>
+                        )}
+                      </SidebarMenuButton>
+                      
+                      {/* Payment Submenu */}
+                      {state === 'expanded' && paymentMenuOpen && (
+                        <div className="ml-6 mt-1 space-y-1">
+                          {paymentMenuItems.map((paymentItem) => {
+                            const isPaymentActive = pathname === paymentItem.href || pathname.startsWith(paymentItem.href + '/');
+                            
+                            return (
+                              <SidebarMenuButton
+                                key={paymentItem.href}
+                                className={`group transition-all duration-200 font-medium rounded-lg px-3 py-2 min-h-[36px] flex items-center ${
+                                  isPaymentActive
+                                    ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                                    : 'hover:bg-muted/60 text-muted-foreground hover:text-blue-700'
+                                }`}
+                                onClick={() => router.push(paymentItem.href)}
+                              >
+                                <paymentItem.icon className={`h-4 w-4 ${
+                                  isPaymentActive ? 'text-blue-600' : 'text-blue-500 group-hover:text-blue-600'
+                                } transition-all flex-shrink-0`} />
+                                <span className="font-medium text-sm ml-3">{paymentItem.label}</span>
+                              </SidebarMenuButton>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </SidebarMenuItem>
+                  )}
                   
                   {/* Separator */}
                   <div className={`${state === 'expanded' ? 'mx-2 sm:mx-3' : 'mx-0'} my-3 sm:my-4`}>

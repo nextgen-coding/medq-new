@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -23,7 +23,10 @@ import {
   Crown,
   Calendar,
   CalendarDays,
-  Eye
+  Eye,
+  Sparkles,
+  Trophy,
+  Users
 } from 'lucide-react'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { AppSidebar, AppSidebarProvider } from '@/components/layout/AppSidebar'
@@ -74,6 +77,7 @@ interface PricingData {
 export default function PaymentPage() {
   const { user, refreshUser } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   const [state, setState] = useState<PaymentState>({
     method: null,
@@ -89,6 +93,8 @@ export default function PaymentPage() {
     requiresProof: false,
     status: 'selecting'
   })
+
+  const [countdown, setCountdown] = useState<number | null>(null)
 
   const [pricing, setPricing] = useState<PricingData | null>(null)
   const [isPricingLoading, setIsPricingLoading] = useState(true)
@@ -138,8 +144,92 @@ export default function PaymentPage() {
     fetchPricing()
   }, [])
 
-  // Redirect users with active subscriptions to dashboard
+  // Handle payment success/failure from URL parameters
   useEffect(() => {
+    const paymentStatus = searchParams.get('payment')
+    const subscriptionType = searchParams.get('type')
+    const paymentMethod = searchParams.get('method') // New parameter for payment method
+    
+    if (paymentStatus === 'success') {
+      setState(prev => ({ ...prev, status: 'completed' }))
+      
+      // Determine success message based on payment method
+      let title = "🎉 Paiement réussi !"
+      let description = `Votre abonnement ${subscriptionType === 'annual' ? 'annuel' : 'semestriel'} a été activé avec succès. Profitez de tous les contenus premium !`
+      
+      if (paymentMethod === 'voucher_code') {
+        title = "🎉 Code de bon validé !"
+        description = `Votre code de bon a été appliqué avec succès ! Votre abonnement ${subscriptionType === 'annual' ? 'annuel' : 'semestriel'} est maintenant actif.`
+      } else if (paymentMethod === 'custom_payment') {
+        title = "🎉 Paiement personnalisé validé !"
+        description = `Votre paiement personnalisé a été validé par nos équipes. Votre abonnement ${subscriptionType === 'annual' ? 'annuel' : 'semestriel'} est maintenant actif.`
+      }
+      
+      toast({
+        title,
+        description,
+        variant: "default"
+      })
+      // Refresh user data to update subscription status
+      refreshUser()
+      
+      // Start countdown for auto-redirect
+      setCountdown(5)
+      const countdownInterval = setInterval(() => {
+        setCountdown(prev => {
+          if (prev && prev > 1) {
+            return prev - 1
+          } else {
+            clearInterval(countdownInterval)
+            router.push('/dashboard')
+            return null
+          }
+        })
+      }, 1000)
+      
+      // Clean URL parameters after a delay
+      setTimeout(() => {
+        router.replace('/upgrade', { scroll: false })
+      }, 2000)
+      
+      return () => clearInterval(countdownInterval)
+    } else if (paymentStatus === 'failed') {
+      let title = "❌ Paiement échoué"
+      let description = "Le paiement n'a pas pu être traité. Veuillez réessayer ou contactez le support."
+      
+      if (paymentMethod === 'voucher_code') {
+        title = "❌ Code de bon invalide"
+        description = "Le code de bon fourni n'est pas valide ou a déjà été utilisé. Veuillez vérifier le code ou contactez le support."
+      } else if (paymentMethod === 'custom_payment') {
+        title = "❌ Paiement personnalisé refusé"
+        description = "Votre paiement personnalisé n'a pas pu être validé. Veuillez vérifier vos informations ou contactez le support."
+      }
+      
+      toast({
+        title,
+        description,
+        variant: "destructive"
+      })
+      // Clean URL parameters
+      router.replace('/upgrade', { scroll: false })
+    } else if (paymentStatus === 'error') {
+      toast({
+        title: "⚠️ Erreur technique",
+        description: "Une erreur technique s'est produite lors du traitement de votre paiement. Veuillez contacter le support.",
+        variant: "destructive"
+      })
+      // Clean URL parameters
+      router.replace('/upgrade', { scroll: false })
+    }
+  }, [searchParams, refreshUser, router])
+
+  // Redirect users with active subscriptions to dashboard (but only if not showing payment result)
+  useEffect(() => {
+    const paymentStatus = searchParams.get('payment')
+    
+    // Don't redirect if we're showing a payment result
+    if (paymentStatus) return
+    
     if (user && user.hasActiveSubscription) {
       toast({
         title: "Abonnement actif",
@@ -148,7 +238,7 @@ export default function PaymentPage() {
       })
       router.push('/dashboard')
     }
-  }, [user, router])
+  }, [user, router, searchParams])
 
   // Show loading while pricing is being fetched
   if (isPricingLoading || !pricing) {
@@ -263,16 +353,31 @@ export default function PaymentPage() {
           // Show proof upload form
           setState(prev => ({ ...prev, status: 'awaiting_proof' }))
         } else {
-          // Voucher payment completed
+          // Voucher or custom payment completed
           setState(prev => ({ ...prev, status: 'completed' }))
+          
+          // Enhanced success message based on payment method
+          let title = 'Succès'
+          let enhancedDescription = data.message
+          
+          if (state.method === 'voucher_code') {
+            title = '🎉 Code de bon validé !'
+            enhancedDescription = `Votre code de bon a été appliqué avec succès ! ${data.message}`
+          } else if (state.method === 'custom_payment') {
+            title = '🎉 Paiement enregistré !'
+            enhancedDescription = `Votre demande de paiement personnalisé a été enregistrée. ${data.message}`
+          }
+          
           toast({
-            title: 'Succès',
-            description: data.message,
+            title,
+            description: enhancedDescription,
             variant: 'default'
           })
           // Refresh user data and redirect
           if (refreshUser) await refreshUser()
-          router.push('/dashboard')
+          setTimeout(() => {
+            router.push('/dashboard')
+          }, 2000)
         }
       }
 
@@ -740,26 +845,70 @@ export default function PaymentPage() {
                   </Card>
                 )}
 
-                {/* Success/Completion Message */}
+                {/* Success/Completion Message - Enhanced */}
                 {state.status === 'completed' && (
-                  <Card className="border-green-200 bg-green-50 dark:bg-green-950">
-                    <CardContent className="pt-6">
+                  <Card className="shadow-2xl border-0 bg-gradient-to-br from-green-50 via-emerald-50 to-green-100 dark:from-green-950 dark:via-emerald-950 dark:to-green-900">
+                    <CardContent className="pt-10 pb-10">
                       <div className="text-center">
-                        <div className="mx-auto w-12 h-12 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center mb-4">
-                          <Check className="h-6 w-6 text-green-600" />
+                        <div className="relative mb-8">
+                          <div className="w-24 h-24 bg-gradient-to-r from-green-500 to-emerald-500 rounded-full flex items-center justify-center mx-auto shadow-2xl">
+                            <Check className="h-12 w-12 text-white" />
+                          </div>
+                          <div className="absolute -top-2 -right-2 w-10 h-10 bg-yellow-400 rounded-full flex items-center justify-center shadow-lg">
+                            <Sparkles className="h-5 w-5 text-yellow-800 animate-pulse" />
+                          </div>
                         </div>
-                        <h3 className="text-lg font-semibold text-green-800 dark:text-green-200 mb-2">
-                          {state.method === 'voucher_code' ? 'Abonnement activé !' : 'Demande soumise !'}
+                        <h3 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+                          {(() => {
+                            const urlMethod = searchParams.get('method')
+                            const displayMethod = urlMethod || state.method
+                            
+                            if (displayMethod === 'voucher_code') return '🎉 Code de bon validé !'
+                            if (displayMethod === 'custom_payment') return '✅ Paiement enregistré !'
+                            return '✅ Paiement réussi !'
+                          })()}
                         </h3>
-                        <p className="text-green-700 dark:text-green-300 mb-4">
-                          {state.method === 'voucher_code' 
-                            ? 'Votre abonnement a été activé avec succès. Vous avez maintenant accès à tous les contenus.'
-                            : 'Votre justificatif a été soumis. Un administrateur va vérifier votre paiement dans les plus brefs délais.'
-                          }
+                        <p className="text-gray-700 dark:text-gray-300 mb-6 text-xl leading-relaxed max-w-md mx-auto">
+                          {(() => {
+                            const urlMethod = searchParams.get('method')
+                            const displayMethod = urlMethod || state.method
+                            
+                            if (displayMethod === 'voucher_code') {
+                              return 'Parfait ! Votre code de bon a été appliqué avec succès. Votre abonnement premium est maintenant actif et vous pouvez profiter de tous les contenus exclusifs.'
+                            }
+                            if (displayMethod === 'custom_payment') {
+                              return 'Votre demande de paiement personnalisé a été enregistrée. Une fois validée par nos équipes, votre abonnement premium sera activé et vous recevrez une confirmation.'
+                            }
+                            return 'Félicitations ! Votre paiement a été traité avec succès et votre abonnement premium est maintenant actif. Accédez dès maintenant à tous les contenus exclusifs !'
+                          })()}
                         </p>
-                        <Button onClick={() => router.push('/dashboard')}>
-                          Retour au tableau de bord
-                        </Button>
+                        
+                        {/* Auto-redirect notice for payment success */}
+                        {searchParams.get('payment') === 'success' && countdown && (
+                          <div className="mb-6 p-4 bg-blue-100 border border-blue-200 rounded-lg">
+                            <p className="text-blue-800 text-sm font-medium">
+                              ℹ️ Redirection automatique vers le tableau de bord dans <span className="font-bold text-lg">{countdown}</span> seconde{countdown > 1 ? 's' : ''}...
+                            </p>
+                          </div>
+                        )}
+                        
+                        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                          <Button 
+                            onClick={() => router.push('/dashboard')}
+                            className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white font-bold py-4 px-8 rounded-2xl transition-all duration-300 transform hover:scale-105 shadow-xl text-lg"
+                          >
+                            <Trophy className="h-6 w-6 mr-2" />
+                            Accéder au contenu premium
+                          </Button>
+                          <Button 
+                            variant="outline"
+                            onClick={() => router.push('/profile')}
+                            className="border-3 border-gray-300 hover:border-gray-400 py-4 px-8 rounded-2xl transition-all duration-300 font-semibold text-lg"
+                          >
+                            <Users className="h-6 w-6 mr-2" />
+                            Mon profil
+                          </Button>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>

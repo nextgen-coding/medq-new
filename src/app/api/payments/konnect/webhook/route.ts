@@ -46,7 +46,8 @@ export async function GET(req: NextRequest) {
     const paymentRef = searchParams.get('payment_ref')
 
     if (!paymentRef) {
-      return NextResponse.json({ error: 'Payment reference is required' }, { status: 400 })
+      console.error('No payment reference provided in webhook')
+      return NextResponse.redirect(new URL('/upgrade?payment=error', req.url))
     }
 
     // Find payment by Konnect payment reference
@@ -57,7 +58,7 @@ export async function GET(req: NextRequest) {
 
     if (!payment) {
       console.error('Payment not found for ref:', paymentRef)
-      return NextResponse.json({ error: 'Payment not found' }, { status: 404 })
+      return NextResponse.redirect(new URL('/upgrade?payment=error', req.url))
     }
 
     // Get payment details from Konnect
@@ -72,7 +73,7 @@ export async function GET(req: NextRequest) {
 
     if (!konnectResponse.ok) {
       console.error('Failed to fetch payment details from Konnect')
-      return NextResponse.json({ error: 'Failed to verify payment' }, { status: 500 })
+      return NextResponse.redirect(new URL('/upgrade?payment=error', req.url))
     }
 
     const konnectData = await konnectResponse.json()
@@ -116,10 +117,7 @@ export async function GET(req: NextRequest) {
         }
       })
 
-      return NextResponse.json({ 
-        error: 'Payment amount verification failed',
-        details: 'Amount mismatch detected'
-      }, { status: 400 })
+      return NextResponse.redirect(new URL('/upgrade?payment=failed', req.url))
     }
 
     // Update payment status based on Konnect response
@@ -146,6 +144,9 @@ export async function GET(req: NextRequest) {
       })
 
       console.log(`Payment ${payment.id} completed successfully for user ${payment.userId}`)
+      
+      // Redirect to upgrade page with success parameters
+      return NextResponse.redirect(new URL(`/upgrade?payment=success&type=${payment.subscriptionType}`, req.url))
     } else if (konnectPayment.status === 'failed' && payment.status !== 'failed') {
       await prisma.payment.update({
         where: { id: payment.id },
@@ -153,15 +154,17 @@ export async function GET(req: NextRequest) {
       })
 
       console.log(`Payment ${payment.id} failed for user ${payment.userId}`)
+      
+      // Redirect to upgrade page with error parameters
+      return NextResponse.redirect(new URL('/upgrade?payment=failed', req.url))
     }
 
-    return NextResponse.json({ success: true, status: konnectPayment.status })
+    // For other statuses, redirect to upgrade page
+    return NextResponse.redirect(new URL('/upgrade', req.url))
 
   } catch (error) {
     console.error('Konnect webhook error:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    // Redirect to upgrade page with error in case of server error
+    return NextResponse.redirect(new URL('/upgrade?payment=error', req.url))
   }
 }
