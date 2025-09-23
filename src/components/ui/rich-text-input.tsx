@@ -731,7 +731,7 @@ export function RichTextInput({
   };
 
   return (
-    <div className="space-y-2" onFocus={(e) => e.stopPropagation()} onInput={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+    <div className="space-y-2" data-rich-text-input onFocus={(e) => e.stopPropagation()} onInput={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
       <div className="relative edit-input-isolation-layer" style={{ isolation: 'isolate', contain: 'layout style paint' }}>
         {useInlineImages ? (
           <div

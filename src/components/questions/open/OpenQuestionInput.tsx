@@ -8,12 +8,13 @@ interface OpenQuestionInputProps {
   setAnswer: (answer: string) => void;
   isSubmitted: boolean;
   onSubmit?: () => void; // optional submit handler for Enter key
+  onSkip?: () => void; // optional skip handler for Enter key when answer is empty
   onBlur?: (answer: string) => void; // callback when leaving input field
   isActive?: boolean; // whether this question is currently active/focused
   disableEnterKey?: boolean; // when true, defer Enter handling to parent
 }
 
-export function OpenQuestionInput({ answer, setAnswer, isSubmitted, onSubmit, onBlur, isActive = false, disableEnterKey = false }: OpenQuestionInputProps) {
+export function OpenQuestionInput({ answer, setAnswer, isSubmitted, onSubmit, onSkip, onBlur, isActive = false, disableEnterKey = false }: OpenQuestionInputProps) {
   const { t } = useTranslation();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -23,6 +24,27 @@ export function OpenQuestionInput({ answer, setAnswer, isSubmitted, onSubmit, on
       textareaRef.current.focus();
     }
   }, [isSubmitted, isActive]);
+
+  // Add click-outside functionality to blur the textarea when clicking elsewhere
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (textareaRef.current && !textareaRef.current.contains(event.target as Node)) {
+        // Only blur if the textarea is currently focused
+        if (document.activeElement === textareaRef.current) {
+          textareaRef.current.blur();
+        }
+      }
+    };
+
+    // Only add listener when not submitted
+    if (!isSubmitted) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isSubmitted]);
   
   const handleAnswerChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
     if (isSubmitted) return;
@@ -56,7 +78,20 @@ export function OpenQuestionInput({ answer, setAnswer, isSubmitted, onSubmit, on
         return; // allow newline
       }
       e.preventDefault();
-      onSubmit?.();
+      
+      // If answer is empty and onSkip is available, skip instead of submitting
+      if (!answer.trim() && onSkip) {
+        if (textareaRef.current) {
+          textareaRef.current.blur();
+        }
+        // Small delay to ensure blur happens before navigation
+        setTimeout(() => {
+          onSkip();
+        }, 10);
+      } else {
+        // Call onSubmit for actual submission with answer
+        onSubmit?.();
+      }
     }
   };
   
@@ -72,7 +107,7 @@ export function OpenQuestionInput({ answer, setAnswer, isSubmitted, onSubmit, on
         rows={3}
         disabled={isSubmitted}
         className={`
-          resize-none transition-all duration-200 w-full max-w-full min-h-[60px] text-sm
+          resize-none transition-all duration-200 w-full max-w-none min-h-[60px] text-sm
           ${isSubmitted ? 'bg-muted' : ''}
         `}
       />

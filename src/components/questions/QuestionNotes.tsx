@@ -56,7 +56,6 @@ export function QuestionNotes({ questionId, onHasContentChange, autoEdit = false
   // Auto-enter edit mode when autoEdit is true and no content exists
   useEffect(() => {
     if (autoEdit && !hasContent && initialLoaded) {
-      console.log('QuestionNotes - Auto-entering edit mode:', { autoEdit, hasContent, initialLoaded, questionType });
       setIsEditing(true);
       setManuallyEnteredEditMode(true); // Mark as manually entered when autoEdit triggers
     }
@@ -153,8 +152,6 @@ export function QuestionNotes({ questionId, onHasContentChange, autoEdit = false
           questionType === 'grouped-mcq';
 
         const apiUrl = isClinicalCase ? '/api/clinical-case-notes' : '/api/user-question-state';
-
-        console.log('QuestionNotes - API routing:', { questionId, questionType, isClinicalCase, apiUrl });
 
         const res = await fetch(`${apiUrl}?userId=${user.id}&questionId=${questionId}`);
         if (!res.ok || cancelled) return;
@@ -269,15 +266,11 @@ export function QuestionNotes({ questionId, onHasContentChange, autoEdit = false
       return false;
     }
 
-    console.log('Syncing to server with content:', content, 'and image URLs:', imageUrls);
-
     // Check if this is a clinical case or grouped question based on explicit questionType
     const isClinicalCase = questionType === 'clinical-case' ||
       questionType === 'grouped-qroc' ||
       questionType === 'grouped-qcm' ||
       questionType === 'grouped-mcq';
-
-    console.log('Is clinical case:', isClinicalCase, 'questionId:', questionId, 'questionType:', questionType);
 
     const apiUrl = isClinicalCase ? '/api/clinical-case-notes' : '/api/user-question-state';
 
@@ -332,7 +325,6 @@ export function QuestionNotes({ questionId, onHasContentChange, autoEdit = false
         
         // Notify other components that notes have been updated
         const hasContent = cleanedContent.trim().length > 0;
-        console.log('QuestionNotes - Dispatching notes-updated event:', { questionId, hasContent, contentLength: cleanedContent.trim().length });
         window.dispatchEvent(new CustomEvent('notes-updated', {
           detail: { questionId, hasContent }
         }));
@@ -382,7 +374,6 @@ export function QuestionNotes({ questionId, onHasContentChange, autoEdit = false
     }
     
     // Notify other components that notes have been cleared
-    console.log('QuestionNotes - Dispatching notes-cleared event:', { questionId, hasContent: false });
     window.dispatchEvent(new CustomEvent('notes-updated', {
       detail: { questionId, hasContent: false }
     }));
@@ -441,7 +432,6 @@ export function QuestionNotes({ questionId, onHasContentChange, autoEdit = false
       setLastSavedAt(null);
 
       // Notify other components that notes have been cleared
-      console.log('QuestionNotes - Dispatching notes-cleared event:', { questionId, hasContent: false });
       window.dispatchEvent(new CustomEvent('notes-updated', {
         detail: { questionId, hasContent: false }
       }));
@@ -549,7 +539,7 @@ export function QuestionNotes({ questionId, onHasContentChange, autoEdit = false
 
   // Always show the notebook-style interface
   return (
-    <div className="mt-4">
+    <div className="mt-4" data-question-notes>
       <div className="rounded-lg overflow-hidden shadow-sm border border-gray-300 dark:border-gray-600">
         {/* Notebook-style header - Enhanced with deeper colors */}
         <div className="h-12 bg-gradient-to-r from-amber-200 to-yellow-200 border-b border-amber-400 relative shadow-sm">

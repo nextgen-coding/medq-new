@@ -1,5 +1,16 @@
  'use client';
 
+/**
+ * CreateQuestionDialog - Question creation interface with numbering scheme to prevent collisions
+ * 
+ * NUMBERING SCHEME (caseNumber field):
+ * - Clinical Cases: 1-999 (auto-assigned starting from 1)
+ * - Multi-QROC Groups: 1000-1999 (auto-assigned starting from 1000)  
+ * - Multi-MCQ Groups: 2000-2999 (auto-assigned starting from 2000)
+ * 
+ * This prevents different question types from being grouped together incorrectly.
+ */
+
 import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -274,24 +285,42 @@ export function CreateQuestionDialog({ lecture, isOpen, onOpenChange, onQuestion
           return;
         }
       }
+      
+      // Validate manual group number range for QROC
+      if (formData.number && (formData.number < 1000 || formData.number >= 2000)) {
+        toast({ 
+          title: 'Erreur de numérotation', 
+          description: 'Les groupes QROC doivent utiliser des numéros entre 1000 et 1999.', 
+          variant: 'destructive' 
+        });
+        return;
+      }
+      
       try {
         setIsSubmitting(true);
-        // Auto assign group number if absent: fetch existing max caseNumber among qroc
+        // Auto assign group number if absent: fetch existing max caseNumber among QROC groups only
         let groupNumber = formData.number;
         if (!groupNumber) {
           try {
             const resp = await fetch(`/api/questions?lectureId=${lecture.id}`);
             if (resp.ok) {
               const data = await resp.json();
-              const maxExisting = (data as any[])
-                .filter(q => q.type === 'qroc' && q.caseNumber)
-                .reduce((m, q) => Math.max(m, q.caseNumber || 0), 0);
-              groupNumber = maxExisting + 1;
+              // Only look at QROC questions with caseNumber (multi-QROC groups)
+              // Use range 1000-1999 for QROC groups to avoid collision with clinical cases
+              const qrocGroupNumbers = (data as any[])
+                .filter(q => q.type === 'qroc' && q.caseNumber && q.caseNumber >= 1000 && q.caseNumber < 2000)
+                .map(q => q.caseNumber);
+              
+              if (qrocGroupNumbers.length > 0) {
+                groupNumber = Math.max(...qrocGroupNumbers) + 1;
+              } else {
+                groupNumber = 1000; // Start QROC groups at 1000
+              }
             } else {
-              groupNumber = Math.floor(Date.now()/1000); // fallback
+              groupNumber = 1000; // fallback
             }
           } catch {
-            groupNumber = Math.floor(Date.now()/1000);
+            groupNumber = 1000;
           }
         }
         let created = 0;
@@ -348,23 +377,40 @@ export function CreateQuestionDialog({ lecture, isOpen, onOpenChange, onQuestion
         if (validOpts.length < 2) { toast({ title: 'Erreur', description: 'Chaque QCM doit avoir au moins 2 options.', variant: 'destructive' }); return; }
         if (sq.correctAnswers.length === 0) { toast({ title: 'Erreur', description: 'Sélectionnez au moins une bonne réponse pour chaque QCM.', variant: 'destructive' }); return; }
       }
+      
+      // Validate manual group number range for MCQ
+      if (formData.number && (formData.number < 2000 || formData.number >= 3000)) {
+        toast({ 
+          title: 'Erreur de numérotation', 
+          description: 'Les groupes QCM doivent utiliser des numéros entre 2000 et 2999.', 
+          variant: 'destructive' 
+        });
+        return;
+      }
       try {
         setIsSubmitting(true);
-        // Determine or assign group number among existing MCQs
+        // Determine or assign group number among existing MCQ groups only
         let groupNumber = formData.number;
         if (!groupNumber) {
           try {
             const resp = await fetch(`/api/questions?lectureId=${lecture.id}`);
             if (resp.ok) {
               const data = await resp.json();
-              const maxExisting = (data as any[])
-                .filter(q => q.type === 'mcq' && q.caseNumber)
-                .reduce((m, q) => Math.max(m, q.caseNumber || 0), 0);
-              groupNumber = maxExisting + 1;
+              // Only look at MCQ questions with caseNumber (multi-MCQ groups)
+              // Use range 2000-2999 for MCQ groups to avoid collision with clinical cases and QROC groups
+              const mcqGroupNumbers = (data as any[])
+                .filter(q => q.type === 'mcq' && q.caseNumber && q.caseNumber >= 2000 && q.caseNumber < 3000)
+                .map(q => q.caseNumber);
+              
+              if (mcqGroupNumbers.length > 0) {
+                groupNumber = Math.max(...mcqGroupNumbers) + 1;
+              } else {
+                groupNumber = 2000; // Start MCQ groups at 2000
+              }
             } else {
-              groupNumber = Math.floor(Date.now()/1000);
+              groupNumber = 2000;
             }
-          } catch { groupNumber = Math.floor(Date.now()/1000); }
+          } catch { groupNumber = 2000; }
         }
         let created = 0;
         for (let i=0; i<qcmSubs.length; i++) {
@@ -615,14 +661,42 @@ export function CreateQuestionDialog({ lecture, isOpen, onOpenChange, onQuestion
 
   // ===== Builder Submit =====
   const handleBuilderSubmit = async () => {
-    // Check if case number is explicitly provided by user
-    if (caseNumber === undefined || isNaN(caseNumber)) {
-      toast({ title: 'Erreur de validation', description: 'Numéro de cas requis. Veuillez saisir un numéro dans le champ "Numéro du cas".', variant: 'destructive' });
+    // Validate manual case number range for clinical cases
+    if (caseNumber !== undefined && !isNaN(caseNumber) && (caseNumber >= 1000)) {
+      toast({ 
+        title: 'Erreur de numérotation', 
+        description: 'Les cas cliniques doivent utiliser des numéros entre 1 et 999.', 
+        variant: 'destructive' 
+      });
       return;
     }
+    
+    // Auto assign case number if not provided - only look at clinical cases
+    let effectiveCaseNumber = caseNumber;
+    if (effectiveCaseNumber === undefined || isNaN(effectiveCaseNumber)) {
+      try {
+        const resp = await fetch(`/api/questions?lectureId=${lecture.id}`);
+        if (resp.ok) {
+          const data = await resp.json();
+          // Only look at clinical case questions (clinic_mcq, clinic_croq)
+          // Use range 1-999 for clinical cases to avoid collision with multi-question groups
+          const clinicalCaseNumbers = (data as any[])
+            .filter(q => (q.type === 'clinic_mcq' || q.type === 'clinic_croq') && q.caseNumber && q.caseNumber < 1000)
+            .map(q => q.caseNumber);
+          
+          if (clinicalCaseNumbers.length > 0) {
+            effectiveCaseNumber = Math.max(...clinicalCaseNumbers) + 1;
+          } else {
+            effectiveCaseNumber = 1; // Start clinical cases at 1
+          }
+        } else {
+          effectiveCaseNumber = 1; // fallback
+        }
+      } catch {
+        effectiveCaseNumber = 1;
+      }
+    }
 
-    // Use the explicitly provided case number
-    const effectiveCaseNumber = caseNumber;
     if (!caseText.trim()) {
       toast({ title: 'Erreur de validation', description: 'Texte du cas requis.', variant: 'destructive' });
       return;
@@ -666,7 +740,7 @@ export function CreateQuestionDialog({ lecture, isOpen, onOpenChange, onQuestion
           explanation: null, // per-sub explanation removed
           courseReminder: formData.courseReminder.trim() || null,
           number: null,
-          session: null,
+          session: formData.session.trim() || null,
           mediaUrl: null,
           mediaType: null,
           courseReminderMediaUrl: formData.reminderMediaUrl || null,
@@ -840,7 +914,25 @@ export function CreateQuestionDialog({ lecture, isOpen, onOpenChange, onQuestion
             <div className="space-y-2">
               <Label htmlFor="number">N°</Label>
               {/* Per-sub explanation removed; rely on global rappel du cours below */}
-              <Input id="number" type="number" placeholder="N°" value={formData.number === undefined ? '' : formData.number} onChange={(e)=> setFormData(prev => ({ ...prev, number: e.target.value === '' ? undefined : parseInt(e.target.value,10) }))} />
+              <Input 
+                id="number" 
+                type="number" 
+                placeholder={
+                  (formData.type === 'qroc' && multiQrocMode) ? "1000-1999 (auto)" :
+                  (formData.type === 'mcq' && multiQcmMode) ? "2000-2999 (auto)" :
+                  builderModeDerived ? "1-999 (auto)" :
+                  "N°"
+                }
+                value={formData.number === undefined ? '' : formData.number} 
+                onChange={(e)=> setFormData(prev => ({ ...prev, number: e.target.value === '' ? undefined : parseInt(e.target.value,10) }))} 
+              />
+              {((formData.type === 'qroc' && multiQrocMode) || (formData.type === 'mcq' && multiQcmMode) || builderModeDerived) && (
+                <p className="text-xs text-gray-500">
+                  {(formData.type === 'qroc' && multiQrocMode) && "Groupes QROC: 1000-1999"}
+                  {(formData.type === 'mcq' && multiQcmMode) && "Groupes QCM: 2000-2999"}
+                  {builderModeDerived && "Cas cliniques: 1-999"}
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="session">Session</Label>
@@ -934,7 +1026,17 @@ export function CreateQuestionDialog({ lecture, isOpen, onOpenChange, onQuestion
                 <CardHeader className="pb-3"><CardTitle className="text-sm">Données du cas</CardTitle></CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className="space-y-2"><Label htmlFor="caseNumber">Numéro du cas *</Label><Input id="caseNumber" type="number" value={caseNumber === undefined ? '' : caseNumber} onChange={e=> setCaseNumber(e.target.value === '' ? undefined : parseInt(e.target.value,10))} required /></div>
+                    <div className="space-y-2">
+                      <Label htmlFor="caseNumber">Numéro du cas *</Label>
+                      <Input 
+                        id="caseNumber" 
+                        type="number" 
+                        placeholder="1-999 (auto)" 
+                        value={caseNumber === undefined ? '' : caseNumber} 
+                        onChange={e=> setCaseNumber(e.target.value === '' ? undefined : parseInt(e.target.value,10))} 
+                      />
+                      <p className="text-xs text-gray-500">Cas cliniques: 1-999</p>
+                    </div>
                     <div className="md:col-span-3 space-y-2"><Label htmlFor="caseText">Texte du cas *</Label><RichTextInput value={caseText} onChange={setCaseText} images={images} onImagesChange={setImages} rows={6} placeholder="Description clinique partagée... Vous pouvez inclure des images." /></div>
                   </div>
                 </CardContent>
@@ -1051,19 +1153,21 @@ export function CreateQuestionDialog({ lecture, isOpen, onOpenChange, onQuestion
             </>
           )}
 
-          {/* Énoncé (single question OR multi QROC group header) */}
-          <div className="space-y-2">
-            <Label htmlFor="text">{((multiQrocMode && formData.type==='qroc') || (multiQcmMode && formData.type==='mcq')) ? 'Texte commun (optionnel)' : 'Énoncé de la question *'}</Label>
-            <RichTextInput
-              value={formData.text}
-              onChange={(value) => setFormData(prev => ({ ...prev, text: value }))}
-              images={images}
-              onImagesChange={setImages}
-              placeholder="Saisir l'énoncé de la question... Vous pouvez insérer des images directement dans le texte."
-              rows={6}
-              className="min-h-[100px]"
-            />
-          </div>
+          {/* Énoncé (single question OR multi QROC group header) - Hidden for clinical cases */}
+          {formData.type !== 'clinical_case' && (
+            <div className="space-y-2">
+              <Label htmlFor="text">{((multiQrocMode && formData.type==='qroc') || (multiQcmMode && formData.type==='mcq')) ? 'Texte commun (optionnel)' : 'Énoncé de la question *'}</Label>
+              <RichTextInput
+                value={formData.text}
+                onChange={(value) => setFormData(prev => ({ ...prev, text: value }))}
+                images={images}
+                onImagesChange={setImages}
+                placeholder="Saisir l'énoncé de la question... Vous pouvez insérer des images directement dans le texte."
+                rows={6}
+                className="min-h-[100px]"
+              />
+            </div>
+          )}
 
           {/* (Block reference QROC removed; unified bottom section handles all) */}
 

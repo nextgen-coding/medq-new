@@ -37,7 +37,10 @@ export default function RootLayout({
 }) {
   return (
   <html lang="en">
-  <body className={`${inter.className} overflow-x-hidden min-h-screen h-full w-full`}>
+  <body 
+    className={`${inter.className} overflow-x-hidden min-h-screen h-full w-full`}
+    suppressHydrationWarning={true}
+  >
     {/* Preload PDF worker to avoid race conditions in production */}
     <link rel="preload" as="script" href="/pdf.worker.min.mjs" />
     <link rel="prefetch" href="/pdf.worker.min.mjs" />

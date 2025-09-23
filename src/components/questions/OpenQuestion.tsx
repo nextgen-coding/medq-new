@@ -56,6 +56,7 @@ interface OpenQuestionProps {
   disableEnterHandlers?: boolean; // when true, OpenQuestion won't handle Enter; parent handles it
   onFocus?: () => void; // callback when any part of the question receives focus
   autoFocus?: boolean; // control initial autofocus of textarea when active
+  showEyeButton?: boolean; // control whether to show the eye button in header
 }
 
 export function OpenQuestion({ 
@@ -87,6 +88,7 @@ export function OpenQuestion({
   disableEnterHandlers = false,
   onFocus,
   autoFocus = true,
+  showEyeButton = false,
 }: OpenQuestionProps) {
   const [answer, setAnswer] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -98,8 +100,40 @@ export function OpenQuestion({
   const [deferredAssessmentResult, setDeferredAssessmentResult] = useState<boolean | 'partial' | null>(null); // Track deferred self-assessment
   const [isPinned, setIsPinned] = useState(false); // Track if question is pinned
   const [showNotesArea, setShowNotesArea] = useState(false); // Control showing notes/comments after click
+  const [submittedAnswer, setSubmittedAnswer] = useState(''); // Preserve the user's answer for display
+  const [shouldShowUserAnswer, setShouldShowUserAnswer] = useState(false); // Flag to control what to display
   const [notesHasContent, setNotesHasContent] = useState(false); // track if notes have content
   const [notesManuallyControlled, setNotesManuallyControlled] = useState(false); // track if user manually opened/closed notes
+  const [showInlineAnswer, setShowInlineAnswer] = useState(false); // Control inline answer visibility
+
+  // Helper function to get color classes based on evaluation result
+  const getEvaluationColors = (result: boolean | 'partial' | null | undefined) => {
+    if (result === true) {
+      return {
+        border: 'border-green-300/60 dark:border-green-600/70',
+        background: 'bg-green-50/80 dark:bg-green-900/40',
+        text: 'text-green-800 dark:text-green-50'
+      };
+    } else if (result === 'partial') {
+      return {
+        border: 'border-amber-300/60 dark:border-amber-600/70',
+        background: 'bg-amber-50/80 dark:bg-amber-900/40',
+        text: 'text-amber-800 dark:text-amber-50'
+      };
+    } else if (result === false) {
+      return {
+        border: 'border-red-300/60 dark:border-red-600/70',
+        background: 'bg-red-50/80 dark:bg-red-900/40',
+        text: 'text-red-800 dark:text-red-50'
+      };
+    }
+    // Default to emerald when no evaluation or showing correct answer
+    return {
+      border: 'border-emerald-300/60 dark:border-emerald-600/70',
+      background: 'bg-emerald-50/80 dark:bg-emerald-900/40',
+      text: 'text-emerald-800 dark:text-emerald-50'
+    };
+  };
 
   // Auto-show notes when content is detected, but don't auto-hide when content is deleted
   useEffect(() => {
@@ -149,6 +183,8 @@ export function OpenQuestion({
       setAssessmentCompleted(false);
       setHasSubmitted(false);
       hasSubmittedRef.current = false;
+      setSubmittedAnswer(''); // Reset preserved answer
+      setShouldShowUserAnswer(false); // Reset flag
     }
   }, [resetSignal]);
 
@@ -215,22 +251,22 @@ export function OpenQuestion({
       if (response.ok) {
         setIsPinned(true);
         toast({
-          title: "Question Pinned",
-          description: "This question has been pinned to your collection.",
+          title: "Question épinglée",
+          description: "Cette question a été ajoutée à votre collection épinglée.",
         });
   window.dispatchEvent(new Event('pinned-updated'));
       } else {
         toast({
-          title: "Error",
-          description: "Failed to pin question.",
+          title: "Erreur",
+          description: "Impossible d'épingler la question.",
           variant: "destructive",
         });
       }
     } catch (error) {
       console.error('Error pinning question:', error);
       toast({
-        title: "Error",
-        description: "Failed to pin question.",
+        title: "Erreur",
+        description: "Impossible d'épingler la question.",
         variant: "destructive",
       });
     }
@@ -247,22 +283,22 @@ export function OpenQuestion({
       if (response.ok) {
         setIsPinned(false);
         toast({
-          title: "Question Unpinned",
-          description: "This question has been removed from your pinned collection.",
+          title: "Question désépinglée",
+          description: "Cette question a été retirée de votre collection épinglée.",
         });
   window.dispatchEvent(new Event('pinned-updated'));
       } else {
         toast({
-          title: "Error",
-          description: "Failed to unpin question.",
+          title: "Erreur",
+          description: "Impossible de désépingler la question.",
           variant: "destructive",
         });
       }
     } catch (error) {
       console.error('Error unpinning question:', error);
       toast({
-        title: "Error",
-        description: "Failed to unpin question.",
+        title: "Erreur",
+        description: "Impossible de désépingler la question.",
         variant: "destructive",
       });
     }
@@ -320,6 +356,7 @@ export function OpenQuestion({
   useEffect(() => {
     if (isAnswered) {
       setAnswer(userAnswer || '');
+      setSubmittedAnswer(userAnswer || ''); // Preserve user's answer for display
       setSubmitted(true);
       setHasSubmitted(true);
       hasSubmittedRef.current = true;
@@ -332,11 +369,16 @@ export function OpenQuestion({
           // Evaluation done – hide buttons
           setAssessmentCompleted(true);
           setShowSelfAssessment(false);
+          setShouldShowUserAnswer(true); // Show user's answer when evaluation is completed
         }
       } else {
-        // Immediate mode
+        // Immediate mode or clinical case after refresh
         setAssessmentCompleted(answerResult !== undefined);
         setShowSelfAssessment(false);
+        // In clinical cases (identified by hideActions + hideMeta), always show user answer if evaluation is complete
+        if (hideActions && hideMeta && answerResult !== undefined) {
+          setShouldShowUserAnswer(true);
+        }
       }
     } else {
       if (!userAnswer) setAnswer('');
@@ -345,8 +387,9 @@ export function OpenQuestion({
       setAssessmentCompleted(false);
       setHasSubmitted(false);
       hasSubmittedRef.current = false;
+      setShouldShowUserAnswer(false); // Reset flag when not answered
     }
-  }, [question.id, isAnswered, answerResult, showDeferredSelfAssessment, userAnswer]);
+  }, [question.id, isAnswered, answerResult, showDeferredSelfAssessment, userAnswer, hideActions, hideMeta]);
 
   const handleSubmit = async () => {
     // In grouped clinical case mode we disable individual submission until parent submits
@@ -357,6 +400,7 @@ export function OpenQuestion({
     hasSubmittedRef.current = true;
     setSubmitted(true);
     setHasSubmitted(true);
+    setSubmittedAnswer(answer); // Preserve the user's answer for display during self-assessment
     
     // Keep notes hidden by default - user can manually open if needed
     
@@ -393,6 +437,7 @@ export function OpenQuestion({
   const handleSelfAssessment = async (rating: 'correct' | 'wrong' | 'partial') => {
     setAssessmentCompleted(true);
     setShowSelfAssessment(false);
+    setShouldShowUserAnswer(true); // Flag to show user answer instead of correct answer
     
     // Store the rating as a string for proper handling in the navigator
     const resultValue = rating === 'correct' ? true : rating === 'partial' ? 'partial' : false;
@@ -407,11 +452,11 @@ export function OpenQuestion({
         trackQuestionProgress(lectureId, question.id, resultValue);
       }
     } else {
-      // For regular questions, track progress and call onSubmit
+      // For regular questions, track progress and call onSubmit using the preserved answer
       if (lectureId) {
         trackQuestionProgress(lectureId, question.id, resultValue);
       }
-      onSubmit(answer, resultValue);
+      onSubmit(submittedAnswer, resultValue); // Use preserved answer
     }
 
     // Persist attempt + score
@@ -433,6 +478,33 @@ export function OpenQuestion({
         });
       } catch {}
     }
+  };
+
+  const handleResubmit = () => {
+    // Reset the question state to allow resubmission
+    setAnswer('');
+    setSubmitted(false);
+    setShowSelfAssessment(false);
+    setAssessmentCompleted(false);
+    setHasSubmitted(false);
+    hasSubmittedRef.current = false;
+    setDeferredAssessmentResult(null);
+    setSubmittedAnswer(''); // Reset preserved answer
+    setShouldShowUserAnswer(false); // Reset flag
+    
+    // Optional: Show a toast to confirm the reset
+    toast({
+      title: "Question réinitialisée",
+      description: "Vous pouvez maintenant soumettre une nouvelle réponse.",
+    });
+    
+    // Focus the textarea after a brief delay to ensure state has updated
+    setTimeout(() => {
+      const textarea = document.querySelector('textarea');
+      if (textarea) {
+        textarea.focus();
+      }
+    }, 100);
   };
 
   const handleQuestionUpdated = async () => {
@@ -459,16 +531,12 @@ export function OpenQuestion({
 
   // Compute expected reference answer (memoized)
   const expectedReference = useMemo(() => {
-    // In revision mode, use userAnswer if available (when isAnswered is true but not submitted)
-    if (isAnswered && !submitted && userAnswer) {
-      return userAnswer;
-    }
-    
+    // Always show the correct answer, not the user's answer
     const correctArr: string[] = (question as any).correctAnswers || (question as any).correct_answers || [];
     const expectedFromArray = Array.isArray(correctArr) && correctArr.length > 0 ? correctArr.filter(Boolean).join(' / ') : '';
     const expected = expectedFromArray || (question as any).course_reminder || (question as any).courseReminder || question.explanation || (question as any).correctAnswer || '';
     return expected || '';
-  }, [question, isAnswered, submitted, userAnswer]);
+  }, [question]);
 
   // Admin function to toggle question visibility
   const handleToggleVisibility = async () => {
@@ -556,6 +624,9 @@ export function OpenQuestion({
         event.preventDefault();
         if (answer.trim()) {
           handleSubmit();
+        } else {
+          // Allow skipping to next question even if no answer provided
+          onNext();
         }
         return;
       }
@@ -581,7 +652,7 @@ export function OpenQuestion({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
       transition={{ duration: 0.4 }}
-      className="space-y-2 w-full max-w-full"
+      className="space-y-2 w-full max-w-none"
       onFocus={onFocus}
     >
   {/**
@@ -593,17 +664,14 @@ export function OpenQuestion({
         // simple (non-clinical) QROC: immediate results, individual submit enabled
         const isSimpleQroc = !hideImmediateResults && !disableIndividualSubmit;
         // Can show reference answer under same rules as original logic
-        // In revision mode, use userAnswer if available (when isAnswered is true but not submitted)
+        // Always show the correct answer, not the user's answer
         let expectedReferenceInline = '';
-        if (isAnswered && !submitted && userAnswer) {
-          expectedReferenceInline = userAnswer;
-        } else {
-          const correctArr: string[] = (question as any).correctAnswers || (question as any).correct_answers || [];
-          const expectedFromArray = Array.isArray(correctArr) && correctArr.length > 0 ? correctArr.filter(Boolean).join(' / ') : '';
-          const expected = expectedFromArray || (question as any).course_reminder || (question as any).courseReminder || question.explanation || (question as any).correctAnswer || '';
-          expectedReferenceInline = expected || '';
-        }
-        const canShowReferenceInline = submitted && expectedReferenceInline && (!hideImmediateResults || (showSelfAssessment && showDeferredSelfAssessment) || assessmentCompleted);
+        const correctArr: string[] = (question as any).correctAnswers || (question as any).correct_answers || [];
+        const expectedFromArray = Array.isArray(correctArr) && correctArr.length > 0 ? correctArr.filter(Boolean).join(' / ') : '';
+        const expected = expectedFromArray || (question as any).course_reminder || (question as any).courseReminder || question.explanation || (question as any).correctAnswer || '';
+        expectedReferenceInline = expected || '';
+        
+        const canShowReferenceInline = submitted && expectedReferenceInline && (!hideImmediateResults || (showSelfAssessment && showDeferredSelfAssessment) || assessmentCompleted) && !showSelfAssessment;
 
         if (!(submitted && isSimpleQroc)) return null;
 
@@ -622,12 +690,14 @@ export function OpenQuestion({
 
             {/* Reference answer inside same card */}
             {canShowReferenceInline && (
-              <div className="rounded-md bg-emerald-50/80 dark:bg-emerald-900/40 px-4 sm:px-5 py-3">
+              <div className={`rounded-xl border ${shouldShowUserAnswer ? getEvaluationColors(deferredAssessmentResult || answerResult).border : 'border-emerald-300/60 dark:border-emerald-600/70'} ${shouldShowUserAnswer ? getEvaluationColors(deferredAssessmentResult || answerResult).background : 'bg-emerald-50/80 dark:bg-emerald-900/40'} px-4 sm:px-5 py-3 shadow-sm`}>
                 <div className="mb-1.5">
-                  <h3 className="text-base md:text-lg font-semibold tracking-tight text-emerald-800 dark:text-emerald-50">Réponse</h3>
+                  <h3 className={`text-base md:text-lg font-semibold tracking-tight ${shouldShowUserAnswer ? getEvaluationColors(deferredAssessmentResult || answerResult).text : 'text-emerald-800 dark:text-emerald-50'}`}>
+                    {shouldShowUserAnswer ? "Votre réponse" : "Réponse"}
+                  </h3>
                 </div>
-                <div className="prose prose-sm md:prose-base dark:prose-invert max-w-none leading-relaxed text-emerald-800 dark:text-emerald-50">
-                  <RichTextDisplay text={expectedReferenceInline} enableImageZoom={true} />
+                <div className={`prose prose-sm md:prose-base dark:prose-invert max-w-none leading-relaxed ${shouldShowUserAnswer ? getEvaluationColors(deferredAssessmentResult || answerResult).text : 'text-emerald-800 dark:text-emerald-50'}`}>
+                  <RichTextDisplay text={shouldShowUserAnswer ? (submittedAnswer || answer || "Aucune réponse saisie") : expectedReferenceInline} enableImageZoom={true} />
                 </div>
               </div>
             )}
@@ -637,11 +707,13 @@ export function OpenQuestion({
               <div ref={selfAssessmentRef}>
                 <OpenQuestionSelfAssessment
                   onAssessment={handleSelfAssessment}
-                  userAnswerText={submitted ? answer : undefined}
+                  userAnswerText={submittedAnswer || (submitted ? answer : undefined)}
                   questionId={question.id}
                   enableHighlighting={enableAnswerHighlighting}
                   highlightConfirm={highlightConfirm}
                   variant="flat"
+                  selectedRating={deferredAssessmentResult}
+                  correctAnswer={(question.correct_answers || question.correctAnswers || []).join(', ') || question.explanation || ''}
                 />
               </div>
             )}
@@ -650,9 +722,10 @@ export function OpenQuestion({
       })()}
       
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
-        <div className="flex-1 min-w-0 max-w-3xl">
-          {/* In simple QROC post-submit wrapper we already show the question text inside the container */}
-          {!hideMeta && !(submitted && !hideImmediateResults && !disableIndividualSubmit) && (
+        <div className="flex-1 min-w-0 max-w-5xl">
+          {/* Always ensure question text is visible - either in header or inline */}
+          {!hideMeta && 
+           !(submitted && !hideImmediateResults && !disableIndividualSubmit) && (
             <OpenQuestionHeader 
               questionText={question.text} 
               questionNumber={question.number}
@@ -662,18 +735,60 @@ export function OpenQuestion({
               questionId={question.id}
               highlightConfirm={highlightConfirm}
               hideMeta={hideMeta}
+              correctAnswers={question.correct_answers || question.correctAnswers}
+              showEyeButton={showEyeButton}
             />
           )}
-          {hideMeta && !(submitted && !hideImmediateResults && !disableIndividualSubmit) && (
-            <div className="inline-block">
-              <HighlightableQuestionText
-                questionId={question.id}
-                text={question.text}
-                className="mt-0 text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100 leading-relaxed break-words whitespace-pre-wrap inline"
-                confirmMode={highlightConfirm}
-                images={question.images}
-              />
-            </div>
+          {/* Show inline question text when hideMeta is true - with optional eye button */}
+          {hideMeta && 
+           !(submitted && !hideImmediateResults && !disableIndividualSubmit) && (
+            <>
+              <div className="flex items-start gap-3 mb-2">
+                {question.number && (
+                  <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold tracking-wide flex-shrink-0 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                    Question {question.number}
+                  </span>
+                )}
+                <div className="flex-1 min-w-0">
+                  <HighlightableQuestionText
+                    questionId={question.id}
+                    text={question.text}
+                    className="mt-0 text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100 leading-relaxed break-words whitespace-pre-wrap"
+                    confirmMode={highlightConfirm}
+                    images={question.images}
+                  />
+                </div>
+                {showEyeButton && (question.correct_answers || question.correctAnswers) && ((question.correct_answers && question.correct_answers.length > 0) || (question.correctAnswers && question.correctAnswers.length > 0)) && (
+                  <div className="flex-shrink-0 mt-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowInlineAnswer(!showInlineAnswer)}
+                      className="h-8 w-8 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/20 rounded-md shadow-sm"
+                      title={showInlineAnswer ? "Masquer la réponse" : "Voir la réponse"}
+                    >
+                      {showInlineAnswer ? (
+                        <EyeOff className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      )}
+                    </Button>
+                  </div>
+                )}
+              </div>
+              
+              {/* Show correct answer when eye button is clicked */}
+              {showInlineAnswer && showEyeButton && (question.correct_answers || question.correctAnswers) && ((question.correct_answers && question.correct_answers.length > 0) || (question.correctAnswers && question.correctAnswers.length > 0)) && (
+                <div className="mb-3 rounded-xl border border-green-200 bg-green-50 p-3 dark:border-green-800 dark:bg-green-950">
+                  <div className="text-sm font-medium text-green-800 dark:text-green-200 mb-2">
+                    Réponse attendue :
+                  </div>
+                  <div className="text-sm text-green-700 dark:text-green-300">
+                    <RichTextDisplay content={(question.correct_answers || question.correctAnswers || []).join(', ')} />
+                  </div>
+                </div>
+              )}
+            </>
           )}
           {/* Inline media attached to the question (not the reminder) */}
           {(() => {
@@ -698,15 +813,33 @@ export function OpenQuestion({
       
   {/* Media is now displayed inside the "Rappel du cours" section on the page */}
 
-    {/* Show correct answer directly in revision mode */}
-    {hideActions && isAnswered && userAnswer && (
+    {/* Show correct answer directly in revision mode (only when not in self-assessment and not in clinical/multi context) */}
+    {hideActions && isAnswered && userAnswer && !showSelfAssessment && !hideMeta && !disableIndividualSubmit && (
       <div className="mt-4">
-        <div className="rounded-xl border border-emerald-300/60 dark:border-emerald-600/70 bg-emerald-50/80 dark:bg-emerald-900/50 px-6 py-3 shadow-sm">
+        <div className={`rounded-xl border ${shouldShowUserAnswer ? getEvaluationColors(deferredAssessmentResult || answerResult).border : 'border-emerald-300/60 dark:border-emerald-600/70'} ${shouldShowUserAnswer ? getEvaluationColors(deferredAssessmentResult || answerResult).background : 'bg-emerald-50/80 dark:bg-emerald-900/50'} px-6 py-3 shadow-sm`}>
           <div className="mb-2">
-            <h3 className="text-base md:text-lg font-bold tracking-tight text-emerald-800 dark:text-emerald-50">Réponse correcte</h3>
+            <h3 className={`text-base md:text-lg font-bold tracking-tight ${shouldShowUserAnswer ? getEvaluationColors(deferredAssessmentResult || answerResult).text : 'text-emerald-800 dark:text-emerald-50'}`}>
+              {shouldShowUserAnswer ? "Votre réponse" : "Réponse correcte"}
+            </h3>
           </div>
-          <div className="prose prose-sm md:prose-base dark:prose-invert max-w-none leading-relaxed text-emerald-800 dark:text-emerald-50">
-            <RichTextDisplay text={userAnswer} enableImageZoom={true} />
+          <div className={`prose prose-sm md:prose-base dark:prose-invert max-w-none leading-relaxed ${shouldShowUserAnswer ? getEvaluationColors(deferredAssessmentResult || answerResult).text : 'text-emerald-800 dark:text-emerald-50'}`}>
+            <RichTextDisplay text={shouldShowUserAnswer ? (submittedAnswer || answer || "Aucune réponse saisie") : ((question.correct_answers || question.correctAnswers || []).join(', ') || question.explanation || '')} enableImageZoom={true} />
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Show user answer in clinical/grouped mode after self-assessment */}
+    {hideActions && isAnswered && userAnswer && disableIndividualSubmit && hideImmediateResults && (assessmentCompleted || shouldShowUserAnswer) && (
+      <div className="mt-4">
+        <div className={`rounded-xl border ${shouldShowUserAnswer ? getEvaluationColors(deferredAssessmentResult || answerResult).border : 'border-emerald-300/60 dark:border-emerald-600/70'} ${shouldShowUserAnswer ? getEvaluationColors(deferredAssessmentResult || answerResult).background : 'bg-emerald-50/80 dark:bg-emerald-900/50'} px-6 py-3 shadow-sm`}>
+          <div className="mb-2">
+            <h3 className={`text-base md:text-lg font-bold tracking-tight ${shouldShowUserAnswer ? getEvaluationColors(deferredAssessmentResult || answerResult).text : 'text-emerald-800 dark:text-emerald-50'}`}>
+              Votre réponse
+            </h3>
+          </div>
+          <div className={`prose prose-sm md:prose-base dark:prose-invert max-w-none leading-relaxed ${shouldShowUserAnswer ? getEvaluationColors(deferredAssessmentResult || answerResult).text : 'text-emerald-800 dark:text-emerald-50'}`}>
+            <RichTextDisplay text={submittedAnswer || answer || "Aucune réponse saisie"} enableImageZoom={true} />
           </div>
         </div>
       </div>
@@ -723,6 +856,7 @@ export function OpenQuestion({
           setAnswer={setAnswer}
           isSubmitted={submitted && !keepInputAfterSubmit}
           onSubmit={handleSubmit}
+          onSkip={onNext}
           onBlur={handleBlur}
           isActive={autoFocus}
           disableEnterKey={disableEnterHandlers}
@@ -736,16 +870,21 @@ export function OpenQuestion({
     // Avoid duplicate reference/self-assessment when wrapped in simple QROC container
     const usingWrapper = submitted && !hideImmediateResults && !disableIndividualSubmit;
     if (usingWrapper) return null;
-    const canShowReference = submitted && expectedReference && (!hideImmediateResults || (showSelfAssessment && showDeferredSelfAssessment) || assessmentCompleted);
+    const canShowReference = submitted && expectedReference && (!hideImmediateResults || (showSelfAssessment && showDeferredSelfAssessment) || assessmentCompleted) && !showSelfAssessment;
     if (!canShowReference) return null;
+    
+    // After self-assessment completion, show user's answer instead of correct answer
+    const displayText = shouldShowUserAnswer ? (submittedAnswer || answer || "Aucune réponse saisie") : expectedReference;
+    const titleText = shouldShowUserAnswer ? "Votre réponse" : "Réponse";
+    
     return (
       <div className="mt-0.5">
-        <div className="rounded-xl border border-emerald-300/60 dark:border-emerald-600/70 bg-emerald-50/80 dark:bg-emerald-900/50 px-6 py-2 shadow-sm">
+        <div className={`rounded-xl border ${shouldShowUserAnswer ? getEvaluationColors(deferredAssessmentResult || answerResult).border : 'border-emerald-300/60 dark:border-emerald-600/70'} ${shouldShowUserAnswer ? getEvaluationColors(deferredAssessmentResult || answerResult).background : 'bg-emerald-50/80 dark:bg-emerald-900/50'} px-6 py-2 shadow-sm`}>
           <div className="mb-2">
-            <h3 className="text-base md:text-lg font-bold tracking-tight text-emerald-800 dark:text-emerald-50">Réponse</h3>
+            <h3 className={`text-base md:text-lg font-bold tracking-tight ${shouldShowUserAnswer ? getEvaluationColors(deferredAssessmentResult || answerResult).text : 'text-emerald-800 dark:text-emerald-50'}`}>{titleText}</h3>
           </div>
-          <div className="prose prose-sm md:prose-base dark:prose-invert max-w-none leading-relaxed text-emerald-800 dark:text-emerald-50">
-            <RichTextDisplay text={expectedReference} enableImageZoom={true} />
+          <div className={`prose prose-sm md:prose-base dark:prose-invert max-w-none leading-relaxed ${shouldShowUserAnswer ? getEvaluationColors(deferredAssessmentResult || answerResult).text : 'text-emerald-800 dark:text-emerald-50'}`}>
+            <RichTextDisplay text={displayText} enableImageZoom={true} />
           </div>
         </div>
       </div>
@@ -757,13 +896,15 @@ export function OpenQuestion({
     if (usingWrapper) return null;
     if (!(showSelfAssessment && (!hideImmediateResults || showDeferredSelfAssessment))) return null;
     return (
-      <div ref={selfAssessmentRef}>
+      <div ref={selfAssessmentRef} className="pt-4 -mx-3 px-3">
         <OpenQuestionSelfAssessment
           onAssessment={handleSelfAssessment}
-          userAnswerText={submitted ? answer : undefined}
+          userAnswerText={submittedAnswer || (submitted ? answer : undefined)}
           questionId={question.id}
           enableHighlighting={enableAnswerHighlighting}
           highlightConfirm={highlightConfirm}
+          selectedRating={deferredAssessmentResult}
+          correctAnswer={(question.correct_answers || question.correctAnswers || []).join(', ') || question.explanation || ''}
         />
       </div>
     );
@@ -778,6 +919,11 @@ export function OpenQuestion({
           showNext={submitted} // Show "Suivant" immediately after submission
           hasSubmitted={hasSubmitted}
           assessmentCompleted={assessmentCompleted}
+          assessmentResult={deferredAssessmentResult || (showDeferredSelfAssessment ? null : (answerResult !== undefined ? answerResult : null))}
+          onResubmit={handleResubmit}
+          userAnswerText={userAnswer || answer}
+          correctAnswer={question.correctAnswers?.[0]}
+          currentAnswer={answer}
           showNotesArea={showNotesArea}
           hideNotesButton={false} // Always show notes button so users can hide/show notes
           onToggleNotes={() => {

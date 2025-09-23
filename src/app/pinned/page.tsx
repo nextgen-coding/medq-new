@@ -76,21 +76,21 @@ export default function PinnedQuestionsPage() {
       if (response.ok) {
         setPinnedQuestions(prev => prev.filter(pq => pq.questionId !== questionId));
         toast({
-          title: "Question Unpinned",
-          description: "Question has been removed from your pinned collection.",
+          title: "Question désépinglée",
+          description: "Cette question a été retirée de votre collection épinglée.",
         });
       } else {
         toast({
-          title: "Error",
-          description: "Failed to unpin question.",
+          title: "Erreur",
+          description: "Impossible de désépingler la question.",
           variant: "destructive",
         });
       }
     } catch (error) {
       console.error('Error unpinning question:', error);
       toast({
-        title: "Error",
-        description: "Failed to unpin question.",
+        title: "Erreur",
+        description: "Impossible de désépingler la question.",
         variant: "destructive",
       });
     }

@@ -263,23 +263,12 @@ export function QuestionControlPanel({
             // Clinical case - always check for clinical-case-{caseNumber} notes
             const caseItem = item as ClinicalCase;
             noteIdsToCheck.push(`clinical-case-${caseItem.caseNumber}`);
-            console.log('Task Navigator - Adding clinical case note check:', `clinical-case-${caseItem.caseNumber}`);
           } else {
             // Regular question - check for question ID notes
             const question = item as Question;
             noteIdsToCheck.push(question.id);
-            console.log('Task Navigator - Adding regular question note check:', question.id);
           }
         });
-
-        console.log('Task Navigator - All note IDs to check:', noteIdsToCheck);
-        console.log('Task Navigator - Questions being processed:', questions.map(q => ({
-          id: 'questions' in q ? `clinical-case-${q.caseNumber}` : (q as any).id,
-          type: 'questions' in q ? 'clinicalCase' : (q as any).type,
-          caseNumber: 'caseNumber' in q ? q.caseNumber : null
-        })));
-
-        console.log('Task Navigator - Checking notes for IDs:', noteIdsToCheck);
 
         const results = await Promise.all(
           noteIdsToCheck.map(async (id) => {
@@ -291,8 +280,6 @@ export function QuestionControlPanel({
                 id.startsWith('group-mcq-');
 
               const apiUrl = isClinicalCase ? '/api/clinical-case-notes' : '/api/user-question-state';
-
-              console.log(`Task Navigator - Checking notes for ${id}: using ${apiUrl}`);
 
               const res = await fetch(`${apiUrl}?userId=${encodeURIComponent(user.id)}&questionId=${encodeURIComponent(id)}`, {
                 signal: controller.signal,
@@ -315,8 +302,6 @@ export function QuestionControlPanel({
           results.forEach(([id, hasNote]) => {
             newNotesMap[id] = hasNote;
           });
-          console.log('Task Navigator - Initial notes fetch results:', results);
-          console.log('Task Navigator - Setting initial notesMap:', newNotesMap);
           setNotesMap(newNotesMap);
         }
       } catch {
@@ -331,14 +316,12 @@ export function QuestionControlPanel({
   useEffect(() => {
     const handleNotesUpdate = (event: any) => {
       const { questionId, hasContent } = event.detail || {};
-      console.log('Task Navigator - Received notes-updated event:', { questionId, hasContent, currentNotesMap: notesMap });
       if (questionId) {
         setNotesMap(prev => {
           const updated = {
             ...prev,
             [questionId]: hasContent
           };
-          console.log('Task Navigator - Updated notesMap:', updated);
           return updated;
         });
       }
@@ -499,8 +482,6 @@ export function QuestionControlPanel({
         noteId = entry.id;
         hasNote = notesMap[entry.id] === true;
       }
-
-      console.log('Task Navigator - Checking notes for entry:', { entryId: entry.id, entryType: entry.type, noteId, hasNote, notesMap: notesMap[noteId] });
       const isPinned = pinnedIds.includes(entry.id);
 
       return (
@@ -673,18 +654,6 @@ export function QuestionControlPanel({
       }
     });
 
-    console.log('Task Navigator - Classification results:', {
-  regularQuestions: regularQuestions.length,
-  multiQrocGroups: multiQrocGroups.length,
-  multiMcqGroups: multiMcqGroups.length,
-  clinicalCases: clinicalCases.length,
-  questions: questions.map(q => ({
-    id: 'questions' in q ? `clinical-case-${q.caseNumber}` : (q as any).id,
-    type: 'questions' in q ? 'clinicalCase' : (q as any).type,
-    caseNumber: 'caseNumber' in q ? q.caseNumber : null
-  }))
-});
-
     // We'll render multi QROC groups inside the QROC block instead of clinical cases
 
     // Group regular questions by type
@@ -792,7 +761,18 @@ export function QuestionControlPanel({
               ? groupChildren.every(q => answers[q.id] !== undefined)
               : answers[question.id] !== undefined;
             const isCurrent = question.originalIndex === currentQuestionIndex && !isComplete;
-            const isCorrect = answerResults[question.id];
+            
+            // Calculate isCorrect for groups (similar to clinical cases)
+            let isCorrect: boolean | 'partial' | undefined;
+            if (isGroup && isAnswered) {
+              // For groups (multi QROC/MCQ), calculate result based on individual question results
+              const allCorrect = groupChildren.every(q => answerResults[q.id] === true);
+              const someCorrect = groupChildren.some(q => answerResults[q.id] === true || answerResults[q.id] === 'partial');
+              isCorrect = allCorrect ? true : (someCorrect ? 'partial' : false);
+            } else if (!isGroup) {
+              // For individual questions, use direct result
+              isCorrect = answerResults[question.id];
+            }
             
             // Determine the correct note ID to check
             let noteId = question.id;
@@ -808,12 +788,10 @@ export function QuestionControlPanel({
             }
 
             const hasNote = notesMap[noteId] === true;
-            console.log('Task Navigator - Regular question notes check:', { questionId: question.id, noteId, hasNote, notesMap: notesMap[noteId] });
             const isHidden = (question as any).hidden === true;
             const isPinned = pinnedIds.includes(question.id) || (isGroup && groupChildren.some((q: any)=> pinnedIds.includes(q.id)));
             const isGroupHidden = isGroup && groupChildren.every((q:any)=> q.hidden);
 
-            console.log('Task Navigator - Regular question notes check:', { questionId: question.id, noteId, hasNote, notesMap });
             return (
               <motion.div
                 key={question.id}
@@ -868,11 +846,6 @@ export function QuestionControlPanel({
                       )}
                       <span className="text-left text-xs text-gray-600 dark:text-gray-400 truncate flex items-center gap-1 w-full">
                         {`${getTypeLabel(question.type)} ${(question as any).displayNumber ?? question.number ?? (question.originalIndex + 1)}`}
-                        {(groupMeta?.multiQroc || groupMeta?.multiMcq) && (
-                          <span className="inline-flex items-center text-[10px] px-1.5 py-0.5 rounded-md bg-medblue-100 text-medblue-700 dark:bg-medblue-900/40 dark:text-medblue-300 font-medium">
-                            {groupMeta.total}x
-                          </span>
-                        )}
                         {extraLabel && (
                           <span className="text-[10px] uppercase tracking-wide text-blue-600 dark:text-blue-300 font-medium">{extraLabel}</span>
                         )}
@@ -986,8 +959,6 @@ export function QuestionControlPanel({
                 // Check for notes using clinical-case-{caseNumber} format
                 const noteId = `clinical-case-${clinicalCase.caseNumber}`;
                 const hasNote = notesMap[noteId] === true;
-
-                console.log('Task Navigator - Clinical case notes check:', { caseNumber: clinicalCase.caseNumber, noteId, hasNote, notesMap: notesMap[noteId] });
                 
                 // Aggregate pin/hidden for clinical case
                 const anyPinned = clinicalCase.questions.some(q => pinnedIds.includes(q.id));
