@@ -142,7 +142,6 @@ export function useLecture(lectureId: string | undefined, mode?: string | null) 
   // Group questions and organize by sections with niveau-specific rules
   const groupedQuestions = useMemo(() => {
     if (!questions || questions.length === 0) {
-      console.log('No questions available, returning empty array');
       return [];
     }
     // Determine niveau
@@ -375,15 +374,6 @@ export function useLecture(lectureId: string | undefined, mode?: string | null) 
       ...clinicalCases
     ];
 
-    console.log('Grouped questions result:', {
-      totalQuestions: questions.length,
-      totalGroupedItems: result.length,
-      mcqCount: mcqSingles.length,
-      qrocCount: qrocSingles.length,
-  clinicalCasesCount: clinicalCases.length,
-  multiQrocGroups: multiQrocCases.length
-    });
-
     return result;
   }, [questions, lecture?.specialty?.niveau?.name]);
 
@@ -425,15 +415,6 @@ export function useLecture(lectureId: string | undefined, mode?: string | null) 
       }
 
       const data = await response.json();
-      
-      console.log('Raw API response data:', {
-        lectureId,
-        hasLecture: !!data,
-        lectureTitle: data?.title,
-        questionsCount: data?.questions?.length || 0,
-        rawQuestions: data?.questions,
-        firstQuestionStructure: data?.questions?.[0]
-      });
       
       // Cache the data
       lectureCache.set(lectureId, {
@@ -702,11 +683,6 @@ export function useLecture(lectureId: string | undefined, mode?: string | null) 
 
   const currentQuestion = useMemo(() => {
     const question = groupedQuestions[currentQuestionIndex];
-    console.log('Current question:', {
-      currentQuestionIndex,
-      hasQuestion: !!question,
-      questionType: question ? ('type' in question ? question.type : 'clinical') : 'unknown'
-    });
     return question;
   }, [groupedQuestions, currentQuestionIndex]);
   

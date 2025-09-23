@@ -163,9 +163,7 @@ export function ClinicalCaseQuestion({
       // The QuestionNotes component will handle fetching and setting notesHasContent
       // This effect runs after the QuestionNotes component has had a chance to load
       setTimeout(() => {
-        console.log('ClinicalCaseQuestion - Auto-show check:', { notesHasContent, showNotesArea, notesManuallyControlled });
         if (notesHasContent && !notesManuallyControlled) {
-          console.log('ClinicalCaseQuestion - Auto-showing notes area');
           setShowNotesArea(true);
         }
       }, 100);
@@ -186,15 +184,6 @@ export function ClinicalCaseQuestion({
   const [reportTargetQuestion, setReportTargetQuestion] = useState<Question | null>(null);
   const questionRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const caseTextRef = useRef<HTMLDivElement | null>(null);
-
-  // Debug logging for displayMode and question type detection
-  console.log('ClinicalCaseQuestion - Props:', {
-    displayMode,
-    clinicalCase: {
-      caseNumber: clinicalCase.caseNumber,
-      questions: clinicalCase.questions.map(q => ({ id: q.id, type: (q as any).type }))
-    }
-  });
 
   // Initial focus on case text when component loads (non-revision mode)
   useEffect(() => {
@@ -489,10 +478,8 @@ export function ClinicalCaseQuestion({
     });
     
     if (allMeaningfullyAnswered && clinicalCase.questions.length > 0) {
-      console.log('All questions meaningfully answered, scheduling auto-submission');
       // Debounced auto-submission - only submit if user stops typing for 1 second
       autoSubmitTimeoutRef.current = setTimeout(() => {
-        console.log('Auto-submitting case after user stopped typing');
         handleCompleteCase();
       }, 1000);
     }
@@ -591,6 +578,21 @@ export function ClinicalCaseQuestion({
       const isEditable = !!target && ((target as any).isContentEditable === true);
       const isTextarea = tag === 'TEXTAREA';
       const isTextInput = isTextarea || (tag === 'INPUT' && type && !['radio','checkbox','button','submit'].includes(type!));
+
+      // Check if this textarea or contentEditable is for notes or comments (should not trigger navigation)
+      if ((isTextarea || isEditable) && target) {
+        // Check if element is inside notes or comments components
+        const isNotesOrCommentsElement = target.closest('[data-notes-component]') || 
+                                        target.closest('.notes-component') || 
+                                        target.classList.contains('force-ltr') || // Comments use this class
+                                        target.closest('.comments-ltr-override') ||
+                                        target.closest('[data-rich-text-input]') ||
+                                        target.closest('[data-question-notes]') ||
+                                        target.closest('[data-question-comments]');
+                               
+        // If it's a notes/comments element, don't handle navigation
+        if (isNotesOrCommentsElement) return;
+      }
 
       // In revision mode, only allow navigation, not submission
       if (revisionMode) {

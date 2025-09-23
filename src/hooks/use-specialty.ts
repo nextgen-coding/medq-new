@@ -22,8 +22,6 @@ export function useSpecialty(specialtyId: string | undefined) {
     setIsLoading(true);
     
     try {
-      console.log('Fetching specialty with ID:', specialtyId);
-      
       // Fetch specialty using our new API
       const specialtyResponse = await fetch(`/api/specialties/${specialtyId}`);
       
@@ -43,7 +41,6 @@ export function useSpecialty(specialtyId: string | undefined) {
           variant: "destructive",
         });
       } else {
-        console.log('Successfully fetched specialty:', specialtyData);
         setSpecialty(specialtyData);
         
         // Fetch lectures for this specialty using our new API
@@ -55,7 +52,6 @@ export function useSpecialty(specialtyId: string | undefined) {
           setLectures([]);
         } else {
           const lecturesData = await lecturesResponse.json();
-          console.log('Successfully fetched lectures:', lecturesData?.length || 0);
           setLectures(lecturesData || []);
           
           // Set the first lecture as default if available
