@@ -446,6 +446,21 @@ export function ClinicalCaseQuestion({
       try { onAnswerUpdate(questionId, answer, result); } catch {}
     }
 
+    // Check if this was the last unanswered question and complete immediately if so
+    setTimeout(() => {
+      const allAnswered = clinicalCase.questions.every(question => {
+        const currentAnswer = question.id === questionId ? answer : answers[question.id];
+        if (currentAnswer === undefined || currentAnswer === null) return false;
+        if (Array.isArray(currentAnswer)) return currentAnswer.length > 0;
+        if (typeof currentAnswer === 'string') return currentAnswer.trim().length > 0;
+        return Boolean(currentAnswer);
+      });
+      
+      if (allAnswered && !isCaseComplete && !showResults) {
+        handleCompleteCase();
+      }
+    }, 50); // Small delay to ensure state updates are processed
+
     // Don't auto-focus next question immediately - wait for Enter key to navigate
     // This allows users to press 1/2 for QCM without jumping to QROC
   };
@@ -591,7 +606,9 @@ export function ClinicalCaseQuestion({
                                         target.closest('[data-question-comments]');
                                
         // If it's a notes/comments element, don't handle navigation
-        if (isNotesOrCommentsElement) return;
+        if (isNotesOrCommentsElement) {
+          return;
+        }
       }
 
       // In revision mode, only allow navigation, not submission
@@ -618,35 +635,34 @@ export function ClinicalCaseQuestion({
       const currentQuestion = clinicalCase.questions[activeIndex];
       const isCurrentAnswered = currentQuestion ? isQuestionAnswered(currentQuestion) : false;
 
-      // For QROC (textarea): Enter always navigates (Shift+Enter for newlines)
-      if (isTextarea && !e.shiftKey) {
+      // For QROC (textarea) and other text inputs: Enter always navigates (Shift+Enter for newlines in textarea)
+      if ((isTextarea && !e.shiftKey) || isTextInput) {
         e.preventDefault();
-        // Blur current textarea to ensure focus moves properly
+        // Blur current input/textarea to ensure focus moves properly
         if (target) {
           (target as HTMLElement).blur();
         }
-        navigateToNextQuestion();
+        // Use sequential navigation to allow skipping empty QROC inputs
+        navigateToNextQuestionInSequence();
         return;
       }
 
-      // For MCQ: Enter navigates only if current question is answered
+      // For MCQ and any other question type: Enter always navigates (allow skipping)
       if (!isTextInput && !isEditable) {
-        // Use setTimeout to ensure answer state has been updated before checking
-        setTimeout(() => {
-          const isNowAnswered = currentQuestion ? isQuestionAnswered(currentQuestion) : false;
-          if (!isNowAnswered) {
-            // Don't navigate if MCQ is not answered
-            return;
-          }
-          navigateToNextQuestion();
-        }, 10);
         e.preventDefault();
+        // Use sequential navigation to allow skipping any question
+        navigateToNextQuestionInSequence();
         return;
       }
     };
 
     // Helper function for smooth navigation to next question
     const navigateToNextQuestion = () => {
+      // Ensure current active element loses focus
+      if (document.activeElement && document.activeElement !== document.body) {
+        (document.activeElement as HTMLElement).blur();
+      }
+      
       const nextIndex = findNextUnansweredQuestion();
       
       if (nextIndex !== -1) {
@@ -669,6 +685,63 @@ export function ClinicalCaseQuestion({
       }
     };
 
+    // Helper function to navigate to the next unanswered question intelligently
+    const navigateToNextQuestionInSequence = () => {
+      // Ensure current active element loses focus
+      if (document.activeElement && document.activeElement !== document.body) {
+        (document.activeElement as HTMLElement).blur();
+      }
+      
+      // First, try to find the next unanswered question from current position
+      const nextUnansweredIndex = findNextUnansweredQuestion();
+      
+      if (nextUnansweredIndex !== -1) {
+        // Found an unanswered question ahead, go to it
+        setActiveIndex(nextUnansweredIndex);
+        const nextQuestion = clinicalCase.questions[nextUnansweredIndex];
+        const element = questionRefs.current[nextQuestion.id];
+        
+        if (element) {
+          scrollIntoViewWithOffset(element, 'smooth');
+          
+          // Focus appropriate input after scrolling
+          setTimeout(() => {
+            focusFirstInput(nextQuestion.id);
+          }, 300);
+        }
+      } else {
+        // No unanswered questions ahead, cycle back to first unanswered question
+        const firstUnansweredIndex = findFirstUnansweredQuestion();
+        if (firstUnansweredIndex !== -1) {
+          setActiveIndex(firstUnansweredIndex);
+          const unansweredQuestion = clinicalCase.questions[firstUnansweredIndex];
+          const element = questionRefs.current[unansweredQuestion.id];
+          
+          if (element) {
+            scrollIntoViewWithOffset(element, 'smooth');
+            setTimeout(() => {
+              focusFirstInput(unansweredQuestion.id);
+            }, 300);
+          }
+        } else {
+          // All questions answered - submit the case immediately
+          setTimeout(() => {
+            handleCompleteCase();
+          }, 100); // Small delay to ensure UI updates
+        }
+      }
+    };
+
+    // Find first unanswered question from the beginning of the list
+    const findFirstUnansweredQuestion = (): number => {
+      for (let i = 0; i < clinicalCase.questions.length; i++) {
+        if (!isQuestionAnswered(clinicalCase.questions[i])) {
+          return i;
+        }
+      }
+      return -1; // All questions answered
+    };
+
     // Find next unanswered question starting from current active index
     const findNextUnansweredQuestion = (): number => {
       for (let i = activeIndex + 1; i < clinicalCase.questions.length; i++) {
@@ -679,8 +752,8 @@ export function ClinicalCaseQuestion({
       return -1; // All questions answered
     };
 
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
+    document.addEventListener('keydown', onKey, true); // Use capture phase to catch textarea events first
+    return () => document.removeEventListener('keydown', onKey, true);
   }, [showResults, evaluationComplete, evaluationOrder, onNext, activeIndex, clinicalCase.questions, answers, revisionMode]);
 
   // Scroll to current evaluation question when evaluation index changes
@@ -773,35 +846,7 @@ export function ClinicalCaseQuestion({
             }, 50);
           }
         }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            e.stopPropagation();
-            if (!showResults) {
-              const firstUnansweredIndex = clinicalCase.questions.findIndex(q => answers[q.id] === undefined);
-              if (firstUnansweredIndex !== -1) {
-                setActiveIndex(firstUnansweredIndex);
-                const targetQuestion = clinicalCase.questions[firstUnansweredIndex];
-                const element = questionRefs.current[targetQuestion.id];
-                if (element) {
-                  scrollIntoViewWithOffset(element, 'smooth');
-                  // Focus the first input in the target question after scrolling
-                  setTimeout(() => {
-                    focusFirstInput(targetQuestion.id);
-                  }, 500);
-                }
-              } else {
-                handleCompleteCase();
-              }
-            } else {
-              // In results phase, Enter moves to next when allowed
-              if (evaluationComplete || evaluationOrder.length === 0) {
-                onNext();
-              }
-            }
-          }
-        }}
-        // Remove container-level Enter interception; rely on document-level handler
+        // Removed container-level Enter interception; rely on document-level handler
       >
         {isInlineLayout ? (
           // Inline layout for compact questions: question number and question content on same line
