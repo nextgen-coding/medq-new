@@ -318,12 +318,12 @@ export default function AdminVouchersPage() {
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <Gift className="h-6 w-6 text-blue-600" />
+                  <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                    <Gift className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                   </div>
                   <div className="ml-3">
-                    <p className="text-sm font-medium text-gray-600">Total des codes</p>
-                    <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total des codes</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.total}</p>
                   </div>
                 </div>
               </CardContent>
@@ -332,12 +332,12 @@ export default function AdminVouchersPage() {
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center">
-                  <div className="p-2 bg-green-100 rounded-lg">
-                    <CheckCircle className="h-6 w-6 text-green-600" />
+                  <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                    <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
                   </div>
                   <div className="ml-3">
-                    <p className="text-sm font-medium text-gray-600">Utilisés</p>
-                    <p className="text-2xl font-bold text-gray-900">{stats.used}</p>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Utilisés</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.used}</p>
                   </div>
                 </div>
               </CardContent>
@@ -346,12 +346,12 @@ export default function AdminVouchersPage() {
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center">
-                  <div className="p-2 bg-yellow-100 rounded-lg">
-                    <Gift className="h-6 w-6 text-yellow-600" />
+                  <div className="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
+                    <Gift className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
                   </div>
                   <div className="ml-3">
-                    <p className="text-sm font-medium text-gray-600">Disponibles</p>
-                    <p className="text-2xl font-bold text-gray-900">{stats.unused}</p>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Disponibles</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.unused}</p>
                   </div>
                 </div>
               </CardContent>
@@ -360,12 +360,12 @@ export default function AdminVouchersPage() {
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center">
-                  <div className="p-2 bg-red-100 rounded-lg">
-                    <XCircle className="h-6 w-6 text-red-600" />
+                  <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
+                    <XCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
                   </div>
                   <div className="ml-3">
-                    <p className="text-sm font-medium text-gray-600">Expirés</p>
-                    <p className="text-2xl font-bold text-gray-900">{stats.expired}</p>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Expirés</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{stats.expired}</p>
                   </div>
                 </div>
               </CardContent>
@@ -437,7 +437,7 @@ export default function AdminVouchersPage() {
                         <TableRow key={voucher.id}>
                           <TableCell>
                             <div className="flex items-center gap-2">
-                              <code className="bg-gray-100 px-2 py-1 rounded text-sm font-mono">
+                              <code className="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-sm font-mono text-gray-900 dark:text-gray-100">
                                 {voucher.code}
                               </code>
                               <Button

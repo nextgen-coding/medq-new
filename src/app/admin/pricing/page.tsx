@@ -231,7 +231,7 @@ export default function AdminPricingPage() {
           <Alert>
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              <strong>Dernière mise à jour :</strong> {new Date(settings.updatedAt).toLocaleString('fr-FR')} 
+              <strong>Dernière mise à jour :</strong> {new Date(settings.updatedAt).toLocaleString('fr-FR') +' '} 
               par {settings.updater.name || settings.updater.email}
               {settings.isDiscountActive && (
                 <span className="ml-4 text-green-600 font-medium">

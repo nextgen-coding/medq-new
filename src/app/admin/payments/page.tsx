@@ -195,12 +195,12 @@ export default function AdminPaymentsPage() {
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center">
-                    <div className="p-2 bg-blue-100 rounded-lg">
-                      <CreditCard className="h-6 w-6 text-blue-600" />
+                    <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                      <CreditCard className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                     </div>
                     <div className="ml-3">
-                      <p className="text-sm font-medium text-gray-600">Total des paiements</p>
-                      <p className="text-2xl font-bold text-gray-900">{payments.length}</p>
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total des paiements</p>
+                      <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{payments.length}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -209,12 +209,12 @@ export default function AdminPaymentsPage() {
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center">
-                    <div className="p-2 bg-yellow-100 rounded-lg">
-                      <Clock className="h-6 w-6 text-yellow-600" />
+                    <div className="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
+                      <Clock className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
                     </div>
                     <div className="ml-3">
-                      <p className="text-sm font-medium text-gray-600">En attente</p>
-                      <p className="text-2xl font-bold text-gray-900">{pendingVerifications}</p>
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">En attente</p>
+                      <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{pendingVerifications}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -223,12 +223,12 @@ export default function AdminPaymentsPage() {
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center">
-                    <div className="p-2 bg-green-100 rounded-lg">
-                      <Check className="h-6 w-6 text-green-600" />
+                    <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                      <Check className="h-6 w-6 text-green-600 dark:text-green-400" />
                     </div>
                     <div className="ml-3">
-                      <p className="text-sm font-medium text-gray-600">Vérifiés</p>
-                      <p className="text-2xl font-bold text-gray-900">
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Vérifiés</p>
+                      <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                         {payments.filter(p => ['completed', 'verified'].includes(p.status)).length}
                       </p>
                     </div>
@@ -239,12 +239,12 @@ export default function AdminPaymentsPage() {
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center">
-                    <div className="p-2 bg-red-100 rounded-lg">
-                      <X className="h-6 w-6 text-red-600" />
+                    <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
+                      <X className="h-6 w-6 text-red-600 dark:text-red-400" />
                     </div>
                     <div className="ml-3">
-                      <p className="text-sm font-medium text-gray-600">Rejetés</p>
-                      <p className="text-2xl font-bold text-gray-900">
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Rejetés</p>
+                      <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                         {payments.filter(p => ['failed', 'rejected', 'cancelled'].includes(p.status)).length}
                       </p>
                     </div>
@@ -448,7 +448,7 @@ export default function AdminPaymentsPage() {
                     {selectedPayment.customPaymentDetails && (
                       <div>
                         <label className="text-sm font-medium">Détails du paiement</label>
-                        <p className="mt-1 p-2 bg-gray-50 rounded border text-sm">
+                        <p className="mt-1 p-2 bg-gray-50 dark:bg-gray-800 rounded border text-sm text-gray-900 dark:text-gray-100">
                           {selectedPayment.customPaymentDetails}
                         </p>
                       </div>

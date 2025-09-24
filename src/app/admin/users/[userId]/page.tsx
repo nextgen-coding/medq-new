@@ -953,7 +953,7 @@ export default function UserDetailPage() {
                                   {payment.customPaymentDetails && (
                                     <div>
                                       <Label className="text-sm font-medium">Détails</Label>
-                                      <p className="mt-1 p-2 bg-gray-50 rounded text-sm">
+                                      <p className="mt-1 p-2 bg-gray-50 dark:bg-gray-800 rounded text-sm text-gray-900 dark:text-gray-100">
                                         {payment.customPaymentDetails}
                                       </p>
                                     </div>
@@ -971,7 +971,7 @@ export default function UserDetailPage() {
                                   {payment.adminNotes && (
                                     <div>
                                       <Label className="text-sm font-medium">Notes admin</Label>
-                                      <p className="mt-1 p-2 bg-gray-50 rounded text-sm">
+                                      <p className="mt-1 p-2 bg-gray-50 dark:bg-gray-800 rounded text-sm text-gray-900 dark:text-gray-100">
                                         {payment.adminNotes}
                                       </p>
                                     </div>
