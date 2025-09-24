@@ -89,32 +89,32 @@ export function OpenQuestionSelfAssessment({ onAssessment, userAnswerText, quest
           )}
 
           {!assessmentCompleted && (
-            <div className="mt-1 flex flex-row gap-2 w-full">
+            <div className="mt-1 flex flex-col xs:flex-row gap-2 w-full">
               <Button
                 size="lg"
-                className="flex-1 gap-3 bg-green-600/90 hover:bg-green-600 text-white shadow-md hover:shadow-lg transition-all duration-200 transform-gpu hover:-translate-y-0.5 active:translate-y-0 focus-visible:ring-2 focus-visible:ring-green-400"
+                className="flex-1 gap-2 xs:gap-3 bg-green-600/90 hover:bg-green-600 text-white shadow-md hover:shadow-lg transition-all duration-200 transform-gpu hover:-translate-y-0.5 active:translate-y-0 focus-visible:ring-2 focus-visible:ring-green-400 text-sm xs:text-base"
                 onClick={() => handleRatingSelect('correct')}
               >
-                <CheckCircle className="h-5 w-5" />
-                Correcte
+                <CheckCircle className="h-4 w-4 xs:h-5 xs:w-5 flex-shrink-0" />
+                <span className="truncate">Correcte</span>
               </Button>
 
               <Button
                 size="lg"
-                className="flex-1 gap-3 bg-amber-500/90 hover:bg-amber-500 text-white shadow-md hover:shadow-lg transition-all duration-200 transform-gpu hover:-translate-y-0.5 active:translate-y-0 focus-visible:ring-2 focus-visible:ring-amber-400"
+                className="flex-1 gap-2 xs:gap-3 bg-amber-500/90 hover:bg-amber-500 text-white shadow-md hover:shadow-lg transition-all duration-200 transform-gpu hover:-translate-y-0.5 active:translate-y-0 focus-visible:ring-2 focus-visible:ring-amber-400 text-sm xs:text-base"
                 onClick={() => handleRatingSelect('partial')}
               >
-                <MinusCircle className="h-5 w-5" />
-                Partiellement correcte
+                <MinusCircle className="h-4 w-4 xs:h-5 xs:w-5 flex-shrink-0" />
+                <span className="truncate">Partiellement correcte</span>
               </Button>
 
               <Button
                 size="lg"
-                className="flex-1 gap-3 bg-red-600/90 hover:bg-red-600 text-white shadow-md hover:shadow-lg transition-all duration-200 transform-gpu hover:-translate-y-0.5 active:translate-y-0 focus-visible:ring-2 focus-visible:ring-red-400"
+                className="flex-1 gap-2 xs:gap-3 bg-red-600/90 hover:bg-red-600 text-white shadow-md hover:shadow-lg transition-all duration-200 transform-gpu hover:-translate-y-0.5 active:translate-y-0 focus-visible:ring-2 focus-visible:ring-red-400 text-sm xs:text-base"
                 onClick={() => handleRatingSelect('wrong')}
               >
-                <XCircle className="h-5 w-5" />
-                Incorrecte
+                <XCircle className="h-4 w-4 xs:h-5 xs:w-5 flex-shrink-0" />
+                <span className="truncate">Incorrecte</span>
               </Button>
             </div>
           )}
@@ -152,30 +152,30 @@ export function OpenQuestionSelfAssessment({ onAssessment, userAnswerText, quest
             </div>
           )}
           {!assessmentCompleted && (
-            <div className="mt-4 flex flex-row gap-2 w-full">
+            <div className="mt-4 flex flex-col xs:flex-row gap-2 w-full">
               <Button
                 size="lg"
-                className="flex-1 gap-3 bg-green-600/90 hover:bg-green-600 text-white shadow-md hover:shadow-lg transition-all duration-200 transform-gpu hover:-translate-y-0.5 active:translate-y-0 focus-visible:ring-2 focus-visible:ring-green-400"
+                className="flex-1 gap-2 xs:gap-3 bg-green-600/90 hover:bg-green-600 text-white shadow-md hover:shadow-lg transition-all duration-200 transform-gpu hover:-translate-y-0.5 active:translate-y-0 focus-visible:ring-2 focus-visible:ring-green-400 text-sm xs:text-base"
                 onClick={() => handleRatingSelect('correct')}
               >
-                <CheckCircle className="h-5 w-5" />
-                Correcte
+                <CheckCircle className="h-4 w-4 xs:h-5 xs:w-5 flex-shrink-0" />
+                <span className="truncate">Correcte</span>
               </Button>
               <Button
                 size="lg"
-                className="flex-1 gap-3 bg-amber-500/90 hover:bg-amber-500 text-white shadow-md hover:shadow-lg transition-all duration-200 transform-gpu hover:-translate-y-0.5 active:translate-y-0 focus-visible:ring-2 focus-visible:ring-amber-400"
+                className="flex-1 gap-2 xs:gap-3 bg-amber-500/90 hover:bg-amber-500 text-white shadow-md hover:shadow-lg transition-all duration-200 transform-gpu hover:-translate-y-0.5 active:translate-y-0 focus-visible:ring-2 focus-visible:ring-amber-400 text-sm xs:text-base"
                 onClick={() => handleRatingSelect('partial')}
               >
-                <MinusCircle className="h-5 w-5" />
-                Partiellement correcte
+                <MinusCircle className="h-4 w-4 xs:h-5 xs:w-5 flex-shrink-0" />
+                <span className="truncate">Partiellement correcte</span>
               </Button>
               <Button
                 size="lg"
-                className="flex-1 gap-3 bg-red-600/90 hover:bg-red-600 text-white shadow-md hover:shadow-lg transition-all duration-200 transform-gpu hover:-translate-y-0.5 active:translate-y-0 focus-visible:ring-2 focus-visible:ring-red-400"
+                className="flex-1 gap-2 xs:gap-3 bg-red-600/90 hover:bg-red-600 text-white shadow-md hover:shadow-lg transition-all duration-200 transform-gpu hover:-translate-y-0.5 active:translate-y-0 focus-visible:ring-2 focus-visible:ring-red-400 text-sm xs:text-base"
                 onClick={() => handleRatingSelect('wrong')}
               >
-                <XCircle className="h-5 w-5" />
-                Incorrecte
+                <XCircle className="h-4 w-4 xs:h-5 xs:w-5 flex-shrink-0" />
+                <span className="truncate">Incorrecte</span>
               </Button>
             </div>
           )}

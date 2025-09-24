@@ -79,53 +79,61 @@ export function MCQActions({
           {hasSubmitted ? "Répondu" : "Soumettre la réponse"}
         </Button>
       ) : (
-        <div className="w-full sm:w-auto sm:ml-auto flex flex-col sm:flex-row sm:items-center gap-2">
-          <div className="flex items-center sm:mr-4">
+        <div className="w-full sm:w-auto sm:ml-auto flex flex-col gap-3">
+          {/* Result indicator - full width on mobile */}
+          <div className="flex items-center justify-center sm:justify-start">
             {isCorrect === true ? (
               <div className="flex items-center text-green-600">
                 <CheckCircle className="h-5 w-5 mr-2" />
-                <span className="font-medium">Correcte!</span>
+                <span className="font-medium text-sm sm:text-base">Correcte!</span>
               </div>
             ) : isCorrect === 'partial' ? (
               <div className="flex items-center text-yellow-600">
                 <AlertCircle className="h-5 w-5 mr-2" />
-                <span className="font-medium">Partiellement correcte</span>
+                <span className="font-medium text-sm sm:text-base">Partiellement correcte</span>
               </div>
             ) : (
               <div className="flex items-center text-red-600">
                 <XCircle className="h-5 w-5 mr-2" />
-                <span className="font-medium">Incorrecte</span>
+                <span className="font-medium text-sm sm:text-base">Incorrecte</span>
               </div>
             )}
           </div>
-          <div className="flex gap-2 justify-end flex-wrap items-center">
+          
+          {/* Action buttons - responsive layout */}
+          <div className="flex flex-col xs:flex-row gap-2 xs:justify-end items-stretch xs:items-center">
             {/* Resubmit Button */}
             {onResubmit && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={onResubmit}
-                className="flex items-center gap-1"
+                className="flex items-center gap-1 justify-center text-xs sm:text-sm min-w-0 flex-shrink-0"
               >
-                <span className="hidden sm:inline">Soumettre à nouveau</span>
-                <span className="sm:hidden">Réessayer</span>
+                <span className="hidden xs:inline truncate">Soumettre à nouveau</span>
+                <span className="xs:hidden truncate">Réessayer</span>
               </Button>
             )}
-      {onToggleNotes && !hideNotesButton && (
+            
+            {/* Notes Button */}
+            {onToggleNotes && !hideNotesButton && (
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-        onClick={onToggleNotes}
-        className="flex items-center gap-1"
+                onClick={onToggleNotes}
+                className="flex items-center gap-1 justify-center text-xs sm:text-sm min-w-0 flex-shrink-0"
               >
-                <StickyNote className="h-4 w-4" />
-        <span className="hidden sm:inline">{showNotesArea ? 'Fermer les notes' : 'Mes notes'}</span>
+                <StickyNote className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">{showNotesArea ? 'Fermer les notes' : 'Mes notes'}</span>
               </Button>
             )}
-            <Button onClick={onNext} className="group">
-              <span className="hidden sm:inline">Question suivante</span>
-              <ArrowRight className="sm:ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
+            
+            {/* Next Button */}
+            <Button onClick={onNext} className="group flex items-center gap-1 justify-center text-xs sm:text-sm min-w-0 flex-shrink-0">
+              <span className="hidden xs:inline truncate">Question suivante</span>
+              <span className="xs:hidden truncate">Suivant</span>
+              <ArrowRight className="h-4 w-4 flex-shrink-0 transition-transform group-hover:translate-x-1" />
             </Button>
           </div>
         </div>

@@ -103,9 +103,9 @@ export function LectureComments({ lectureId }: LectureCommentsProps) {
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
     if (diffMins < 1) return 'À l\'instant';
-    if (diffMins < 60) return `${diffMins}m`;
+    if (diffMins < 60) return `${diffMins}min`;
     if (diffHours < 24) return `${diffHours}h`;
-    if (diffDays < 7) return `${diffDays}d`;
+    if (diffDays < 7) return `${diffDays}j`;
     
     return date.toLocaleDateString();
   };

@@ -611,8 +611,8 @@ function GroupedQrocContainer({ clinicalCase, answers, answerResults, pinnedQues
         })()}
         {groupAnswered && (
           <div className="mt-8 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2 flex-wrap">
-              <div className="flex gap-2 flex-wrap justify-end">
+            <div className="flex flex-col xs:flex-row xs:items-center xs:justify-end gap-2">
+              <div className="flex flex-col xs:flex-row gap-2 items-stretch xs:items-center">
                 {groupAnswered && !notesHasContent && (
                   <Button
                     variant="outline"
@@ -621,15 +621,15 @@ function GroupedQrocContainer({ clinicalCase, answers, answerResults, pinnedQues
                       setOpenNotes(p => !p);
                       if (!openNotes) setTimeout(() => { notesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 30);
                     }}
-                    className="flex items-center gap-1"
+                    className="flex items-center justify-center gap-1 w-full xs:w-auto text-xs xs:text-sm"
                   >
                     <StickyNote className="h-4 w-4" />
-                    <span className="hidden sm:inline">{openNotes ? 'Fermer les notes' : 'Prendre une note'}</span>
+                    <span>{openNotes ? 'Fermer les notes' : 'Mes notes'}</span>
                   </Button>
                 )}
 
-                <Button onClick={onNext} size="sm" className="flex items-center gap-1">
-                  <span className="hidden sm:inline">Suivant</span>
+                <Button onClick={onNext} size="sm" className="flex items-center justify-center gap-1 w-full xs:w-auto text-xs xs:text-sm">
+                  Suivant
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>

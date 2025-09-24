@@ -11,7 +11,7 @@ const fullSelect = {
   updatedAt: true,
   parentCommentId: true,
   imageUrls: true,
-  user: { select: { id: true, name: true, email: true, role: true } },
+  user: { select: { id: true, name: true, email: true, role: true, image: true } },
 };
 
 // GET /api/question-comments?questionId=...
@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch users (profiles) in one query
     const userIds = [...new Set(raw.map(r => r.user_id))];
-    const users = userIds.length ? await prisma.$queryRaw<Array<{ id: string; name: string | null; email: string | null; role: string }>>`SELECT id::text AS id, name, email, role FROM profiles WHERE id = ANY(${userIds}::uuid[])` : [];
+    const users = userIds.length ? await prisma.$queryRaw<Array<{ id: string; name: string | null; email: string | null; role: string; image: string | null }>>`SELECT id::text AS id, name, email, role, image FROM profiles WHERE id = ANY(${userIds}::uuid[])` : [];
     const userMap: Record<string, any> = {};
     users.forEach(u => { userMap[u.id] = u; });
 
@@ -133,10 +133,10 @@ export async function POST(request: NextRequest) {
     `;
     const row = inserted?.[0];
     if (!row) throw new Error('Insert failed');
-    const userRows = await prisma.$queryRaw<Array<{ id: string; name: string | null; email: string | null; role: string }>>`
-      SELECT id::text AS id, name, email, role FROM profiles WHERE id = ${userId}::uuid;
+    const userRows = await prisma.$queryRaw<Array<{ id: string; name: string | null; email: string | null; role: string; image: string | null }>>`
+      SELECT id::text AS id, name, email, role, image FROM profiles WHERE id = ${userId}::uuid;
     `;
-    const userInfo = userRows?.[0] ?? { id: userId, name: null, email: null, role: 'student' };
+    const userInfo = userRows?.[0] ?? { id: userId, name: null, email: null, role: 'student', image: null };
     return NextResponse.json({ id: row.id, content: row.content, createdAt: row.created_at, updatedAt: row.updated_at, isAnonymous: false, parentCommentId: row.parent_comment_id, imageUrls: [], replies: [], user: userInfo }, { status: 201 });
   } catch (e) {
     console.error('Error creating question comment:', e);

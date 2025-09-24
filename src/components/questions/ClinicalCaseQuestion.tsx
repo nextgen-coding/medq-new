@@ -1192,23 +1192,23 @@ export function ClinicalCaseQuestion({
                 {!hasOpen && showResults && 'Révision terminée'}
               </div>
 
-              <div className="flex gap-2 flex-wrap justify-end items-center">
+              <div className="flex flex-col xs:flex-row gap-2 xs:justify-end items-stretch xs:items-center">
                 {/* Group submit: shown for any grouped block (MCQ or open) */}
                 {!showResults && (
                   <Button
                     onClick={handleCompleteCase}
                     size="sm"
                     disabled={answeredQuestions !== clinicalCase.totalQuestions || isCaseComplete}
-                    className={`font-semibold ${answeredQuestions === clinicalCase.totalQuestions && !isCaseComplete ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-600/50 text-white cursor-not-allowed'}`}
+                    className={`font-semibold w-full xs:w-auto ${answeredQuestions === clinicalCase.totalQuestions && !isCaseComplete ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-600/50 text-white cursor-not-allowed'}`}
                     data-submit-case
                   >Soumettre la réponse</Button>
                 )}
 
                 {/* Result display and action buttons when submitted */}
                 {showResults && (
-                  <div className="flex items-center gap-2">
-                    {/* Result display */}
-                    <div className="flex items-center">
+                  <>
+                    {/* Result display - full width on mobile, auto on desktop */}
+                    <div className="flex items-center justify-center xs:justify-start w-full xs:w-auto">
                       {(() => {
                         const overallResult = (() => {
                           if (!hasOpen) {
@@ -1231,21 +1231,21 @@ export function ClinicalCaseQuestion({
                           return (
                             <div className="flex items-center text-green-600">
                               <CheckCircle className="h-5 w-5 mr-2" />
-                              <span className="font-medium">Correcte!</span>
+                              <span className="font-medium text-sm xs:text-base">Correcte!</span>
                             </div>
                           );
                         } else if (overallResult === 'partial') {
                           return (
                             <div className="flex items-center text-yellow-600">
                               <AlertCircle className="h-5 w-5 mr-2" />
-                              <span className="font-medium">Partiellement correcte</span>
+                              <span className="font-medium text-sm xs:text-base">Partiellement correcte</span>
                             </div>
                           );
                         } else if (overallResult === false) {
                           return (
                             <div className="flex items-center text-red-600">
                               <XCircle className="h-5 w-5 mr-2" />
-                              <span className="font-medium">Incorrecte</span>
+                              <span className="font-medium text-sm xs:text-base">Incorrecte</span>
                             </div>
                           );
                         }
@@ -1253,47 +1253,50 @@ export function ClinicalCaseQuestion({
                       })()}
                     </div>
 
-                    {/* Resubmit button */}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleResubmit}
-                      className="flex items-center gap-1"
-                    >
-                      Soumettre à nouveau
-                    </Button>
-
-                    {/* Notes toggle: positioned before next button like in MCQActions */}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        const newShowNotesArea = !showNotesArea;
-                        setShowNotesArea(newShowNotesArea);
-                        setNotesManuallyControlled(true);
-                        if (newShowNotesArea) {
-                          setTimeout(() => {
-                            const notesElement = document.getElementById(`clinical-case-notes-${clinicalCase.caseNumber}`);
-                            if (notesElement) {
-                              scrollIntoViewWithOffset(notesElement, 'smooth');
-                            }
-                          }, 30);
-                        }
-                      }}
-                      className="flex items-center gap-1"
-                    >
-                      <StickyNote className="h-4 w-4" />
-                      <span className="hidden sm:inline">{showNotesArea ? 'Fermer les notes' : 'Mes notes'}</span>
-                    </Button>
-
-                    {/* Next button: show immediately when case is complete or no open questions, and show after evaluation for multi-mode with open questions */}
-                    {(isCaseComplete || (!hasOpen || evaluationComplete)) && (
-                      <Button onClick={onNext} size="sm" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold">
-                        Question suivante
-                        <ChevronRight className="h-4 w-4 ml-2" />
+                    {/* Action buttons in responsive layout */}
+                    <div className="flex flex-col xs:flex-row gap-2 w-full xs:w-auto">
+                      {/* Resubmit button */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleResubmit}
+                        className="flex items-center justify-center gap-1 w-full xs:w-auto text-xs xs:text-sm"
+                      >
+                        Soumettre à nouveau
                       </Button>
-                    )}
-                  </div>
+
+                      {/* Notes toggle: positioned before next button like in MCQActions */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const newShowNotesArea = !showNotesArea;
+                          setShowNotesArea(newShowNotesArea);
+                          setNotesManuallyControlled(true);
+                          if (newShowNotesArea) {
+                            setTimeout(() => {
+                              const notesElement = document.getElementById(`clinical-case-notes-${clinicalCase.caseNumber}`);
+                              if (notesElement) {
+                                scrollIntoViewWithOffset(notesElement, 'smooth');
+                              }
+                            }, 30);
+                          }
+                        }}
+                        className="flex items-center justify-center gap-1 w-full xs:w-auto text-xs xs:text-sm"
+                      >
+                        <StickyNote className="h-4 w-4" />
+                        <span>{showNotesArea ? 'Fermer les notes' : 'Mes notes'}</span>
+                      </Button>
+
+                      {/* Next button: show immediately when case is complete or no open questions, and show after evaluation for multi-mode with open questions */}
+                      {(isCaseComplete || (!hasOpen || evaluationComplete)) && (
+                        <Button onClick={onNext} size="sm" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold w-full xs:w-auto text-xs xs:text-sm">
+                          Question suivante
+                          <ChevronRight className="h-4 w-4 ml-2" />
+                        </Button>
+                      )}
+                    </div>
+                  </>
                 )}
               </div>
             </div>

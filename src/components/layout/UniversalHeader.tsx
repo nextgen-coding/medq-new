@@ -95,7 +95,7 @@ export function UniversalHeader({
     const date = typeof d === 'string' ? new Date(d) : d;
     const diff = (Date.now() - date.getTime()) / 1000;
     if (diff < 60) return `${Math.floor(diff)}s`;
-    if (diff < 3600) return `${Math.floor(diff/60)}m`;
+    if (diff < 3600) return `${Math.floor(diff/60)}min`;
     if (diff < 86400) return `${Math.floor(diff/3600)}h`;
     return date.toLocaleDateString();
   };

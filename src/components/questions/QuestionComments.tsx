@@ -23,7 +23,7 @@ type QComment = {
   updatedAt: string;
   parentCommentId?: string | null;
   replies?: QComment[];
-  user: { id: string; name?: string | null; email: string; role: string };
+  user: { id: string; name?: string | null; email: string; role: string; image?: string | null };
   imageUrls?: string[];
 };
 
@@ -291,10 +291,10 @@ export function QuestionComments({ questionId, commentType = 'regular' }: Questi
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m`;
+    if (diffMins < 1) return 'À l\'instant';
+    if (diffMins < 60) return `${diffMins}min`;
     if (diffHours < 24) return `${diffHours}h`;
-    if (diffDays < 7) return `${diffDays}d`;
+    if (diffDays < 7) return `${diffDays}j`;
     
     return date.toLocaleDateString();
   };
@@ -347,12 +347,12 @@ export function QuestionComments({ questionId, commentType = 'regular' }: Questi
     };
 
     return (
-      <div className="flex gap-2 mt-3 relative">
+      <div className="flex gap-1.5 sm:gap-2 mt-3 relative">
         {/* Threading line continuation */}
-        <div className="absolute -left-8 top-0 w-3 h-5 border-l-2 border-b-2 border-gray-300 dark:border-gray-600 rounded-bl-lg"></div>
+        <div className="absolute -left-6 sm:-left-8 top-0 w-2 sm:w-3 h-5 border-l-2 border-b-2 border-gray-300 dark:border-gray-600 rounded-bl-lg"></div>
         
-        <div className="flex-1 space-y-2">
-        <div className="comments-ltr-override bg-gray-100 dark:bg-gray-800 rounded-full px-4 py-2 min-h-[36px] flex items-center">
+        <div className="flex-1 space-y-2 min-w-0">
+        <div className="comments-ltr-override bg-gray-100 dark:bg-gray-800 rounded-full px-3 sm:px-4 py-2 min-h-[32px] sm:min-h-[36px] flex items-center">
           <textarea
             ref={replyInputRef}
             value={replyText}
@@ -365,10 +365,10 @@ export function QuestionComments({ questionId, commentType = 'regular' }: Questi
             onFocus={handleFocus}
             onKeyDown={handleKeyDown}
             placeholder={`Répondre à ${parentUserName}...`}
-            className="force-ltr flex-1 bg-transparent border-none outline-none resize-none text-sm placeholder:text-gray-500 dark:placeholder:text-gray-400"
+            className="force-ltr flex-1 bg-transparent border-none outline-none resize-none text-xs sm:text-sm placeholder:text-gray-500 dark:placeholder:text-gray-400"
             style={{ 
-              minHeight: '20px', 
-              maxHeight: '120px', 
+              minHeight: '18px', 
+              maxHeight: '100px', 
               direction: 'ltr', 
               textAlign: 'left', 
               unicodeBidi: 'plaintext',
@@ -384,20 +384,21 @@ export function QuestionComments({ questionId, commentType = 'regular' }: Questi
             autoComplete="off"
             spellCheck="false"
           />
-        </div>          {/* Reply Image Previews */}
+        </div>          
+          {/* Reply Image Previews */}
           {replyImages.length > 0 && (
-            <div className="flex flex-wrap gap-2 pl-4">
+            <div className="flex flex-wrap gap-1.5 sm:gap-2 pl-3 sm:pl-4">
               {replyImages.map((img, i) => (
                 <div key={i} className="relative group">
                   <img 
                     src={img.url} 
                     alt="preview" 
-                    className="h-12 w-12 object-cover rounded-lg border"
+                    className="h-10 w-10 sm:h-12 sm:w-12 object-cover rounded-lg border"
                   />
                   <button
                     type="button"
                     onClick={() => setReplyImages(imgs => imgs.filter((_, idx) => idx !== i))}
-                    className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute -top-0.5 -right-0.5 sm:-top-1 sm:-right-1 bg-red-500 text-white rounded-full w-3.5 h-3.5 sm:w-4 sm:h-4 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
                   >
                     <X className="h-2 w-2" />
                   </button>
@@ -449,8 +450,19 @@ export function QuestionComments({ questionId, commentType = 'regular' }: Questi
                 className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors cursor-pointer"
               >
                 <ImageIcon className="h-3 w-3" />
-                Photo
+                <span className="hidden xs:inline">Photo</span>
               </label>
+            </div>
+            
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <button
+                type="button"
+                onClick={cancelReply}
+                className="text-xs text-gray-500 hover:text-gray-700 transition-colors px-1"
+              >
+                <span className="hidden xs:inline">Annuler</span>
+                <span className="xs:hidden">×</span>
+              </button>
             </div>
           </div>
         </div>
@@ -459,9 +471,13 @@ export function QuestionComments({ questionId, commentType = 'regular' }: Questi
           size="sm"
           disabled={!canPostReply}
           onClick={handleSubmitReply}
-          className="h-9 px-3 rounded-full bg-blue-500 hover:bg-blue-600 text-white"
+          className="h-8 w-8 sm:h-9 sm:w-auto sm:px-3 rounded-full bg-blue-500 hover:bg-blue-600 text-white flex-shrink-0 p-0 sm:p-2"
         >
-          <Send className="h-4 w-4" />
+          {submitting ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Send className="h-3.5 w-3.5" />
+          )}
         </Button>
       </div>
     );
@@ -494,8 +510,24 @@ export function QuestionComments({ questionId, commentType = 'regular' }: Questi
           
           {/* Avatar */}
           <div className="flex-shrink-0">
-            <div className={`${isReply ? 'w-8 h-8' : 'w-10 h-10'} rounded-full bg-blue-500 flex items-center justify-center text-white font-semibold text-sm`}>
-              {displayAsAnonymous ? <EyeOff className="h-4 w-4" /> : initials}
+            <div className={`${isReply ? 'w-8 h-8' : 'w-10 h-10'} rounded-full overflow-hidden ${!comment.user.image || displayAsAnonymous ? 'bg-blue-500 flex items-center justify-center text-white font-semibold text-sm' : ''}`}>
+              {displayAsAnonymous ? (
+                <EyeOff className="h-4 w-4" />
+              ) : comment.user.image ? (
+                <img 
+                  src={comment.user.image} 
+                  alt={displayName}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    // Fallback to initials if image fails to load
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    target.parentElement!.innerHTML = `<div class="w-full h-full bg-blue-500 flex items-center justify-center text-white font-semibold text-sm">${initials}</div>`;
+                  }}
+                />
+              ) : (
+                initials
+              )}
             </div>
           </div>
 
@@ -703,20 +735,35 @@ export function QuestionComments({ questionId, commentType = 'regular' }: Questi
         </div>
 
         {/* Fixed Comment Input at Bottom */}
-        <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
+        <div className="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-3 sm:p-4">
           {ownerId ? (
             <div className="space-y-3">
-              <div className="flex gap-3">
+              <div className="flex gap-2 sm:gap-3">
                 {/* User Avatar */}
                 <div className="flex-shrink-0">
-                  <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-semibold text-sm">
-                    {user?.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'U'}
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full overflow-hidden bg-blue-500 flex items-center justify-center text-white font-semibold text-xs sm:text-sm">
+                    {user?.image ? (
+                      <img 
+                        src={user.image} 
+                        alt={user.name || user.email}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          // Fallback to initials if image fails to load
+                          const target = e.target as HTMLImageElement;
+                          target.style.display = 'none';
+                          const initials = user?.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'U';
+                          target.parentElement!.innerHTML = initials;
+                        }}
+                      />
+                    ) : (
+                      user?.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'U'
+                    )}
                   </div>
                 </div>
 
                 {/* Input Area */}
-                <div className="flex-1">
-                  <div className="comments-ltr-override bg-gray-100 dark:bg-gray-800 rounded-full px-4 py-2 min-h-[40px] flex items-center">
+                <div className="flex-1 min-w-0">
+                  <div className="comments-ltr-override bg-gray-100 dark:bg-gray-800 rounded-full px-3 sm:px-4 py-2 min-h-[36px] sm:min-h-[40px] flex items-center">
                     <textarea
                       ref={textareaRef}
                       value={text}
@@ -738,10 +785,10 @@ export function QuestionComments({ questionId, commentType = 'regular' }: Questi
                         }
                       }}
                       placeholder="Écrire un commentaire..."
-                      className="force-ltr flex-1 bg-transparent border-none outline-none resize-none text-sm placeholder:text-gray-500 dark:placeholder:text-gray-400"
+                      className="force-ltr flex-1 bg-transparent border-none outline-none resize-none text-xs sm:text-sm placeholder:text-gray-500 dark:placeholder:text-gray-400"
                       style={{ 
-                        minHeight: '24px', 
-                        maxHeight: '120px', 
+                        minHeight: '20px', 
+                        maxHeight: '100px', 
                         direction: 'ltr', 
                         textAlign: 'left', 
                         unicodeBidi: 'plaintext',
@@ -765,7 +812,7 @@ export function QuestionComments({ questionId, commentType = 'regular' }: Questi
                   size="sm"
                   disabled={!canPostRoot}
                   onClick={() => add()}
-                  className="h-10 px-4 rounded-full bg-blue-500 hover:bg-blue-600 text-white flex-shrink-0"
+                  className="h-9 w-9 sm:h-10 sm:w-auto sm:px-4 rounded-full bg-blue-500 hover:bg-blue-600 text-white flex-shrink-0 p-0 sm:p-2"
                 >
                   {submitting ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -777,20 +824,20 @@ export function QuestionComments({ questionId, commentType = 'regular' }: Questi
 
               {/* Image Previews */}
               {images.length > 0 && (
-                <div className="ml-13 flex flex-wrap gap-2">
+                <div className="ml-10 sm:ml-13 flex flex-wrap gap-2">
                   {images.map((url, i) => (
                     <div key={i} className="relative group">
                       <img 
                         src={url} 
                         alt="preview" 
-                        className="h-16 w-16 object-cover rounded-lg border"
+                        className="h-12 w-12 sm:h-16 sm:w-16 object-cover rounded-lg border"
                       />
                       <button
                         type="button"
                         onClick={() => setImages(imgs => imgs.filter((_, idx) => idx !== i))}
-                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="absolute -top-1 -right-1 sm:-top-2 sm:-right-2 bg-red-500 text-white rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
                       >
-                        <X className="h-3 w-3" />
+                        <X className="h-2 w-2 sm:h-3 sm:w-3" />
                       </button>
                     </div>
                   ))}
@@ -798,8 +845,8 @@ export function QuestionComments({ questionId, commentType = 'regular' }: Questi
               )}
 
               {/* Action Bar */}
-              <div className="ml-13 flex items-center justify-between">
-                <div className="flex items-center gap-4">
+              <div className="ml-10 sm:ml-13 flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-3 sm:gap-4">
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -865,19 +912,20 @@ export function QuestionComments({ questionId, commentType = 'regular' }: Questi
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={submitting}
-                    className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+                    className="flex items-center gap-1 text-xs sm:text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
                   >
-                    <ImageIcon className="h-4 w-4" />
-                    Photo
+                    <ImageIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                    <span className="hidden xs:inline">Photo</span>
                   </button>
 
-                  <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                  <label className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                     <Checkbox 
                       checked={postAnonymous} 
                       onCheckedChange={(v) => setPostAnonymous(!!v)} 
-                      className="h-4 w-4" 
+                      className="h-3.5 w-3.5 sm:h-4 sm:w-4" 
                     />
-                    Anonyme
+                    <span className="hidden xs:inline">Anonyme</span>
+                    <span className="xs:hidden">Anon</span>
                   </label>
                 </div>
               </div>

@@ -62,78 +62,88 @@ export function OpenQuestionActions({
         </Button>
       )}
       
-      <div className={`flex gap-2 ${showPrevious ? 'sm:ml-auto' : ''} justify-end flex-wrap`}>
-        <div className="flex gap-2 items-center flex-wrap">
+      <div className={`flex flex-col gap-3 ${showPrevious ? 'sm:ml-auto' : ''} w-full sm:w-auto`}>
+        {/* Submit button for unanswered questions */}
         {!hasSubmitted && (
-          <Button
-            onClick={onSubmit}
-            disabled={!canSubmit || !currentAnswer.trim()}
-            className="flex items-center gap-1 w-full sm:w-auto"
-          >
-            <SendHorizontal className="h-4 w-4" />
-            <span className="hidden sm:inline">Soumettre</span>
-          </Button>
+          <div className="flex justify-end">
+            <Button
+              onClick={onSubmit}
+              disabled={!canSubmit || !currentAnswer.trim()}
+              className="flex items-center gap-1 w-full xs:w-auto text-xs sm:text-sm"
+            >
+              <SendHorizontal className="h-4 w-4" />
+              <span className="hidden xs:inline">Soumettre</span>
+              <span className="xs:hidden">OK</span>
+            </Button>
+          </div>
         )}
 
-        {/* Assessment Result Indicator */}
+        {/* Assessment Result Indicator - full width on mobile */}
         {isSubmitted && assessmentCompleted && assessmentResult !== undefined && (
-          <div className="flex items-center mr-4">
+          <div className="flex items-center justify-center sm:justify-start">
             {assessmentResult === true ? (
               <div className="flex items-center text-green-600">
                 <CheckCircle className="h-5 w-5 mr-2" />
-                <span className="font-medium">Correcte!</span>
+                <span className="font-medium text-sm sm:text-base">Correcte!</span>
               </div>
             ) : assessmentResult === 'partial' ? (
               <div className="flex items-center text-yellow-600">
                 <AlertCircle className="h-5 w-5 mr-2" />
-                <span className="font-medium">Partiellement correcte</span>
+                <span className="font-medium text-sm sm:text-base">Partiellement correcte</span>
               </div>
             ) : (
               <div className="flex items-center text-red-600">
                 <XCircle className="h-5 w-5 mr-2" />
-                <span className="font-medium">Incorrecte</span>
+                <span className="font-medium text-sm sm:text-base">Incorrecte</span>
               </div>
             )}
           </div>
         )}
 
+        {/* Action buttons for submitted questions - responsive layout */}
+        {isSubmitted && assessmentCompleted && (
+          <div className="flex flex-col xs:flex-row gap-2 items-stretch xs:items-center xs:justify-end">
+            {/* Resubmit Button */}
+            {onResubmit && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onResubmit}
+                className="flex items-center gap-1 justify-center text-xs sm:text-sm min-w-0 flex-shrink-0"
+              >
+                <span className="hidden xs:inline truncate">Soumettre à nouveau</span>
+                <span className="xs:hidden truncate">Réessayer</span>
+              </Button>
+            )}
 
-        {/* Resubmit Button */}
-        {isSubmitted && assessmentCompleted && onResubmit && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onResubmit}
-            className="flex items-center gap-1"
-          >
-            <span className="hidden sm:inline">Soumettre à nouveau</span>
-            <span className="sm:hidden">Réessayer</span>
-          </Button>
-        )}
+            {/* Notes Button */}
+            {onToggleNotes && !hideNotesButton && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onToggleNotes}
+                className="flex items-center gap-1 justify-center text-xs sm:text-sm min-w-0 flex-shrink-0"
+              >
+                <StickyNote className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">{showNotesArea ? 'Fermer les notes' : 'Mes notes'}</span>
+              </Button>
+            )}
 
-        {onToggleNotes && !hideNotesButton && assessmentCompleted && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={onToggleNotes}
-            className="flex items-center gap-1"
-          >
-            <StickyNote className="h-4 w-4" />
-            <span className="hidden sm:inline">{showNotesArea ? 'Fermer les notes' : 'Mes notes'}</span>
-          </Button>
+            {/* Next Button */}
+            {showNext && (
+              <Button
+                size="sm"
+                onClick={onNext}
+                className="flex items-center gap-1 justify-center text-xs sm:text-sm min-w-0 flex-shrink-0"
+              >
+                <span className="hidden xs:inline truncate">Suivant</span>
+                <span className="xs:hidden truncate">Suivant</span>
+                <ChevronRight className="h-4 w-4 flex-shrink-0" />
+              </Button>
+            )}
+          </div>
         )}
-        {showNext && (
-          <Button
-            size="sm"
-            onClick={onNext}
-            className="flex items-center gap-1"
-          >
-            <span className="hidden sm:inline">Suivant</span>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        )}
-        </div>
       </div>
     </div>
   );

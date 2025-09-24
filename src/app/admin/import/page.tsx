@@ -19,18 +19,18 @@ export default function ImportPage() {
           {mode === 'choose' && (
             <div className="space-y-6">
               {/* Pipeline Overview */}
-              <div className="bg-gradient-to-r from-blue-50 to-green-50 border border-blue-200 rounded-lg p-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-4">🔄 Pipeline Validation & Import</h2>
+              <div className="bg-gradient-to-r from-blue-50 to-green-50 dark:from-blue-950/30 dark:to-green-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">🔄 Pipeline Validation & Import</h2>
                 <div className="grid md:grid-cols-2 gap-6">
                   <div className="space-y-3">
-                    <h3 className="font-semibold text-blue-900">1️⃣ Validation (Filter)</h3>
-                    <p className="text-sm text-blue-800">
+                    <h3 className="font-semibold text-blue-900 dark:text-blue-200">1️⃣ Validation (Filter)</h3>
+                    <p className="text-sm text-blue-800 dark:text-blue-300">
                       <strong>Localisation :</strong> Admin → Validation<br/>
                       <strong>Objectif :</strong> Vérifier rapidement que votre classeur est utilisable, identifier les champs manquants et corriger les lignes avant l'import.
                     </p>
-                    <div className="bg-white/60 p-3 rounded border">
-                      <p className="text-xs font-medium mb-2">Vérifications automatiques :</p>
-                      <ul className="text-xs space-y-1">
+                    <div className="bg-white/60 dark:bg-gray-800/60 p-3 rounded border dark:border-gray-700">
+                      <p className="text-xs font-medium mb-2 text-gray-900 dark:text-gray-100">Vérifications automatiques :</p>
+                      <ul className="text-xs space-y-1 text-gray-800 dark:text-gray-200">
                         <li>• Classeur non vide, au moins une feuille reconnue</li>
                         <li>• Colonnes présentes selon le type de feuille</li>
                         <li>• Réponses QCM valides (A–E) ou "?" / "Pas de réponse"</li>
@@ -40,14 +40,14 @@ export default function ImportPage() {
                   </div>
                   
                   <div className="space-y-3">
-                    <h3 className="font-semibold text-green-900">2️⃣ Import (Database)</h3>
-                    <p className="text-sm text-green-800">
+                    <h3 className="font-semibold text-green-900 dark:text-green-200">2️⃣ Import (Database)</h3>
+                    <p className="text-sm text-green-800 dark:text-green-300">
                       <strong>Localisation :</strong> Admin → Import<br/>
                       <strong>Objectif :</strong> Persister les questions validées dans la base de données (Prisma) et attacher les métadonnées.
                     </p>
-                    <div className="bg-white/60 p-3 rounded border">
-                      <p className="text-xs font-medium mb-2">Mapping automatique :</p>
-                      <ul className="text-xs space-y-1">
+                    <div className="bg-white/60 dark:bg-gray-800/60 p-3 rounded border dark:border-gray-700">
+                      <p className="text-xs font-medium mb-2 text-gray-900 dark:text-gray-100">Mapping automatique :</p>
+                      <ul className="text-xs space-y-1 text-gray-800 dark:text-gray-200">
                         <li>• Spécialités & cours : créés si non trouvés</li>
                         <li>• Type de question : déduit de la feuille</li>
                         <li>• Options et réponses : parsing intelligent</li>
@@ -57,11 +57,11 @@ export default function ImportPage() {
                   </div>
                 </div>
                 
-                <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
-                  <p className="text-sm text-yellow-800">
+                <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-800 rounded">
+                  <p className="text-sm text-yellow-800 dark:text-yellow-200">
                     <strong>💡 Conseil :</strong> Si votre classeur est désordonné (format des réponses, explications, espacement), 
                     utilisez d'abord l'<strong>Assistance IA</strong> dans Admin → Validation pour produire un fichier 
-                    <code>ai_fixed.xlsx</code> normalisé, puis importez ce fichier corrigé.
+                    <code className="bg-gray-200 dark:bg-gray-700 px-1 rounded">ai_fixed.xlsx</code> normalisé, puis importez ce fichier corrigé.
                   </p>
                 </div>
               </div>

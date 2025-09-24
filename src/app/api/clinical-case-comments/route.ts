@@ -10,7 +10,7 @@ const fullSelect = {
   updatedAt: true,
   parentCommentId: true,
   imageUrls: true,
-  user: { select: { id: true, name: true, email: true, role: true } },
+  user: { select: { id: true, name: true, email: true, role: true, image: true } },
 };
 
 // GET /api/clinical-case-comments?questionId=...

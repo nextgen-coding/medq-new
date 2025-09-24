@@ -251,9 +251,9 @@ export function QuestionImportPanel() {
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Import Help Section */}
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 space-y-3">
-              <h4 className="font-medium text-green-900">📂 Guide d'Import</h4>
-              <div className="text-sm text-green-800 space-y-3">
+            <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg p-4 space-y-3">
+              <h4 className="font-medium text-green-900 dark:text-green-200">📂 Guide d'Import</h4>
+              <div className="text-sm text-green-800 dark:text-green-300 space-y-3">
                 <div>
                   <p><strong>Objectif :</strong> Persister les questions validées dans la base de données</p>
                 </div>
@@ -261,35 +261,35 @@ export function QuestionImportPanel() {
                 <div>
                   <p><strong>En-têtes requis par feuille :</strong></p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
-                    <div className="bg-white/60 p-2 rounded border">
-                      <p className="font-medium">QCM :</p>
-                      <ul className="text-xs space-y-1 mt-1">
-                        <li>• <code>matiere</code>, <code>cours</code>, <code>texte de la question</code></li>
-                        <li>• <code>option a</code>, <code>option b</code>... (A-E)</li>
-                        <li>• <code>reponse</code> (optionnel), <code>explication</code></li>
+                    <div className="bg-white/60 dark:bg-gray-800/60 p-2 rounded border border-gray-200 dark:border-gray-700">
+                      <p className="font-medium text-gray-900 dark:text-gray-100">QCM :</p>
+                      <ul className="text-xs space-y-1 mt-1 text-gray-800 dark:text-gray-200">
+                        <li>• <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">matiere</code>, <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">cours</code>, <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">texte de la question</code></li>
+                        <li>• <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">option a</code>, <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">option b</code>... (A-E)</li>
+                        <li>• <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">reponse</code> (optionnel), <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">explication</code></li>
                       </ul>
                     </div>
-                    <div className="bg-white/60 p-2 rounded border">
-                      <p className="font-medium">QROC :</p>
-                      <ul className="text-xs space-y-1 mt-1">
-                        <li>• <code>matiere</code>, <code>cours</code>, <code>texte de la question</code></li>
-                        <li>• <code>reponse</code> (obligatoire)</li>
-                        <li>• <code>explication</code> (recommandée)</li>
+                    <div className="bg-white/60 dark:bg-gray-800/60 p-2 rounded border border-gray-200 dark:border-gray-700">
+                      <p className="font-medium text-gray-900 dark:text-gray-100">QROC :</p>
+                      <ul className="text-xs space-y-1 mt-1 text-gray-800 dark:text-gray-200">
+                        <li>• <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">matiere</code>, <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">cours</code>, <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">texte de la question</code></li>
+                        <li>• <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">reponse</code> (obligatoire)</li>
+                        <li>• <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">explication</code> (recommandée)</li>
                       </ul>
                     </div>
-                    <div className="bg-white/60 p-2 rounded border">
-                      <p className="font-medium">CAS QCM :</p>
-                      <ul className="text-xs space-y-1 mt-1">
-                        <li>• <code>texte du cas</code> ou <code>case</code></li>
-                        <li>• <em>Optionnel</em>: <code>texte de la question</code> (si vide, on utilisera le texte du cas)</li>
+                    <div className="bg-white/60 dark:bg-gray-800/60 p-2 rounded border border-gray-200 dark:border-gray-700">
+                      <p className="font-medium text-gray-900 dark:text-gray-100">CAS QCM :</p>
+                      <ul className="text-xs space-y-1 mt-1 text-gray-800 dark:text-gray-200">
+                        <li>• <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">texte du cas</code> ou <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">case</code></li>
+                        <li>• <em>Optionnel</em>: <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">texte de la question</code> (si vide, on utilisera le texte du cas)</li>
                         <li>• + toutes les colonnes QCM</li>
                       </ul>
                     </div>
-                    <div className="bg-white/60 p-2 rounded border">
-                      <p className="font-medium">CAS QROC :</p>
-                      <ul className="text-xs space-y-1 mt-1">
-                        <li>• <code>texte du cas</code> ou <code>case</code></li>
-                        <li>• <em>Optionnel</em>: <code>texte de la question</code> (si vide, on utilisera le texte du cas)</li>
+                    <div className="bg-white/60 dark:bg-gray-800/60 p-2 rounded border border-gray-200 dark:border-gray-700">
+                      <p className="font-medium text-gray-900 dark:text-gray-100">CAS QROC :</p>
+                      <ul className="text-xs space-y-1 mt-1 text-gray-800 dark:text-gray-200">
+                        <li>• <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">texte du cas</code> ou <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">case</code></li>
+                        <li>• <em>Optionnel</em>: <code className="bg-gray-100 dark:bg-gray-700 px-1 rounded">texte de la question</code> (si vide, on utilisera le texte du cas)</li>
                         <li>• + toutes les colonnes QROC</li>
                       </ul>
                     </div>

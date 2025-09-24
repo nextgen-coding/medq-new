@@ -49,7 +49,7 @@ export async function PUT(
             createdAt: true,
             updatedAt: true,
             imageUrls: true,
-            user: { select: { id: true, name: true, email: true, role: true } },
+            user: { select: { id: true, name: true, email: true, role: true, image: true } },
           },
         });
       } catch (inner) {
@@ -67,7 +67,7 @@ export async function PUT(
             isAnonymous: true,
             createdAt: true,
             updatedAt: true,
-            user: { select: { id: true, name: true, email: true, role: true } },
+            user: { select: { id: true, name: true, email: true, role: true, image: true } },
           },
         });
         (updated as any).imageUrls = [];
@@ -84,10 +84,10 @@ export async function PUT(
         `;
         const row = result?.[0];
         if (!row) return NextResponse.json({ error: 'Comment not found' }, { status: 404 });
-        const userRows = await prisma.$queryRaw<Array<{ id: string; name: string | null; email: string | null; role: string }>>`
-          SELECT id::text AS id, name, email, role FROM profiles WHERE id = ${row.user_id}::uuid;
+        const userRows = await prisma.$queryRaw<Array<{ id: string; name: string | null; email: string | null; role: string; image: string | null }>>`
+          SELECT id::text AS id, name, email, role, image FROM profiles WHERE id = ${row.user_id}::uuid;
         `;
-        const userInfo = userRows?.[0] ?? { id: row.user_id, name: null, email: null, role: 'student' };
+        const userInfo = userRows?.[0] ?? { id: row.user_id, name: null, email: null, role: 'student', image: null };
         return NextResponse.json({
           id: row.id,
           content: row.content,

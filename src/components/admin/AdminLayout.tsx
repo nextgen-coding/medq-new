@@ -1,7 +1,5 @@
 import React from 'react';
 import { AdminSidebar, AdminSidebarProvider } from './AdminSidebar';
-import { SidebarInset } from '@/components/ui/sidebar';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { AppHeader } from '@/components/layout/AppHeader';
 
@@ -57,10 +55,14 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       `}</style>
       
       <AdminSidebar />
-      {/* Modern inset area with theme-aware background */}
-      <SidebarInset className="bg-background min-h-screen flex flex-col admin-content">
-        <AppHeader />
-        <ScrollArea className="flex-1 min-h-0 overflow-x-hidden">
+      {/* Modern main area with theme-aware background and proper sticky positioning */}
+      <main className="relative flex min-h-screen flex-1 flex-col bg-background admin-content peer-data-[variant=inset]:min-h-[calc(100svh-theme(spacing.4))] md:peer-data-[variant=inset]:m-2 md:peer-data-[state=collapsed]:peer-data-[variant=inset]:ml-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow">
+        {/* Sticky header */}
+        <header className="sticky top-0 z-40 bg-background/95 backdrop-blur-sm border-b border-border">
+          <AppHeader />
+        </header>
+        {/* Scrollable content area */}
+        <div className="flex-1 overflow-y-auto">
           {/* Clean container with consistent spacing like landing page */}
           <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 sm:py-8 lg:py-12">
             {/* Enhanced content wrapper with modern styling */}
@@ -68,8 +70,8 @@ export function AdminLayout({ children }: AdminLayoutProps) {
               {children}
             </div>
           </div>
-        </ScrollArea>
-      </SidebarInset>
+        </div>
+      </main>
     </AdminSidebarProvider>
   );
 }
