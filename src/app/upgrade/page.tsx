@@ -880,7 +880,7 @@ export default function UpgradePage() {
                         </p>
                       </div>
 
-                      <div className="max-w-xl mx-auto px-4">
+                      <div className="max-w-xl mx-auto px-3 sm:px-4">
                         {state.method === 'konnect_gateway' && (
                           <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
                             <CardContent className="p-4 sm:p-6">
@@ -939,25 +939,29 @@ export default function UpgradePage() {
                         )}
 
                         {state.method === 'custom_payment' && (
-                          <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-                            <CardContent className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+                          <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 mx-1 sm:mx-0">
+                            <CardContent className="p-3 sm:p-6 space-y-4 sm:space-y-6">
                               <div className="p-3 sm:p-4 bg-orange-50 dark:bg-orange-900/20 rounded-xl border dark:border-orange-800/30">
                                 <h3 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2 text-base sm:text-lg">
                                   <Banknote className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600 dark:text-orange-400" />
                                   Informations de paiement
                                 </h3>
-                                <div className="space-y-2 text-xs sm:text-sm">
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-gray-600 dark:text-gray-300">RIB:</span>
-                                    <span className="font-mono break-all sm:break-normal text-gray-900 dark:text-gray-100">{pricing.paymentDetails.ribNumber}</span>
+                                <div className="space-y-3 text-xs sm:text-sm">
+                                  <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-2">
+                                    <span className="text-gray-600 dark:text-gray-300 font-medium">RIB:</span>
+                                    <span className="font-mono text-right sm:text-left break-all text-gray-900 dark:text-gray-100 text-xs leading-relaxed">
+                                      {pricing.paymentDetails.ribNumber}
+                                    </span>
                                   </div>
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-gray-600 dark:text-gray-300">D17:</span>
-                                    <span className="font-mono text-gray-900 dark:text-gray-100">{pricing.paymentDetails.d17PhoneNumber}</span>
+                                  <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-2">
+                                    <span className="text-gray-600 dark:text-gray-300 font-medium">D17:</span>
+                                    <span className="font-mono text-right sm:text-left text-gray-900 dark:text-gray-100">
+                                      {pricing.paymentDetails.d17PhoneNumber}
+                                    </span>
                                   </div>
-                                  <div className="flex justify-between items-center font-semibold">
+                                  <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-2 font-semibold pt-2 border-t border-orange-200 dark:border-orange-700">
                                     <span className="text-gray-900 dark:text-gray-100">Montant à payer:</span>
-                                    <span className="text-medblue-600 dark:text-medblue-400">
+                                    <span className="text-medblue-600 dark:text-medblue-400 text-right sm:text-left text-lg">
                                       {state.subscriptionType === 'annual' ? pricing.annual.finalPrice : pricing.semester.finalPrice} {pricing.currency}
                                     </span>
                                   </div>
@@ -969,11 +973,11 @@ export default function UpgradePage() {
                                   id="payment-details"
                                   value={state.customPaymentDetails}
                                   onChange={(e) => setState(prev => ({ ...prev, customPaymentDetails: e.target.value }))}
-                                  placeholder="Décrivez votre méthode de paiement (ex: Virement effectué le DD/MM/YYYY, référence XXX)"
+                                  placeholder="Ex: Virement effectué le DD/MM/YYYY, référence XXX"
                                   rows={3}
-                                  className="text-sm sm:text-base bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                                  className="text-sm sm:text-base bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 resize-none"
                                 />
-                                <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                                <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
                                   Précisez la méthode utilisée et toute information utile pour la vérification
                                 </p>
                               </div>
@@ -985,7 +989,7 @@ export default function UpgradePage() {
                                 <p className="text-xs text-gray-600 dark:text-gray-400">
                                   Veuillez téléverser une preuve de paiement (capture d'écran, reçu, etc.) pour valider votre paiement.
                                 </p>
-                                <div className="border-2 border-dashed border-medblue-300 dark:border-medblue-700 rounded-lg p-6">
+                                <div className="border-2 border-dashed border-medblue-300 dark:border-medblue-700 rounded-lg p-3 sm:p-6">
                                     <UploadDropzone
                                       endpoint="imageUploader"
                                       onClientUploadComplete={(res) => {
