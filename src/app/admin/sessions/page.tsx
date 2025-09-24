@@ -152,24 +152,25 @@ export default function SessionsAdminPage() {
     <ProtectedRoute requireAdmin>
       <AdminRoute>
         <AdminLayout>
-          <div className="space-y-8">
-            <div className="flex flex-wrap gap-4 justify-between items-start">
-              <div className="flex-1 min-w-[260px]">
-                <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">Gestion des sessions</h1>
+          <div className="space-y-4 sm:space-y-8">
+            <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:gap-4 sm:justify-between sm:items-start">
+              <div className="flex-1 min-w-0 sm:min-w-[260px]">
+                <h1 className="text-2xl sm:text-3xl font-bold mb-2 bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">Gestion des sessions</h1>
                 {!selectedSpecialty && <p className="text-muted-foreground text-sm">Choisissez une spécialité pour gérer ses sessions.</p>}
                 {selectedSpecialty && <p className="text-sm text-muted-foreground">Spécialité : <span className="font-medium text-blue-700 dark:text-blue-300">{selectedSpecialty.name}</span></p>}
               </div>
-              <div className="flex gap-2 items-center ml-auto">
+              <div className="flex flex-wrap gap-2 items-center w-full sm:w-auto sm:ml-auto">
                 {selectedSpecialty && (
                   <Button variant="outline" size="sm" onClick={() => { setSelectedSpecialtyId(null); setShowForm(false); setEditingId(null); setCorrectionSessionId(null); }} className="gap-2 border-blue-200 text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/30">Retour</Button>
                 )}
                 <Button variant="ghost" size="sm" onClick={load} disabled={loading} className="gap-2">
-                  <RefreshCcw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Actualiser
+                  <RefreshCcw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> <span className="hidden xs:inline">Actualiser</span>
                 </Button>
                 {selectedSpecialty && (
-                  <Button onClick={()=> setShowForm(v=>!v)} className="gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/30 shadow">
+                  <Button onClick={()=> setShowForm(v=>!v)} className="gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-blue-600/30 shadow flex-1 xs:flex-initial">
                     {showForm ? <X className="h-4 w-4" /> : <PlusCircle className="h-4 w-4" />}
-                    {editingId ? 'Modifier session' : showForm ? 'Fermer' : 'Nouvelle session'}
+                    <span className="xs:hidden">{editingId ? 'Modifier' : showForm ? 'Fermer' : 'Nouvelle'}</span>
+                    <span className="hidden xs:inline">{editingId ? 'Modifier session' : showForm ? 'Fermer' : 'Nouvelle session'}</span>
                   </Button>
                 )}
               </div>
@@ -187,7 +188,7 @@ export default function SessionsAdminPage() {
                   ) : specialties.length === 0 ? (
                     <div className="py-12 text-center text-sm text-muted-foreground">Aucune spécialité</div>
                   ) : (
-                    <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    <div className="grid gap-4 grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                       {specialties.map(sp => {
                         const iconData = sp.icon ? getMedicalIcon(sp.icon) : getIconBySpecialtyName(sp.name);
                         const IconComp = iconData.icon;
@@ -196,13 +197,21 @@ export default function SessionsAdminPage() {
                         const g = gradients[Math.abs(hash)%gradients.length];
                         const count = (sp as any)._count?.sessions ?? sessionsCountMap[sp.id] ?? 0;
                         return (
-                          <button key={sp.id} onClick={()=>{ setSelectedSpecialtyId(sp.id); resetForm(); }} className="group relative overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-6 text-left transition-all hover:-translate-y-1 hover:shadow-lg hover:shadow-blue-500/25">
-                            <div className={`w-16 h-16 mb-4 rounded-xl flex items-center justify-center bg-gradient-to-br ${g} border-2 border-white/20 shadow-lg group-hover:scale-105 transition-transform`}>
-                              <IconComp className="w-8 h-8 text-white" />
+                          <button key={sp.id} onClick={()=>{ setSelectedSpecialtyId(sp.id); resetForm(); }} className="group relative overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 p-4 sm:p-6 text-left transition-all hover:-translate-y-1 hover:shadow-lg hover:shadow-blue-500/25">
+                            <div className={`w-12 h-12 sm:w-16 sm:h-16 mb-3 sm:mb-4 rounded-xl flex items-center justify-center bg-gradient-to-br ${g} border-2 border-white/20 shadow-lg group-hover:scale-105 transition-transform`}>
+                              <IconComp className="w-6 h-6 sm:w-8 sm:h-8 text-white" />
                             </div>
-                            <h3 className="font-semibold text-gray-900 dark:text-gray-100 line-clamp-1 mb-1">{sp.name}</h3>
-                            {sp.description && <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2 mb-3">{sp.description}</p>}
-                            <div className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-2"><span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500" />{count} session{count>1?'s':''}</span><span className="ml-auto text-blue-600 dark:text-blue-400 group-hover:underline">Gérer →</span></div>
+                            <h3 className="font-semibold text-gray-900 dark:text-gray-100 line-clamp-1 mb-1 text-sm sm:text-base">{sp.name}</h3>
+                            {sp.description && <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2 mb-2 sm:mb-3">{sp.description}</p>}
+                            <div className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-2">
+                              <span className="inline-flex items-center gap-1">
+                                <span className="w-2 h-2 rounded-full bg-blue-500" />{count} session{count>1?'s':''}
+                              </span>
+                              <span className="ml-auto text-blue-600 dark:text-blue-400 group-hover:underline">
+                                <span className="hidden xs:inline">Gérer →</span>
+                                <span className="xs:hidden">→</span>
+                              </span>
+                            </div>
                           </button>
                         )
                       })}
@@ -218,8 +227,8 @@ export default function SessionsAdminPage() {
                   <CardTitle className="text-base font-semibold text-blue-800 dark:text-blue-100">{editingId ? 'Modifier la session' : 'Créer une nouvelle session'}</CardTitle>
                   <CardDescription>{editingId ? 'Mettre à jour les informations de la session.' : 'Définir les informations de la session.'}</CardDescription>
                 </CardHeader>
-                <CardContent className="grid gap-3 md:grid-cols-2">
-                  <div className="space-y-1 md:col-span-2">
+                <CardContent className="grid gap-3 sm:grid-cols-2 p-4 sm:p-6">
+                  <div className="space-y-1 sm:col-span-2">
                     <Label>Nom</Label>
                     <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="border-blue-200 focus:border-blue-400 focus:ring-blue-400/20" />
                   </div>
@@ -251,14 +260,14 @@ export default function SessionsAdminPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="space-y-1 md:col-span-2">
+                  <div className="space-y-1 sm:col-span-2">
                     <Label>Spécialité</Label>
                     <Input value={form.specialtyName} disabled placeholder="Spécialité sélectionnée" className="border-blue-200 bg-muted/40" />
                   </div>
-                  <div className="md:col-span-2 flex gap-2 justify-end pt-2 border-t border-blue-100">
-                    {editingId && <Button variant="outline" size="sm" onClick={() => { setEditingId(null); resetForm(); }} className="border-blue-200 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30">Annuler</Button>}
-                    {!editingId && <Button size="sm" onClick={handleCreate} disabled={!form.name || creating} className="bg-blue-600 hover:bg-blue-700 text-white gap-1"><Plus className="h-4 w-4" /> Créer</Button>}
-                    {editingId && <Button size="sm" onClick={handleUpdate} disabled={!form.name} className="bg-blue-600 hover:bg-blue-700 text-white">Enregistrer</Button>}
+                  <div className="sm:col-span-2 flex flex-col xs:flex-row gap-2 justify-end pt-2 border-t border-blue-100">
+                    {editingId && <Button variant="outline" size="sm" onClick={() => { setEditingId(null); resetForm(); }} className="border-blue-200 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 order-2 xs:order-1">Annuler</Button>}
+                    {!editingId && <Button size="sm" onClick={handleCreate} disabled={!form.name || creating} className="bg-blue-600 hover:bg-blue-700 text-white gap-1 order-1 xs:order-2"><Plus className="h-4 w-4" /> Créer</Button>}
+                    {editingId && <Button size="sm" onClick={handleUpdate} disabled={!form.name} className="bg-blue-600 hover:bg-blue-700 text-white order-1 xs:order-2">Enregistrer</Button>}
                   </div>
                 </CardContent>
               </Card>
@@ -278,47 +287,57 @@ export default function SessionsAdminPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Nom</TableHead>
-                        <TableHead>Niveau</TableHead>
-                        <TableHead>Semestre</TableHead>
-                        <TableHead>PDF</TableHead>
-                        <TableHead>Correction</TableHead>
+                        <TableHead className="hidden sm:table-cell">Niveau</TableHead>
+                        <TableHead className="hidden sm:table-cell">Semestre</TableHead>
+                        <TableHead className="hidden md:table-cell">PDF</TableHead>
+                        <TableHead className="hidden md:table-cell">Correction</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {visibleSessions.map(s => (
                         <TableRow key={s.id} className={editingId === s.id ? 'bg-blue-50 dark:bg-blue-950/20' : ''}>
-                          <TableCell className="font-medium">{s.name}</TableCell>
-                          <TableCell>{s.niveau?.name || '-'}</TableCell>
-                          <TableCell>{s.semester ? `S${s.semester.order}` : '-'}</TableCell>
-                          <TableCell className="max-w-[140px] truncate">{s.pdfUrl ? 'Oui' : '-'}</TableCell>
-                          <TableCell className="max-w-[140px] truncate">{s.correctionUrl ? 'Oui' : '-'}</TableCell>
-                          <TableCell className="text-right space-x-2">
-                            <Button variant="outline" size="sm" onClick={() => startEdit(s)} disabled={deleting === s.id}>
-                              <Pencil className="h-3 w-3" />
-                            </Button>
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
-                              onClick={() => setCorrectionSessionId(correctionSessionId === s.id ? null : s.id)} 
-                              className={correctionSessionId === s.id ? 'bg-blue-600 text-white hover:bg-blue-600/90' : ''}
-                              disabled={deleting === s.id}
-                            >
-                              Corriger
-                            </Button>
-                            <Button 
-                              variant="destructive" 
-                              size="sm" 
-                              onClick={() => confirmDeleteSession(s)}
-                              disabled={deleting === s.id}
-                              className={deleting === s.id ? 'opacity-50 cursor-not-allowed' : ''}
-                            >
-                              {deleting === s.id ? (
-                                <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                              ) : (
-                                <Trash2 className="h-3 w-3" />
-                              )}
-                            </Button>
+                          <TableCell className="font-medium">
+                            <div className="min-w-0">
+                              <div className="font-medium">{s.name}</div>
+                              <div className="text-xs text-muted-foreground sm:hidden">
+                                {s.niveau?.name && <span>{s.niveau.name}</span>}
+                                {s.semester && <span>{s.niveau?.name ? ' • ' : ''}S{s.semester.order}</span>}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="hidden sm:table-cell">{s.niveau?.name || '-'}</TableCell>
+                          <TableCell className="hidden sm:table-cell">{s.semester ? `S${s.semester.order}` : '-'}</TableCell>
+                          <TableCell className="hidden md:table-cell">{s.pdfUrl ? 'Oui' : '-'}</TableCell>
+                          <TableCell className="hidden md:table-cell">{s.correctionUrl ? 'Oui' : '-'}</TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex gap-1 justify-end">
+                              <Button variant="outline" size="sm" onClick={() => startEdit(s)} disabled={deleting === s.id} className="px-2">
+                                <Pencil className="h-3 w-3" />
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => setCorrectionSessionId(correctionSessionId === s.id ? null : s.id)} 
+                                className={`px-2 ${correctionSessionId === s.id ? 'bg-blue-600 text-white hover:bg-blue-600/90' : ''} hidden xs:flex`}
+                                disabled={deleting === s.id}
+                              >
+                                <span className="text-xs">Corr.</span>
+                              </Button>
+                              <Button 
+                                variant="destructive" 
+                                size="sm" 
+                                onClick={() => confirmDeleteSession(s)}
+                                disabled={deleting === s.id}
+                                className={`px-2 ${deleting === s.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                              >
+                                {deleting === s.id ? (
+                                  <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                                ) : (
+                                  <Trash2 className="h-3 w-3" />
+                                )}
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}

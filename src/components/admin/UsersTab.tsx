@@ -244,47 +244,52 @@ export function UsersTab() {
               {/* Mobile: stacked list */}
               <div className="md:hidden divide-y divide-border">
                 {users.map((user) => (
-                  <div key={user.id} className="p-4 space-y-3 hover:bg-muted/30 transition-colors">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1">
-                        <div className="font-medium leading-tight text-sm">{user.name || user.email}</div>
-                        <div className="text-[11px] text-muted-foreground break-all">{user.email}</div>
+                  <div key={user.id} className="p-3 sm:p-4 space-y-2 sm:space-y-3 hover:bg-muted/30 transition-colors">
+                    <div className="flex items-start justify-between gap-2 sm:gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium leading-tight text-sm truncate">{user.name || user.email}</div>
+                        {user.name && (
+                          <div className="text-[11px] text-muted-foreground truncate">{user.email}</div>
+                        )}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge className={`${getRoleColor(user.role)} border-none font-medium rounded-full px-2.5 py-0.5 text-[10px]`}> 
-                          {user.role === 'admin' ? (
-                            <Shield className="h-3 w-3 mr-1" />
-                          ) : (
-                            <User className="h-3 w-3 mr-1" />
-                          )}
-                          {user.role}
-                        </Badge>
-                        <Badge className={`${getStatusColor(user.status)} border-none font-medium rounded-full px-2.5 py-0.5 text-[10px]`}> 
-                          {user.status}
-                        </Badge>
+                      <div className="flex flex-col xs:flex-row items-end xs:items-center gap-1 xs:gap-2 flex-shrink-0">
+                        <div className="flex items-center gap-1">
+                          <Badge className={`${getRoleColor(user.role)} border-none font-medium rounded-full px-2 py-0.5 text-[9px] xs:text-[10px]`}> 
+                            {user.role === 'admin' ? (
+                              <Shield className="h-2.5 w-2.5 xs:h-3 xs:w-3 mr-0.5 xs:mr-1" />
+                            ) : (
+                              <User className="h-2.5 w-2.5 xs:h-3 xs:w-3 mr-0.5 xs:mr-1" />
+                            )}
+                            {user.role}
+                          </Badge>
+                          <Badge className={`${getStatusColor(user.status)} border-none font-medium rounded-full px-2 py-0.5 text-[9px] xs:text-[10px]`}> 
+                            {user.status}
+                          </Badge>
+                        </div>
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => navigateToUser(user.id)}
-                          className="h-8 w-8 p-0 hover:bg-medblue-100 hover:text-medblue-700"
+                          className="h-7 w-7 xs:h-8 xs:w-8 p-0 hover:bg-medblue-100 hover:text-medblue-700"
                         >
-                          <ChevronRight className="h-4 w-4" />
+                          <ChevronRight className="h-3.5 w-3.5 xs:h-4 xs:w-4" />
                         </Button>
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                    <div className="flex items-center justify-between text-[10px] xs:text-[11px] text-muted-foreground">
                       <div className="flex items-center gap-1">
-                        <Activity className="h-4 w-4" />
+                        <Activity className="h-3 w-3 xs:h-4 xs:w-4" />
                         <span>{user._count.progress}</span>
                       </div>
                       <div className="flex items-center gap-1">
-                        <Flag className="h-4 w-4" />
+                        <Flag className="h-3 w-3 xs:h-4 xs:w-4" />
                         <span>{user._count.reports}</span>
                       </div>
                       <div className="flex items-center gap-1">
-                        <Calendar className="h-4 w-4" />
-                        <span>{formatDate(user.createdAt)}</span>
+                        <Calendar className="h-3 w-3 xs:h-4 xs:w-4" />
+                        <span className="hidden xs:inline">{formatDate(user.createdAt)}</span>
+                        <span className="xs:hidden">{new Date(user.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}</span>
                       </div>
                     </div>
 
@@ -293,7 +298,7 @@ export function UsersTab() {
                         value={user.role}
                         onValueChange={(value: 'student' | 'maintainer' | 'admin') => handleRoleChange(user.id, value)}
                       >
-                        <SelectTrigger className="w-40 rounded-xl bg-background/50">
+                        <SelectTrigger className="w-32 xs:w-40 rounded-xl bg-background/50 text-xs">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -330,9 +335,9 @@ export function UsersTab() {
                       <TableHead className="font-semibold uppercase tracking-wide text-[10px] sm:text-xs text-muted-foreground">{t('admin.user')}</TableHead>
                       <TableHead className="font-semibold uppercase tracking-wide text-[10px] sm:text-xs text-muted-foreground">{t('admin.role')}</TableHead>
                       <TableHead className="font-semibold uppercase tracking-wide text-[10px] sm:text-xs text-muted-foreground">{t('admin.status')}</TableHead>
-                      <TableHead className="font-semibold uppercase tracking-wide text-[10px] sm:text-xs text-muted-foreground">{t('admin.progress')}</TableHead>
-                      <TableHead className="font-semibold uppercase tracking-wide text-[10px] sm:text-xs text-muted-foreground">{t('admin.reports')}</TableHead>
-                      <TableHead className="font-semibold uppercase tracking-wide text-[10px] sm:text-xs text-muted-foreground">{t('admin.joined')}</TableHead>
+                      <TableHead className="font-semibold uppercase tracking-wide text-[10px] sm:text-xs text-muted-foreground hidden lg:table-cell">{t('admin.progress')}</TableHead>
+                      <TableHead className="font-semibold uppercase tracking-wide text-[10px] sm:text-xs text-muted-foreground hidden lg:table-cell">{t('admin.reports')}</TableHead>
+                      <TableHead className="font-semibold uppercase tracking-wide text-[10px] sm:text-xs text-muted-foreground hidden xl:table-cell">{t('admin.joined')}</TableHead>
                       <TableHead className="text-right font-semibold uppercase tracking-wide text-[10px] sm:text-xs text-muted-foreground">{t('common.actions')}</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -340,51 +345,61 @@ export function UsersTab() {
                     {users.map((user) => (
                     <TableRow key={user.id} className="hover:bg-muted/30 transition-colors">
                       <TableCell>
-                        <div>
-                          <div className="font-medium leading-tight text-sm sm:text-base">{user.name || user.email}</div>
-                          <div className="text-[10px] sm:text-xs text-muted-foreground break-all">{user.email}</div>
+                        <div className="min-w-0">
+                          <div className="font-medium leading-tight text-sm sm:text-base truncate">{user.name || user.email}</div>
+                          <div className="text-[10px] sm:text-xs text-muted-foreground truncate">{user.email}</div>
+                          <div className="flex items-center gap-2 mt-1 lg:hidden">
+                            <div className="flex items-center gap-1 text-[9px]">
+                              <Activity className="h-3 w-3 text-muted-foreground" />
+                              <span>{user._count.progress}</span>
+                            </div>
+                            <div className="flex items-center gap-1 text-[9px]">
+                              <Flag className="h-3 w-3 text-muted-foreground" />
+                              <span>{user._count.reports}</span>
+                            </div>
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge className={`${getRoleColor(user.role)} border-none font-medium rounded-full px-2.5 py-0.5 text-[10px] sm:text-xs`}> 
+                        <Badge className={`${getRoleColor(user.role)} border-none font-medium rounded-full px-2 sm:px-2.5 py-0.5 text-[9px] sm:text-[10px]`}> 
                           {user.role === 'admin' ? (
-                            <Shield className="h-3 w-3 mr-1" />
+                            <Shield className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 sm:mr-1" />
                           ) : (
-                            <User className="h-3 w-3 mr-1" />
+                            <User className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 sm:mr-1" />
                           )}
                           {user.role}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge className={`${getStatusColor(user.status)} border-none font-medium rounded-full px-2.5 py-0.5 text-[10px] sm:text-xs`}> 
+                        <Badge className={`${getStatusColor(user.status)} border-none font-medium rounded-full px-2 sm:px-2.5 py-0.5 text-[9px] sm:text-[10px]`}> 
                           {user.status}
                         </Badge>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden lg:table-cell">
                         <div className="flex items-center gap-1 text-[10px] sm:text-xs">
                           <Activity className="h-4 w-4 text-muted-foreground" />
                           <span>{user._count.progress}</span>
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden lg:table-cell">
                         <div className="flex items-center gap-1 text-[10px] sm:text-xs">
                           <Flag className="h-4 w-4 text-muted-foreground" />
                           <span>{user._count.reports}</span>
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden xl:table-cell">
                         <div className="flex items-center gap-1 text-[10px] sm:text-xs">
                           <Calendar className="h-4 w-4 text-muted-foreground" />
                           <span>{formatDate(user.createdAt)}</span>
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="flex items-center justify-end gap-1 sm:gap-2">
                           <Select
                             value={user.role}
                             onValueChange={(value: 'student' | 'maintainer' | 'admin') => handleRoleChange(user.id, value)}
                           >
-                            <SelectTrigger className="w-28 sm:w-32 rounded-xl bg-background/50">
+                            <SelectTrigger className="w-24 sm:w-28 lg:w-32 rounded-xl bg-background/50 text-xs">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -412,9 +427,9 @@ export function UsersTab() {
                             variant="ghost"
                             size="sm"
                             onClick={() => navigateToUser(user.id)}
-                            className="h-8 w-8 p-0 hover:bg-medblue-50 rounded-full"
+                            className="h-7 w-7 sm:h-8 sm:w-8 p-0 hover:bg-medblue-50 rounded-full"
                           >
-                            <ChevronRight className="h-4 w-4 text-medblue-600" />
+                            <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-medblue-600" />
                           </Button>
                         </div>
                       </TableCell>

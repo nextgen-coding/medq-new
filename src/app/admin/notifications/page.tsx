@@ -150,24 +150,25 @@ export default function AdminNotificationsPage() {
       <AdminRoute>
         <AdminLayout>
           <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
                 <Button
                   variant="outline"
                   onClick={() => window.location.href = '/admin/inbox'}
-                  className="text-sm border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-950/50 shadow-sm transition-all duration-200"
+                  className="text-sm border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:text-gray-300 dark:hover:bg-gray-950/50 shadow-sm transition-all duration-200 justify-center sm:justify-start"
                 >
                   <ArrowLeft className="h-4 w-4 mr-2" />
-                  Retour à la boîte de réception
+                  <span className="sm:hidden">Retour</span>
+                  <span className="hidden sm:inline">Retour à la boîte de réception</span>
                 </Button>
                 <div>
-                  <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">Notifications</h1>
+                  <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">Notifications</h1>
                   <p className="text-muted-foreground text-sm">Envoyer des notifications ciblées aux utilisateurs.</p>
                 </div>
               </div>
             </div>
 
-            <div className="grid gap-6 lg:grid-cols-3">
+            <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
               <Card className="lg:col-span-2">
                 <CardHeader>
                   <CardTitle>Composer</CardTitle>
@@ -238,31 +239,33 @@ export default function AdminNotificationsPage() {
                     </div>
 
                     <div className={`grid gap-4 ${targetAll ? 'opacity-50 pointer-events-none' : ''}`}>
-                      <div>
-                        <div className="text-sm font-medium mb-2">Niveaux</div>
-                        <div className="flex flex-wrap gap-2">
-                          {(options?.niveaux || []).map(n => (
-                            <button key={n.id} type="button" onClick={()=>toggleFromSet(n.id, niveauIds, setNiveauIds)}
-                              className={`px-2 py-1 rounded border text-xs ${selectedNiveaux.has(n.id) ? 'bg-blue-600 text-white border-blue-600' : 'hover:bg-muted'}`}>
-                              {n.name}{n._count?.users ? <span className="ml-1 opacity-70">({n._count.users})</span> : null}
-                            </button>
-                          ))}
+                        <div>
+                          <div className="text-sm font-medium mb-2">Niveaux</div>
+                          <div className="flex flex-wrap gap-1.5 sm:gap-2">
+                            {(options?.niveaux || []).map(n => (
+                              <button key={n.id} type="button" onClick={()=>toggleFromSet(n.id, niveauIds, setNiveauIds)}
+                                className={`px-2 py-1 rounded border text-xs ${selectedNiveaux.has(n.id) ? 'bg-blue-600 text-white border-blue-600' : 'hover:bg-muted'}`}>
+                                <span className="block sm:hidden">{n.name.substring(0, 3)}</span>
+                                <span className="hidden sm:block">{n.name}</span>
+                                {n._count?.users ? <span className="ml-1 opacity-70">({n._count.users})</span> : null}
+                              </button>
+                            ))}
+                          </div>
                         </div>
-                      </div>
 
-                      <div>
-                        <div className="text-sm font-medium mb-2">Semestres</div>
-                        <div className="flex flex-wrap gap-2">
-                          {(options?.semesters || []).map(s => (
-                            <button key={s.id} type="button" onClick={()=>toggleFromSet(s.id, semesterIds, setSemesterIds)}
-                              className={`px-2 py-1 rounded border text-xs ${selectedSemesters.has(s.id) ? 'bg-blue-600 text-white border-blue-600' : 'hover:bg-muted'}`}>
-                              {s.niveau.name} — {s.name}{s._count?.users ? <span className="ml-1 opacity-70">({s._count.users})</span> : null}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <div>
+                          <div className="text-sm font-medium mb-2">Semestres</div>
+                          <div className="flex flex-wrap gap-1.5 sm:gap-2">
+                            {(options?.semesters || []).map(s => (
+                              <button key={s.id} type="button" onClick={()=>toggleFromSet(s.id, semesterIds, setSemesterIds)}
+                                className={`px-2 py-1 rounded border text-xs ${selectedSemesters.has(s.id) ? 'bg-blue-600 text-white border-blue-600' : 'hover:bg-muted'}`}>
+                                <span className="block sm:hidden">{s.niveau.name.substring(0, 2)} — {s.name.substring(0, 3)}</span>
+                                <span className="hidden sm:block">{s.niveau.name} — {s.name}</span>
+                                {s._count?.users ? <span className="ml-1 opacity-70">({s._count.users})</span> : null}
+                              </button>
+                            ))}
+                          </div>
+                        </div>                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                         <div className="space-y-3">
                           <div>
                             <div className="text-sm font-medium mb-2">Rôles</div>

@@ -194,25 +194,27 @@ export default function AdminVouchersPage() {
     <ProtectedRoute requireAdmin>
       <AdminLayout>
         <div className="space-y-6">
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-0">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
                 Gestion des Codes de Bon
               </h1>
-              <p className="text-gray-600 dark:text-gray-400">
+              <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base">
                 Créez et gérez les codes de bon pour les abonnements
               </p>
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline">
+            <div className="flex gap-2 w-full sm:w-auto">
+              <Button variant="outline" className="flex-1 sm:flex-initial">
                 <Download className="h-4 w-4 mr-2" />
-                Exporter
+                <span className="hidden xs:inline">Exporter</span>
+                <span className="xs:hidden">Export</span>
               </Button>
               <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button>
+                  <Button className="flex-1 sm:flex-initial">
                     <Plus className="h-4 w-4 mr-2" />
-                    Créer des codes
+                    <span className="hidden xs:inline">Créer des codes</span>
+                    <span className="xs:hidden">Créer</span>
                   </Button>
                 </DialogTrigger>
                 <DialogContent>
@@ -314,7 +316,7 @@ export default function AdminVouchersPage() {
           </div>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center">
@@ -378,9 +380,9 @@ export default function AdminVouchersPage() {
               <CardTitle>Filtres</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex gap-4">
+              <div className="flex flex-col xs:flex-row gap-3 xs:gap-4">
                 <Select value={typeFilter} onValueChange={setTypeFilter}>
-                  <SelectTrigger className="w-[180px]">
+                  <SelectTrigger className="w-full xs:w-[140px] sm:w-[180px]">
                     <SelectValue placeholder="Type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -391,7 +393,7 @@ export default function AdminVouchersPage() {
                 </Select>
 
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-[180px]">
+                  <SelectTrigger className="w-full xs:w-[140px] sm:w-[180px]">
                     <SelectValue placeholder="Statut" />
                   </SelectTrigger>
                   <SelectContent>
@@ -417,114 +419,123 @@ export default function AdminVouchersPage() {
               {loading ? (
                 <div className="text-center py-8">Chargement...</div>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Code</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Statut</TableHead>
-                      <TableHead>Utilisé par</TableHead>
-                      <TableHead>Date d'expiration</TableHead>
-                      <TableHead>Créé le</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredVouchers.map((voucher) => {
-                      const isExpired = voucher.expiresAt && new Date(voucher.expiresAt) < new Date();
-                      
-                      return (
-                        <TableRow key={voucher.id}>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <code className="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-sm font-mono text-gray-900 dark:text-gray-100">
-                                {voucher.code}
-                              </code>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleCopyCode(voucher.code)}
-                                className="p-1 h-auto"
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Code</TableHead>
+                        <TableHead className="hidden sm:table-cell">Type</TableHead>
+                        <TableHead>Statut</TableHead>
+                        <TableHead className="hidden md:table-cell">Utilisé par</TableHead>
+                        <TableHead className="hidden lg:table-cell">Date d'expiration</TableHead>
+                        <TableHead className="hidden lg:table-cell">Créé le</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredVouchers.map((voucher) => {
+                        const isExpired = voucher.expiresAt && new Date(voucher.expiresAt) < new Date();
+                        
+                        return (
+                          <TableRow key={voucher.id}>
+                            <TableCell>
+                              <div className="flex flex-col xs:flex-row xs:items-center gap-1 xs:gap-2 min-w-0">
+                                <code className="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded text-xs sm:text-sm font-mono text-gray-900 dark:text-gray-100 truncate max-w-[120px] xs:max-w-none">
+                                  {voucher.code}
+                                </code>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleCopyCode(voucher.code)}
+                                  className="p-1 h-auto xs:ml-auto"
+                                >
+                                  <Copy className="h-3 w-3 sm:h-4 sm:w-4" />
+                                </Button>
+                                <div className="sm:hidden text-xs text-muted-foreground">
+                                  {voucher.subscriptionType === 'annual' ? 'Annuel' : 'Sem.'} • 
+                                  {voucher.isUsed ? ' Utilisé' : isExpired ? ' Expiré' : ' Disponible'}
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="hidden sm:table-cell">
+                              <Badge variant="outline" className="text-xs">
+                                {voucher.subscriptionType === 'annual' ? 'Annuel' : 'Semestriel'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge 
+                                className={`text-xs ${
+                                  voucher.isUsed 
+                                    ? 'bg-green-100 text-green-800'
+                                    : isExpired
+                                      ? 'bg-red-100 text-red-800'
+                                      : 'bg-yellow-100 text-yellow-800'
+                                }`}
                               >
-                                <Copy className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline">
-                              {voucher.subscriptionType === 'annual' ? 'Annuel' : 'Semestriel'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge 
-                              className={
-                                voucher.isUsed 
-                                  ? 'bg-green-100 text-green-800'
-                                  : isExpired
-                                    ? 'bg-red-100 text-red-800'
-                                    : 'bg-yellow-100 text-yellow-800'
-                              }
-                            >
-                              {voucher.isUsed ? 'Utilisé' : isExpired ? 'Expiré' : 'Disponible'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {voucher.usage && voucher.usage.length > 0 ? (
-                              <div>
-                                <div className="font-medium">{voucher.usage[0].user.name}</div>
-                                <div className="text-sm text-gray-500">{voucher.usage[0].user.email}</div>
-                              </div>
-                            ) : (
-                              <span className="text-gray-400">-</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {voucher.expiresAt ? (
-                              <div className="flex items-center gap-1">
-                                <Calendar className="h-4 w-4 text-gray-400" />
-                                {new Date(voucher.expiresAt).toLocaleDateString()}
-                              </div>
-                            ) : (
-                              <span className="text-gray-400">Aucune</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1">
-                              <Calendar className="h-4 w-4 text-gray-400" />
-                              {new Date(voucher.createdAt).toLocaleDateString()}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              {!voucher.isUsed && !isExpired && (
-                                <>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleCopyCode(voucher.code)}
-                                  >
-                                    <Copy className="h-4 w-4 mr-1" />
-                                    Copier
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleDeleteVoucher(voucher.id)}
-                                    disabled={deletingId === voucher.id}
-                                    className="text-red-600 hover:text-red-700"
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-1" />
-                                    {deletingId === voucher.id ? 'Suppression...' : 'Supprimer'}
-                                  </Button>
-                                </>
+                                <span className="hidden xs:inline">{voucher.isUsed ? 'Utilisé' : isExpired ? 'Expiré' : 'Disponible'}</span>
+                                <span className="xs:hidden">{voucher.isUsed ? 'OK' : isExpired ? 'Exp' : 'Disp'}</span>
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="hidden md:table-cell">
+                              {voucher.usage && voucher.usage.length > 0 ? (
+                                <div className="min-w-0">
+                                  <div className="font-medium text-sm truncate">{voucher.usage[0].user.name}</div>
+                                  <div className="text-xs text-gray-500 truncate">{voucher.usage[0].user.email}</div>
+                                </div>
+                              ) : (
+                                <span className="text-gray-400">-</span>
                               )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+                            </TableCell>
+                            <TableCell className="hidden lg:table-cell">
+                              {voucher.expiresAt ? (
+                                <div className="flex items-center gap-1 text-sm">
+                                  <Calendar className="h-3 w-3 text-gray-400" />
+                                  {new Date(voucher.expiresAt).toLocaleDateString()}
+                                </div>
+                              ) : (
+                                <span className="text-gray-400 text-sm">Aucune</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="hidden lg:table-cell">
+                              <div className="flex items-center gap-1 text-sm">
+                                <Calendar className="h-3 w-3 text-gray-400" />
+                                {new Date(voucher.createdAt).toLocaleDateString()}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex flex-col xs:flex-row items-stretch xs:items-center gap-1 xs:gap-2">
+                                {!voucher.isUsed && !isExpired && (
+                                  <>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleCopyCode(voucher.code)}
+                                      className="text-xs px-2 xs:hidden"
+                                    >
+                                      <Copy className="h-3 w-3 mr-1" />
+                                      Copier
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleDeleteVoucher(voucher.id)}
+                                      disabled={deletingId === voucher.id}
+                                      className="text-red-600 hover:text-red-700 text-xs px-2"
+                                    >
+                                      <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                                      <span className="hidden sm:inline">{deletingId === voucher.id ? 'Suppression...' : 'Supprimer'}</span>
+                                      <span className="sm:hidden">Supp.</span>
+                                    </Button>
+                                  </>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
               )}
             </CardContent>
           </Card>

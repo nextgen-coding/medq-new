@@ -113,7 +113,7 @@ async function verifyPaymentAmount(
 async function handler(request: AuthenticatedRequest) {
   try {
     const body = await request.json()
-    const { method, subscriptionType, customPaymentDetails, voucherCode } = body
+    const { method, subscriptionType, customPaymentDetails, voucherCode, proofFileUrl } = body
 
     // Validate input
     if (!method || !subscriptionType) {
@@ -256,6 +256,13 @@ async function handler(request: AuthenticatedRequest) {
         )
       }
 
+      if (!proofFileUrl) {
+        return NextResponse.json(
+          { error: 'Proof of payment is required for custom payment' },
+          { status: 400 }
+        )
+      }
+
       const payment = await prisma.payment.create({
         data: {
           userId: request.user!.userId,
@@ -263,7 +270,8 @@ async function handler(request: AuthenticatedRequest) {
           method: PaymentMethod.custom_payment,
           status: 'awaiting_verification',
           subscriptionType,
-          customPaymentDetails
+          customPaymentDetails,
+          proofImageUrl: proofFileUrl
         }
       })
 

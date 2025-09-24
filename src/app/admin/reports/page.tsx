@@ -218,12 +218,12 @@ export default function AdminReportsPage() {
 
             <div className="space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-gray-100">
               Reports Management
             </h2>
-            <p className="text-gray-600 dark:text-gray-400 mt-1">
+            <p className="text-gray-600 dark:text-gray-400 mt-1 text-sm sm:text-base">
               {lectureId ? 'Lecture-specific reports' : 'All system reports'}
               {filteredReports.length > 0 && ` - ${filteredReports.length} reports`}
             </p>
@@ -231,8 +231,8 @@ export default function AdminReportsPage() {
         </div>
 
         {/* Filters */}
-        <div className="flex gap-4 items-center">
-          <div className="relative flex-1 max-w-sm">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 sm:items-center">
+          <div className="relative flex-1 max-w-full sm:max-w-sm">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
             <Input
               placeholder="Search reports..."
@@ -242,44 +242,46 @@ export default function AdminReportsPage() {
             />
           </div>
           
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-48">
-              <Filter className="w-4 h-4 mr-2" />
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Reports</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="resolved">Resolved</SelectItem>
-              <SelectItem value="dismissed">Dismissed</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex gap-2 sm:gap-4">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full sm:w-48">
+                <Filter className="w-4 h-4 mr-2 hidden xs:block" />
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Reports</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="resolved">Resolved</SelectItem>
+                <SelectItem value="dismissed">Dismissed</SelectItem>
+              </SelectContent>
+            </Select>
 
-          <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-60">
-              <Filter className="w-4 h-4 mr-2" />
-              <SelectValue placeholder="Filtrer par type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tous les types</SelectItem>
-              <SelectItem value="erreur_de_saisie">Erreur de saisie</SelectItem>
-              <SelectItem value="question_hors_cours">Question hors cours</SelectItem>
-              <SelectItem value="correction_erronee">Correction erronée</SelectItem>
-            </SelectContent>
-          </Select>
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="w-full sm:w-60">
+                <Filter className="w-4 h-4 mr-2 hidden xs:block" />
+                <SelectValue placeholder="Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les types</SelectItem>
+                <SelectItem value="erreur_de_saisie">Erreur de saisie</SelectItem>
+                <SelectItem value="question_hors_cours">Question hors cours</SelectItem>
+                <SelectItem value="correction_erronee">Correction erronée</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
           <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="bg-yellow-100 rounded-full p-2">
-                  <Clock className="w-5 h-5 text-yellow-600" />
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="bg-yellow-100 rounded-full p-1.5 sm:p-2">
+                  <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-600" />
                 </div>
-                <div>
-                  <p className="text-sm text-gray-600">Pending</p>
-                  <p className="text-2xl font-bold">
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm text-gray-600">Pending</p>
+                  <p className="text-lg sm:text-2xl font-bold">
                     {reports.filter(r => r.status === 'pending').length}
                   </p>
                 </div>
@@ -288,14 +290,14 @@ export default function AdminReportsPage() {
           </Card>
           
           <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="bg-green-100 rounded-full p-2">
-                  <CheckCircle className="w-5 h-5 text-green-600" />
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="bg-green-100 rounded-full p-1.5 sm:p-2">
+                  <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
                 </div>
-                <div>
-                  <p className="text-sm text-gray-600">Resolved</p>
-                  <p className="text-2xl font-bold">
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm text-gray-600">Resolved</p>
+                  <p className="text-lg sm:text-2xl font-bold">
                     {reports.filter(r => r.status === 'resolved').length}
                   </p>
                 </div>
@@ -304,14 +306,14 @@ export default function AdminReportsPage() {
           </Card>
           
           <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="bg-gray-100 rounded-full p-2">
-                  <XCircle className="w-5 h-5 text-gray-600" />
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="bg-gray-100 rounded-full p-1.5 sm:p-2">
+                  <XCircle className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600" />
                 </div>
-                <div>
-                  <p className="text-sm text-gray-600">Dismissed</p>
-                  <p className="text-2xl font-bold">
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm text-gray-600">Dismissed</p>
+                  <p className="text-lg sm:text-2xl font-bold">
                     {reports.filter(r => r.status === 'dismissed').length}
                   </p>
                 </div>
@@ -320,14 +322,14 @@ export default function AdminReportsPage() {
           </Card>
           
           <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="bg-blue-100 rounded-full p-2">
-                  <AlertTriangle className="w-5 h-5 text-blue-600" />
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="bg-blue-100 rounded-full p-1.5 sm:p-2">
+                  <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
                 </div>
-                <div>
-                  <p className="text-sm text-gray-600">Total</p>
-                  <p className="text-2xl font-bold">{reports.length}</p>
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm text-gray-600">Total</p>
+                  <p className="text-lg sm:text-2xl font-bold">{reports.length}</p>
                 </div>
               </div>
             </CardContent>
@@ -363,56 +365,58 @@ export default function AdminReportsPage() {
           <div className="space-y-4">
             {filteredReports.map((report) => (
               <Card key={report.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
+                <CardContent className="p-4 sm:p-6">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                    <div className="flex-1 min-w-0">
                       {/* Header */}
-                      <div className="flex items-center gap-2 mb-3">
-                        {getStatusIcon(report.status)}
-                        <Badge className={getStatusColor(report.status)}>
-                          {report.status.charAt(0).toUpperCase() + report.status.slice(1)}
-                        </Badge>
-                        <span className="text-sm text-gray-500">
+                      <div className="flex flex-col xs:flex-row xs:items-center gap-2 mb-3">
+                        <div className="flex items-center gap-2">
+                          {getStatusIcon(report.status)}
+                          <Badge className={getStatusColor(report.status)}>
+                            {report.status.charAt(0).toUpperCase() + report.status.slice(1)}
+                          </Badge>
+                        </div>
+                        <span className="text-xs sm:text-sm text-gray-500">
                           {formatDistanceToNow(new Date(report.createdAt), { addSuffix: true })}
                         </span>
                       </div>
 
                       {/* Content */}
                       <div className="space-y-3">
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <User className="w-4 h-4" />
-                          <span>{report.user.name || report.user.email}</span>
+                        <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-600">
+                          <User className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0" />
+                          <span className="truncate">{report.user.name || report.user.email}</span>
                         </div>
                         
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <BookOpen className="w-4 h-4" />
-                          <span>{report.lecture.specialty.name} - {report.lecture.title}</span>
+                        <div className="flex items-start gap-2 text-xs sm:text-sm text-gray-600">
+                          <BookOpen className="w-3 h-3 sm:w-4 sm:h-4 flex-shrink-0 mt-0.5" />
+                          <span className="line-clamp-2">{report.lecture.specialty.name} - {report.lecture.title}</span>
                         </div>
 
-                        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 sm:p-4">
                           <div className="flex items-start gap-2">
-                            <MessageSquare className="w-4 h-4 text-gray-500 mt-0.5" />
-                            <div>
-                              <div className="flex items-center gap-2 mb-1">
-                                <p className="font-medium text-gray-900 dark:text-gray-100">
+                            <MessageSquare className="w-3 h-3 sm:w-4 sm:h-4 text-gray-500 mt-0.5 flex-shrink-0" />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-col xs:flex-row xs:items-center gap-1 xs:gap-2 mb-1">
+                                <p className="font-medium text-gray-900 dark:text-gray-100 text-sm">
                                   Message du rapport
                                 </p>
-                                <Badge variant="secondary">
+                                <Badge variant="secondary" className="text-xs">
                                   {report.reportType === 'erreur_de_saisie' ? 'Erreur de saisie' : report.reportType === 'question_hors_cours' ? 'Question hors cours' : 'Correction erronée'}
                                 </Badge>
                               </div>
-                              <p className="text-gray-700 dark:text-gray-300">
+                              <p className="text-gray-700 dark:text-gray-300 text-sm">
                                 {report.message}
                               </p>
                             </div>
                           </div>
                         </div>
 
-                        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
-                          <p className="font-medium text-blue-900 dark:text-blue-100 mb-1">
+                        <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 sm:p-4">
+                          <p className="font-medium text-blue-900 dark:text-blue-100 mb-1 text-sm">
                             Question ({report.question.type}):
                           </p>
-                          <p className="text-blue-800 dark:text-blue-200 text-sm">
+                          <p className="text-blue-800 dark:text-blue-200 text-xs sm:text-sm line-clamp-3">
                             {report.question.text}
                           </p>
                         </div>
@@ -421,24 +425,26 @@ export default function AdminReportsPage() {
 
                     {/* Actions */}
                     {report.status === 'pending' && (
-                      <div className="flex gap-2 ml-4">
+                      <div className="flex flex-col xs:flex-row gap-2 w-full sm:w-auto sm:ml-4">
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => updateReportStatus(report.id, 'resolved')}
-                          className="text-green-600 hover:bg-green-50"
+                          className="text-green-600 hover:bg-green-50 text-xs sm:text-sm"
                         >
-                          <CheckCircle className="w-4 h-4 mr-1" />
-                          Resolve
+                          <CheckCircle className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                          <span className="hidden xs:inline">Resolve</span>
+                          <span className="xs:hidden">✓</span>
                         </Button>
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => updateReportStatus(report.id, 'dismissed')}
-                          className="text-gray-600 hover:bg-gray-50"
+                          className="text-gray-600 hover:bg-gray-50 text-xs sm:text-sm"
                         >
-                          <XCircle className="w-4 h-4 mr-1" />
-                          Dismiss
+                          <XCircle className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                          <span className="hidden xs:inline">Dismiss</span>
+                          <span className="xs:hidden">✗</span>
                         </Button>
                       </div>
                     )}

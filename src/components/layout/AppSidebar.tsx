@@ -64,7 +64,7 @@ export function AppSidebar() {
 
   return (
     <>
-  <Sidebar className="sticky top-0 h-screen border-r border-border/40 bg-gradient-to-b from-background to-muted/20" collapsible="icon">
+  <Sidebar className="sticky top-0 h-screen border-r border-border/40 bg-gradient-to-b from-background to-muted/20 z-50" collapsible="icon">
         <SidebarHeader className="relative border-b border-border/40 bg-gradient-to-r from-blue-50 to-blue-100/50 dark:from-blue-950/50 dark:to-blue-900/30">
           <div 
             className={`flex items-center justify-center transition-all duration-300 cursor-pointer hover:bg-blue-100/50 dark:hover:bg-blue-900/20 ${state === 'expanded' ? 'px-4 py-4' : 'px-2 py-4'}`}

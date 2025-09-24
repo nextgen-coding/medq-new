@@ -262,7 +262,7 @@ export function AdminSidebar() {
                     }
                     
                     const buttonClassName = `group transition-all duration-200 font-medium rounded-xl ${
-                      state === 'expanded' 
+                      state === 'expanded' || isMobile
                         ? 'px-3 py-3 min-h-[44px] flex items-center' 
                         : 'p-0 min-h-[44px] w-full flex items-center justify-center'
                     } ${
@@ -278,11 +278,14 @@ export function AdminSidebar() {
                         <SidebarMenuButton 
                           className={buttonClassName}
                           onClick={() => router.push(item.href)}
+                          title={item.description || item.label}
                         >
-                          <item.icon className={iconClassName} />
-                          {state === 'expanded' && (
-                            <span className="font-medium text-sm">{item.label}</span>
-                          )}
+                          <div className="flex items-center">
+                            <item.icon className={iconClassName} />
+                            {(state === 'expanded' || isMobile) && (
+                              <span className="font-medium text-sm ml-3">{item.label}</span>
+                            )}
+                          </div>
                         </SidebarMenuButton>
                       </SidebarMenuItem>
                     );
@@ -293,7 +296,7 @@ export function AdminSidebar() {
                     <SidebarMenuItem>
                       <SidebarMenuButton 
                         className={`group transition-all duration-200 font-medium rounded-xl ${
-                          state === 'expanded' 
+                          state === 'expanded' || isMobile
                             ? 'px-3 py-3 min-h-[44px] flex items-center justify-between' 
                             : 'p-0 min-h-[44px] w-full flex items-center justify-center'
                         } ${
@@ -301,12 +304,13 @@ export function AdminSidebar() {
                             ? 'bg-gradient-to-r from-blue-600 to-blue-800 text-white shadow-lg shadow-blue-500/25'
                             : 'hover:bg-muted/80 text-foreground hover:text-blue-600'
                         }`}
+                        title="Gestion des Contenus"
                         onClick={() => {
-                          if (state === 'expanded') {
-                            // Always allow toggling regardless of active state
+                          if (state === 'expanded' || isMobile) {
+                            // Always allow toggling regardless of active state on expanded or mobile
                             setContentMenuOpen(!contentMenuOpen);
                           } else {
-                            // If collapsed, navigate to the first content item
+                            // If collapsed on desktop, navigate to the first content item
                             router.push('/admin/management');
                           }
                         }}
@@ -317,11 +321,11 @@ export function AdminSidebar() {
                               ? 'text-white' 
                               : 'text-blue-500 group-hover:text-blue-600'
                           } transition-all flex-shrink-0`} />
-                          {state === 'expanded' && (
+                          {(state === 'expanded' || isMobile) && (
                             <span className="font-medium text-sm ml-3">Gestion des Contenus</span>
                           )}
                         </div>
-                        {state === 'expanded' && (
+                        {(state === 'expanded' || isMobile) && (
                           <div className="ml-auto">
                             {contentMenuOpen ? (
                               <ChevronDown className="h-4 w-4 transition-transform" />
@@ -333,7 +337,7 @@ export function AdminSidebar() {
                       </SidebarMenuButton>
                       
                       {/* Content Submenu */}
-                      {state === 'expanded' && contentMenuOpen && (
+                      {(state === 'expanded' || isMobile) && contentMenuOpen && (
                         <div className="ml-6 mt-1 space-y-1">
                           {contentMenuItems.map((contentItem) => {
                             const isContentActive = pathname === contentItem.href || pathname.startsWith(contentItem.href + '/');
@@ -346,6 +350,7 @@ export function AdminSidebar() {
                                     ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
                                     : 'hover:bg-muted/60 text-muted-foreground hover:text-blue-700'
                                 }`}
+                                title={contentItem.description}
                                 onClick={() => router.push(contentItem.href)}
                               >
                                 <contentItem.icon className={`h-4 w-4 ${
@@ -365,7 +370,7 @@ export function AdminSidebar() {
                     <SidebarMenuItem>
                       <SidebarMenuButton 
                         className={`group transition-all duration-200 font-medium rounded-xl ${
-                          state === 'expanded' 
+                          state === 'expanded' || isMobile
                             ? 'px-3 py-3 min-h-[44px] flex items-center justify-between' 
                             : 'p-0 min-h-[44px] w-full flex items-center justify-center'
                         } ${
@@ -373,12 +378,13 @@ export function AdminSidebar() {
                             ? 'bg-gradient-to-r from-blue-600 to-blue-800 text-white shadow-lg shadow-blue-500/25'
                             : 'hover:bg-muted/80 text-foreground hover:text-blue-600'
                         }`}
+                        title="Gestion d'Importation"
                         onClick={() => {
-                          if (state === 'expanded') {
-                            // Always allow toggling regardless of active state
+                          if (state === 'expanded' || isMobile) {
+                            // Always allow toggling regardless of active state on expanded or mobile
                             setImportMenuOpen(!importMenuOpen);
                           } else {
-                            // If collapsed, navigate to the first import item
+                            // If collapsed on desktop, navigate to the first import item
                             router.push('/admin/import');
                           }
                         }}
@@ -389,11 +395,11 @@ export function AdminSidebar() {
                               ? 'text-white' 
                               : 'text-blue-500 group-hover:text-blue-600'
                           } transition-all flex-shrink-0`} />
-                          {state === 'expanded' && (
+                          {(state === 'expanded' || isMobile) && (
                             <span className="font-medium text-sm ml-3">Gestion d'Importation</span>
                           )}
                         </div>
-                        {state === 'expanded' && (
+                        {(state === 'expanded' || isMobile) && (
                           <div className="ml-auto">
                             {importMenuOpen ? (
                               <ChevronDown className="h-4 w-4 transition-transform" />
@@ -405,7 +411,7 @@ export function AdminSidebar() {
                       </SidebarMenuButton>
                       
                       {/* Import Submenu */}
-                      {state === 'expanded' && importMenuOpen && (
+                      {(state === 'expanded' || isMobile) && importMenuOpen && (
                         <div className="ml-6 mt-1 space-y-1">
                           {importMenuItems.map((importItem) => {
                             const isImportActive = pathname === importItem.href || pathname.startsWith(importItem.href + '/');
@@ -418,6 +424,7 @@ export function AdminSidebar() {
                                     ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
                                     : 'hover:bg-muted/60 text-muted-foreground hover:text-blue-700'
                                 }`}
+                                title={importItem.description}
                                 onClick={() => router.push(importItem.href)}
                               >
                                 <importItem.icon className={`h-4 w-4 ${
@@ -437,7 +444,7 @@ export function AdminSidebar() {
                     <SidebarMenuItem>
                       <SidebarMenuButton 
                         className={`group transition-all duration-200 font-medium rounded-xl ${
-                          state === 'expanded' 
+                          state === 'expanded' || isMobile
                             ? 'px-3 py-3 min-h-[44px] flex items-center justify-between' 
                             : 'p-0 min-h-[44px] w-full flex items-center justify-center'
                         } ${
@@ -445,12 +452,13 @@ export function AdminSidebar() {
                             ? 'bg-gradient-to-r from-blue-600 to-blue-800 text-white shadow-lg shadow-blue-500/25'
                             : 'hover:bg-muted/80 text-foreground hover:text-blue-600'
                         }`}
+                        title="Gestion des Utilisateurs"
                         onClick={() => {
-                          if (state === 'expanded') {
-                            // Always allow toggling regardless of active state
+                          if (state === 'expanded' || isMobile) {
+                            // Always allow toggling regardless of active state on expanded or mobile
                             setUserManagementMenuOpen(!userManagementMenuOpen);
                           } else {
-                            // If collapsed, navigate to the first user management item
+                            // If collapsed on desktop, navigate to the first user management item
                             router.push('/admin/reports');
                           }
                         }}
@@ -461,11 +469,11 @@ export function AdminSidebar() {
                               ? 'text-white' 
                               : 'text-blue-500 group-hover:text-blue-600'
                           } transition-all flex-shrink-0`} />
-                          {state === 'expanded' && (
+                          {(state === 'expanded' || isMobile) && (
                             <span className="font-medium text-sm ml-3">Gestion des Utilisateurs</span>
                           )}
                         </div>
-                        {state === 'expanded' && (
+                        {(state === 'expanded' || isMobile) && (
                           <div className="ml-auto">
                             {userManagementMenuOpen ? (
                               <ChevronDown className="h-4 w-4 transition-transform" />
@@ -477,7 +485,7 @@ export function AdminSidebar() {
                       </SidebarMenuButton>
                       
                       {/* User Management Submenu */}
-                      {state === 'expanded' && userManagementMenuOpen && (
+                      {(state === 'expanded' || isMobile) && userManagementMenuOpen && (
                         <div className="ml-6 mt-1 space-y-1">
                           {userManagementMenuItems.map((userItem) => {
                             const isUserActive = pathname === userItem.href || pathname.startsWith(userItem.href + '/');
@@ -490,6 +498,7 @@ export function AdminSidebar() {
                                     ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
                                     : 'hover:bg-muted/60 text-muted-foreground hover:text-blue-700'
                                 }`}
+                                title={userItem.description}
                                 onClick={() => router.push(userItem.href)}
                               >
                                 <userItem.icon className={`h-4 w-4 ${
@@ -517,12 +526,13 @@ export function AdminSidebar() {
                             ? 'bg-gradient-to-r from-blue-600 to-blue-800 text-white shadow-lg shadow-blue-500/25'
                             : 'hover:bg-muted/80 text-foreground hover:text-blue-600'
                         }`}
+                        title="Gestion des Paiements"
                         onClick={() => {
-                          if (state === 'expanded') {
-                            // Always allow toggling regardless of active state
+                          if (state === 'expanded' || isMobile) {
+                            // Always allow toggling regardless of active state on expanded or mobile
                             setPaymentMenuOpen(!paymentMenuOpen);
                           } else {
-                            // If collapsed, navigate to the first payment item
+                            // If collapsed on desktop, navigate to the first payment item
                             router.push('/admin/payments');
                           }
                         }}
@@ -533,11 +543,11 @@ export function AdminSidebar() {
                               ? 'text-white' 
                               : 'text-blue-500 group-hover:text-blue-600'
                           } transition-all flex-shrink-0`} />
-                          {state === 'expanded' && (
+                          {(state === 'expanded' || isMobile) && (
                             <span className="font-medium text-sm ml-3">Gestion des Paiements</span>
                           )}
                         </div>
-                        {state === 'expanded' && (
+                        {(state === 'expanded' || isMobile) && (
                           <div className="ml-auto">
                             {paymentMenuOpen ? (
                               <ChevronDown className="h-4 w-4 transition-transform" />
@@ -549,7 +559,7 @@ export function AdminSidebar() {
                       </SidebarMenuButton>
                       
                       {/* Payment Submenu */}
-                      {state === 'expanded' && paymentMenuOpen && (
+                      {(state === 'expanded' || isMobile) && paymentMenuOpen && (
                         <div className="ml-6 mt-1 space-y-1">
                           {paymentMenuItems.map((paymentItem) => {
                             const isPaymentActive = pathname === paymentItem.href || pathname.startsWith(paymentItem.href + '/');
@@ -562,6 +572,7 @@ export function AdminSidebar() {
                                     ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
                                     : 'hover:bg-muted/60 text-muted-foreground hover:text-blue-700'
                                 }`}
+                                title={paymentItem.description}
                                 onClick={() => router.push(paymentItem.href)}
                               >
                                 <paymentItem.icon className={`h-4 w-4 ${
@@ -604,11 +615,14 @@ export function AdminSidebar() {
                           <SidebarMenuButton 
                             className={buttonClassName}
                             onClick={() => router.push(item.href)}
+                            title={item.description || item.label}
                           >
-                            <item.icon className={iconClassName} />
-                            {state === 'expanded' && (
-                              <span className="font-medium text-sm">{item.label}</span>
-                            )}
+                            <div className="flex items-center">
+                              <item.icon className={iconClassName} />
+                              {state === 'expanded' && (
+                                <span className="font-medium text-sm ml-3">{item.label}</span>
+                              )}
+                            </div>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
                       );

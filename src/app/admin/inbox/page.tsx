@@ -148,7 +148,7 @@ export default function AdminInboxPage() {
 
     return (
       <div
-        className={`group relative p-6 transition-all duration-200 hover:shadow-lg hover:scale-[1.01] ${
+        className={`group relative p-4 sm:p-6 transition-all duration-200 hover:shadow-lg sm:hover:scale-[1.01] ${
           notification.read
             ? 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700'
             : `bg-gradient-to-r from-white to-gray-50 dark:from-gray-900 dark:to-gray-800/50 border-l-4 ${typeColor} shadow-sm`
@@ -156,89 +156,90 @@ export default function AdminInboxPage() {
       >
         {/* Unread indicator */}
         {!notification.read && (
-          <div className="absolute top-4 right-4 w-3 h-3 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full shadow-lg animate-pulse" />
+          <div className="absolute top-3 right-3 sm:top-4 sm:right-4 w-2.5 h-2.5 sm:w-3 sm:h-3 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full shadow-lg animate-pulse" />
         )}
 
-        <div className="flex gap-4">
+        <div className="flex gap-3 sm:gap-4">
           {/* Type Icon */}
           <div className="flex-shrink-0">
-            <div className={`w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br ${typeColor} shadow-md`}>
-              <TypeIcon type={notification.type} className={`h-6 w-6 ${typeIconColor}`} />
+            <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl flex items-center justify-center bg-gradient-to-br ${typeColor} shadow-md`}>
+              <TypeIcon type={notification.type} className={`h-5 w-5 sm:h-6 sm:w-6 ${typeIconColor}`} />
             </div>
           </div>
 
           {/* Content */}
           <div className="flex-1 min-w-0">
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
               <div className="flex-1">
-                <div className="flex items-center gap-3 mb-2">
-                  <Shield className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                  <h4 className={`text-lg font-semibold ${
+                <div className="flex items-center gap-2 sm:gap-3 mb-2">
+                  <Shield className="h-3 w-3 sm:h-4 sm:w-4 text-purple-600 dark:text-purple-400 flex-shrink-0" />
+                  <h4 className={`text-base sm:text-lg font-semibold ${
                     notification.read
                       ? 'text-gray-700 dark:text-gray-300'
                       : 'text-gray-900 dark:text-gray-100'
-                  }`}>
+                  } line-clamp-2`}>
                     {notification.title}
                   </h4>
                   {!notification.read && (
-                    <Badge className="bg-gradient-to-r from-blue-500 to-purple-600 text-white text-xs px-2 py-0.5">
-                      Nouveau
+                    <Badge className="bg-gradient-to-r from-blue-500 to-purple-600 text-white text-xs px-1.5 sm:px-2 py-0.5 flex-shrink-0">
+                      <span className="sm:hidden">•</span>
+                      <span className="hidden sm:inline">Nouveau</span>
                     </Badge>
                   )}
                 </div>
-                <p className="text-gray-600 dark:text-gray-400 mb-3 leading-relaxed text-sm">
+                <p className="text-gray-600 dark:text-gray-400 mb-3 leading-relaxed text-sm line-clamp-3 sm:line-clamp-none">
                   {cleanMessage}
                 </p>
-                <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-500">
+                <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs text-gray-500 dark:text-gray-500">
                   <div className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
+                    <Clock className="h-3 w-3 flex-shrink-0" />
                     <span>{notification.time}</span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <Settings className="h-3 w-3" />
+                    <Settings className="h-3 w-3 flex-shrink-0" />
                     <span>Système</span>
                   </div>
                 </div>
               </div>
 
               {/* Actions */}
-              <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all duration-200">
+              <div className="flex items-center gap-1 sm:gap-2 sm:opacity-0 sm:group-hover:opacity-100 transition-all duration-200">
                 {userId && (
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-9 px-3 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/30 dark:hover:bg-blue-950/50 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 hover:text-blue-800 dark:hover:text-blue-200 transition-all duration-200"
+                    className="h-8 px-2 sm:h-9 sm:px-3 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/30 dark:hover:bg-blue-950/50 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 hover:text-blue-800 dark:hover:text-blue-200 transition-all duration-200 text-xs"
                     onClick={() => window.open(`/admin/users/${userId}`, '_blank')}
                     title="Voir le profil utilisateur"
                     aria-label="Voir le profil utilisateur"
                   >
-                    <Users className="h-4 w-4 mr-1" />
-                    Profil
+                    <Users className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                    <span className="hidden xs:inline">Profil</span>
                   </Button>
                 )}
                 {!notification.read && (
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-9 px-3 bg-green-50 hover:bg-green-100 dark:bg-green-950/30 dark:hover:bg-green-950/50 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-300 hover:text-green-800 dark:hover:text-green-200 transition-all duration-200"
+                    className="h-8 px-2 sm:h-9 sm:px-3 bg-green-50 hover:bg-green-100 dark:bg-green-950/30 dark:hover:bg-green-950/50 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-300 hover:text-green-800 dark:hover:text-green-200 transition-all duration-200 text-xs"
                     onClick={() => markAsRead(notification.id)}
                     title="Marquer comme lu"
                     aria-label="Marquer comme lu"
                   >
-                    <Check className="h-4 w-4 mr-1" />
-                    Lu
+                    <Check className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                    <span className="hidden xs:inline">Lu</span>
                   </Button>
                 )}
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-9 px-3 bg-red-50 hover:bg-red-100 dark:bg-red-950/30 dark:hover:bg-red-950/50 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 hover:text-red-800 dark:hover:text-red-200 transition-all duration-200"
+                  className="h-8 px-2 sm:h-9 sm:px-3 bg-red-50 hover:bg-red-100 dark:bg-red-950/30 dark:hover:bg-red-950/50 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 hover:text-red-800 dark:hover:text-red-200 transition-all duration-200 text-xs"
                   onClick={() => deleteNotification(notification.id)}
                   title="Supprimer la notification"
                   aria-label="Supprimer la notification"
                 >
-                  <Trash2 className="h-4 w-4 mr-1" />
-                  Supprimer
+                  <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                  <span className="hidden xs:inline">Supprimer</span>
                 </Button>
               </div>
             </div>
@@ -252,44 +253,46 @@ export default function AdminInboxPage() {
     <AdminLayout>
       <div className="space-y-6">
         {/* Header Section */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl shadow-lg">
-              <Inbox className="h-6 w-6 text-white" />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="p-2 sm:p-3 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl shadow-lg">
+              <Inbox className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-gray-100">
                 Boîte de Réception Admin
               </h1>
-              <p className="text-gray-600 dark:text-gray-400 mt-1">
+              <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400 mt-1">
                 Centre de notifications système et alertes administratives
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
             <Button
               variant="outline"
               onClick={() => window.location.href = '/admin/notifications'}
-              className="text-sm border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-300 dark:hover:bg-blue-950/50 shadow-sm transition-all duration-200"
+              className="text-sm border-blue-200 text-blue-700 hover:bg-blue-50 dark:border-blue-800 dark:text-blue-300 dark:hover:bg-blue-950/50 shadow-sm transition-all duration-200 justify-center"
             >
               <Bell className="h-4 w-4 mr-2" />
-              Créer une notification
+              <span className="sm:hidden">Nouvelle notification</span>
+              <span className="hidden sm:inline">Créer une notification</span>
             </Button>
             {hasUnreadNotifications && (
               <Button
                 variant="outline"
                 onClick={markAllAsRead}
-                className="text-sm border-green-200 text-green-700 hover:bg-green-50 dark:border-green-800 dark:text-green-300 dark:hover:bg-green-950/50 shadow-sm"
+                className="text-sm border-green-200 text-green-700 hover:bg-green-50 dark:border-green-800 dark:text-green-300 dark:hover:bg-green-950/50 shadow-sm justify-center"
               >
                 <CheckCircle2 className="h-4 w-4 mr-2" />
-                Tout marquer comme lu
+                <span className="sm:hidden">Tout marquer lu</span>
+                <span className="hidden sm:inline">Tout marquer comme lu</span>
               </Button>
             )}
           </div>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/20 border-blue-200 dark:border-blue-800">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
