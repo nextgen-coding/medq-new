@@ -153,18 +153,23 @@ export function RichTextInput({
     if (!editor) return value;
     
     let content = '';
+    let isFirstContent = true;
     
     const processNode = (node: Node): void => {
       if (node.nodeType === Node.TEXT_NODE) {
         // Remove zero-width spaces that we use for cursor positioning
         const text = (node.textContent || '').replace(/\u200B/g, '');
-        content += text;
+        if (text) {
+          content += text;
+          isFirstContent = false;
+        }
       } else if (node.nodeType === Node.ELEMENT_NODE) {
         const el = node as HTMLElement;
         
         // Handle image elements
         if (el.dataset.imageId) {
           content += `[IMAGE:${el.dataset.imageId}]`;
+          isFirstContent = false;
           return;
         }
         
@@ -174,13 +179,41 @@ export function RichTextInput({
           return;
         }
         
-        // Handle div elements (contentEditable often creates divs for new lines)
+        // Handle div elements (contentEditable creates these for new lines)
         if (el.tagName.toLowerCase() === 'div') {
-          // Add newline before div content (except for the first div)
-          if (content && !content.endsWith('\n')) {
+          // If this div has content or is not the first element, add a newline before it
+          const hasTextContent = el.textContent && el.textContent.trim();
+          
+          if (!isFirstContent && (hasTextContent || el.querySelector('img[data-image-id]'))) {
             content += '\n';
           }
+          
+          // Process the div's children
           el.childNodes.forEach(child => processNode(child));
+          
+          // Mark that we've processed content
+          if (hasTextContent || el.querySelector('img[data-image-id]')) {
+            isFirstContent = false;
+          }
+          return;
+        }
+        
+        // Handle paragraph elements
+        if (el.tagName.toLowerCase() === 'p') {
+          if (!isFirstContent) {
+            content += '\n';
+          }
+          
+          // Process paragraph children
+          el.childNodes.forEach(child => processNode(child));
+          
+          // Add newline after paragraph if there's meaningful content and a next sibling
+          if ((el.textContent && el.textContent.trim()) || el.querySelector('img[data-image-id]')) {
+            isFirstContent = false;
+            if (el.nextSibling) {
+              content += '\n';
+            }
+          }
           return;
         }
         
@@ -191,7 +224,7 @@ export function RichTextInput({
     
     editor.childNodes.forEach(node => processNode(node));
     
-    // Clean up: normalize multiple newlines but preserve intended line breaks
+    // Clean up excessive newlines but preserve intentional structure
     return content.replace(/\n{3,}/g, '\n\n');
   }, [value]);
 
@@ -329,10 +362,26 @@ export function RichTextInput({
         editor.appendChild(createImageElement(part.id));
       } else if (part.type === 'text' && part.content) {
         const lines = part.content.split('\n');
+        
         for (let i = 0; i < lines.length; i++) {
-          // Always add the line content, even if it's empty (to preserve empty lines)
-          editor.appendChild(document.createTextNode(lines[i]));
-          if (i < lines.length - 1) editor.appendChild(document.createElement('br'));
+          const line = lines[i];
+          
+          if (i === 0 && editor.childNodes.length === 0) {
+            // Very first line - add as text node directly
+            if (line) {
+              editor.appendChild(document.createTextNode(line));
+            }
+          } else {
+            // All other lines go in div elements
+            const div = document.createElement('div');
+            if (line) {
+              div.appendChild(document.createTextNode(line));
+            } else {
+              // For empty lines, add a br to ensure they're preserved
+              div.appendChild(document.createElement('br'));
+            }
+            editor.appendChild(div);
+          }
         }
       }
     }
@@ -590,16 +639,6 @@ export function RichTextInput({
   const pendingUpdateRef = useRef<number | null>(null);
   const savedSelectionRef = useRef<{ start: number; end: number } | null>(null);
 
-  const handleEditorKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
-    e.stopPropagation();
-    
-    if (e.key === 'Enter') {
-      // Let the default behavior handle the newline naturally
-      // Don't prevent default - let browser handle it
-      return;
-    }
-  }, []);
-
   const handleEditorInput = useCallback((e: React.FormEvent<HTMLDivElement> | React.FocusEvent<HTMLDivElement>) => {
     if (!useInlineImages) return;
     e.stopPropagation();
@@ -624,6 +663,74 @@ export function RichTextInput({
       }, 0);
     });
   }, [useInlineImages, getSelectionOffsets, reconstructValueFromEditor, value, onChange]);
+
+  const handleEditorKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      
+      const editor = editorRef.current;
+      if (!editor) return;
+      
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0) return;
+      
+      const range = selection.getRangeAt(0);
+      
+      // Determine if we're at the beginning of the editor
+      const isAtBeginning = range.startContainer === editor || 
+        (range.startContainer.parentNode === editor && range.startOffset === 0);
+      
+      if (isAtBeginning && editor.childNodes.length > 0) {
+        // If we're at the very beginning and there's existing content,
+        // we need to wrap the existing content in a div and insert a new div above it
+        const existingContent = Array.from(editor.childNodes);
+        editor.innerHTML = '';
+        
+        // Create new div for the new line
+        const newDiv = document.createElement('div');
+        newDiv.appendChild(document.createElement('br'));
+        editor.appendChild(newDiv);
+        
+        // Create div for existing content
+        const existingDiv = document.createElement('div');
+        existingContent.forEach(node => existingDiv.appendChild(node));
+        editor.appendChild(existingDiv);
+        
+        // Position cursor at the start of the new div
+        const newRange = document.createRange();
+        newRange.setStart(newDiv, 0);
+        newRange.setEnd(newDiv, 0);
+        selection.removeAllRanges();
+        selection.addRange(newRange);
+      } else {
+        // Normal case: create a new div for the new line
+        const newDiv = document.createElement('div');
+        newDiv.appendChild(document.createElement('br'));
+        
+        // Insert the new div
+        range.deleteContents();
+        range.insertNode(newDiv);
+        
+        // Position cursor at the start of the new div
+        const newRange = document.createRange();
+        newRange.setStart(newDiv, 0);
+        newRange.setEnd(newDiv, 0);
+        selection.removeAllRanges();
+        selection.addRange(newRange);
+      }
+      
+      // Trigger input event to update value
+      setTimeout(() => {
+        handleEditorInput(e as any);
+      }, 0);
+      
+      return;
+    }
+  }, [handleEditorInput]);
+
+
 
   const renderPreview = () => {
     if (!value && !images.length) return null;
