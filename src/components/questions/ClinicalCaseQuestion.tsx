@@ -447,7 +447,14 @@ export function ClinicalCaseQuestion({
     }
 
     // Check if this was the last unanswered question and complete immediately if so
+    // But only for MCQ-only cases - QROC cases require explicit Enter key submission
     setTimeout(() => {
+      // Don't auto-complete for multi-QROC mode or cases containing QROC questions
+      const hasQrocQuestions = clinicalCase.questions.some(q => (q.type as any) === 'clinic_croq');
+      if (displayMode === 'multi_qroc' || hasQrocQuestions) {
+        return; // No auto-complete for QROC cases - user must press Enter
+      }
+
       const allAnswered = clinicalCase.questions.every(question => {
         const currentAnswer = question.id === questionId ? answer : answers[question.id];
         if (currentAnswer === undefined || currentAnswer === null) return false;
@@ -465,7 +472,7 @@ export function ClinicalCaseQuestion({
     // This allows users to press 1/2 for QCM without jumping to QROC
   };
 
-  // Auto-submit when all questions are answered (for multi QROC mode)
+  // Auto-submit when all questions are answered (only for MCQ-only cases)
   const autoSubmitTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   useEffect(() => {
     // Clear any existing timeout
@@ -477,7 +484,14 @@ export function ClinicalCaseQuestion({
     // Only auto-submit if not already completed and not in results mode
     if (isCaseComplete || showResults) return;
 
-    // For auto-submission, use a more conservative check: require meaningful answers
+    // Don't auto-submit for multi-QROC mode or cases containing QROC questions
+    // Users should explicitly press Enter to submit QROC answers
+    const hasQrocQuestions = clinicalCase.questions.some(q => (q.type as any) === 'clinic_croq');
+    if (displayMode === 'multi_qroc' || hasQrocQuestions) {
+      return; // No auto-submit for QROC cases
+    }
+
+    // For MCQ-only cases, use auto-submission with meaningful answers check
     const allMeaningfullyAnswered = clinicalCase.questions.every(question => {
       const answer = answers[question.id];
       if (answer === undefined || answer === null) return false;
@@ -493,7 +507,7 @@ export function ClinicalCaseQuestion({
     });
     
     if (allMeaningfullyAnswered && clinicalCase.questions.length > 0) {
-      // Debounced auto-submission - only submit if user stops typing for 1 second
+      // Debounced auto-submission - only for MCQ-only cases
       autoSubmitTimeoutRef.current = setTimeout(() => {
         handleCompleteCase();
       }, 1000);
