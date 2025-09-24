@@ -72,6 +72,9 @@ export async function GET() {
         currency: pricingSettings.currency,
         isDiscountActive,
         discountPercentage: isDiscountActive ? pricingSettings.discountPercentage : null,
+        discountEndDate: isDiscountActive && pricingSettings.discountEndDate 
+          ? pricingSettings.discountEndDate.toISOString() 
+          : null,
         paymentDetails: {
           ribNumber: pricingSettings.ribNumber || '1234567890',
           d17PhoneNumber: pricingSettings.d17PhoneNumber || '+216 12 345 678'
@@ -104,6 +107,7 @@ export async function GET() {
         currency: 'TND',
         isDiscountActive: false,
         discountPercentage: null,
+        discountEndDate: null,
         paymentDetails: {
           ribNumber: '1234567890',
           d17PhoneNumber: '+216 12 345 678'

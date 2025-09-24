@@ -76,6 +76,7 @@ interface PricingData {
   currency: string
   isDiscountActive: boolean
   discountPercentage: number | null
+  discountEndDate: string | null
   paymentDetails: {
     ribNumber: string
     d17PhoneNumber: string
@@ -123,6 +124,7 @@ export default function PaymentPage() {
           currency: 'TND',
           isDiscountActive: false,
           discountPercentage: null,
+          discountEndDate: null,
           paymentDetails: {
             ribNumber: '1234567890',
             d17PhoneNumber: '+216 12 345 678'
@@ -138,6 +140,7 @@ export default function PaymentPage() {
         currency: 'TND',
         isDiscountActive: false,
         discountPercentage: null,
+        discountEndDate: null,
         paymentDetails: {
           ribNumber: '1234567890',
           d17PhoneNumber: '+216 12 345 678'
@@ -453,189 +456,424 @@ export default function PaymentPage() {
   return (
     <ProtectedRoute>
       <AppSidebarProvider>
-        <div className="flex w-full h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-gray-900 dark:to-gray-800 overflow-hidden">
+        <div className="flex w-full h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:from-gray-950 dark:via-gray-900 dark:to-indigo-950 overflow-hidden">
           <AppSidebar />
           <SidebarInset className="flex flex-col h-full">
             <UniversalHeader
-              title="Mise à niveau premium"
+              title="MedQ Premium"
               rightActions={
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   onClick={() => router.push('/dashboard')}
-                  className="gap-2 hover:bg-white/80 transition-colors"
+                  className="gap-2 hover:bg-white/20 text-gray-600 dark:text-gray-300 transition-all duration-200"
                 >
                   <ArrowLeft className="h-4 w-4" />
-                  Retour
+                  Retour au tableau de bord
                 </Button>
               }
             />
 
             <main className="flex-1 min-h-0 overflow-y-auto">
-              <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 
-                {/* Hero Header */}
-                <div className="text-center mb-12">
-                  <div className="flex justify-center mb-4">
-                    <div className="p-3 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full shadow-lg">
-                      <Crown className="h-8 w-8 text-white" />
+                {/* Modern Hero Section */}
+                <div className="relative text-center mb-16">
+                  {/* Background decoration */}
+                  <div className="absolute inset-0 -z-10">
+                    <div className="absolute top-10 left-10 w-32 h-32 bg-blue-200/30 dark:bg-blue-800/20 rounded-full blur-3xl"></div>
+                    <div className="absolute top-32 right-20 w-40 h-40 bg-purple-200/30 dark:bg-purple-800/20 rounded-full blur-3xl"></div>
+                    <div className="absolute bottom-20 left-1/2 w-48 h-48 bg-indigo-200/30 dark:bg-indigo-800/20 rounded-full blur-3xl transform -translate-x-1/2"></div>
+                  </div>
+                  
+                  {/* Crown icon with animated glow */}
+                  <div className="relative inline-flex items-center justify-center mb-8">
+                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full blur-xl opacity-30 animate-pulse"></div>
+                    <div className="relative p-6 bg-gradient-to-br from-blue-500 via-purple-500 to-indigo-600 rounded-2xl shadow-2xl">
+                      <Crown className="h-12 w-12 text-white" />
                     </div>
                   </div>
-                  <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-4">
-                    Débloquez votre potentiel
+
+                  <h1 className="text-5xl md:text-7xl font-black mb-6">
+                    <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent">
+                      MedQ
+                    </span>
+                    <br />
+                    <span className="text-3xl md:text-5xl font-light text-gray-700 dark:text-gray-300">
+                      Premium
+                    </span>
                   </h1>
-                  <p className="text-xl text-gray-600 dark:text-gray-300 max-w-2xl mx-auto leading-relaxed">
-                    Accédez à tous les contenus premium de MedQ et boostez votre apprentissage médical
+                  
+                  <p className="text-xl md:text-2xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto leading-relaxed mb-8">
+                    Transformez votre apprentissage médical avec un accès illimité aux contenus exclusifs
                   </p>
+
+                  {/* Stats bar */}
+                  <div className="flex flex-wrap justify-center gap-8 mb-12">
+                    <div className="text-center">
+                      <div className="text-2xl md:text-3xl font-bold text-blue-600 dark:text-blue-400">500+</div>
+                      <div className="text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wide">QCM Premium</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl md:text-3xl font-bold text-purple-600 dark:text-purple-400">24/7</div>
+                      <div className="text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wide">Accès illimité</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl md:text-3xl font-bold text-indigo-600 dark:text-indigo-400">∞</div>
+                      <div className="text-sm text-gray-500 dark:text-gray-400 uppercase tracking-wide">Mises à jour</div>
+                    </div>
+                  </div>
                 </div>
 
-                {/* Premium Features Showcase - Hide on success/failure */}
-                {!searchParams.get('payment') && state.status !== 'completed' && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-8 sm:mb-12">
-                    <div className="text-center p-4 sm:p-6 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 hover:shadow-xl transition-all duration-300 transform hover:scale-105">
-                      <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Star className="h-6 w-6 text-blue-600" />
+                {/* Promotional Banner - Show only when discount is active */}
+                {pricing && pricing.isDiscountActive && !searchParams.get('payment') && state.status !== 'completed' && (
+                  <div className="mb-12">
+                    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-red-500 via-orange-500 to-red-600 p-1 shadow-2xl">
+                      <div className="relative bg-white dark:bg-gray-900 rounded-[22px] p-8 text-center">
+                        <div className="absolute inset-0 bg-gradient-to-r from-red-50/50 to-orange-50/50 dark:from-red-950/20 dark:to-orange-950/20 rounded-[22px]"></div>
+                        <div className="relative">
+                          <div className="flex items-center justify-center gap-3 mb-4">
+                            <div className="text-4xl animate-bounce">🔥</div>
+                            <h3 className="text-2xl md:text-3xl font-black bg-gradient-to-r from-red-600 to-orange-600 bg-clip-text text-transparent">
+                              PROMOTION EXCEPTIONNELLE
+                            </h3>
+                            <div className="text-4xl animate-bounce">⚡</div>
+                          </div>
+                          <p className="text-lg md:text-xl text-gray-700 dark:text-gray-300 font-semibold mb-2">
+                            Profitez de <span className="text-red-600 font-black text-2xl">-{pricing.discountPercentage}%</span> sur tous nos abonnements !
+                          </p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            {pricing.discountEndDate ? (
+                              <>
+                                Offre limitée jusqu'au {new Date(pricing.discountEndDate).toLocaleDateString('fr-FR')} • 
+                                Économisez jusqu'à {pricing.annual.discountAmount} {pricing.currency}
+                              </>
+                            ) : (
+                              <>
+                                Offre limitée • Économisez jusqu'à {pricing.annual.discountAmount} {pricing.currency} sur l'abonnement annuel
+                              </>
+                            )}
+                          </p>
+                        </div>
                       </div>
-                      <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Contenu exclusif</h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-300">Accès illimité à toutes les QCM premium</p>
-                    </div>
-                    <div className="text-center p-4 sm:p-6 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 hover:shadow-xl transition-all duration-300 transform hover:scale-105">
-                      <div className="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Shield className="h-6 w-6 text-green-600" />
-                      </div>
-                      <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Suivi avancé</h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-300">Statistiques détaillées et progression</p>
-                    </div>
-                    <div className="text-center p-4 sm:p-6 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-2xl shadow-lg border border-white/20 hover:shadow-xl transition-all duration-300 transform hover:scale-105 sm:col-span-2 lg:col-span-1">
-                      <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Zap className="h-6 w-6 text-purple-600" />
-                      </div>
-                      <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Mise à jour</h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-300">Nouveau contenu ajouté régulièrement</p>
                     </div>
                   </div>
                 )}
 
-                {/* Subscription Plans - Hide on success/failure */}
+                {/* Modern Premium Features - Hide on success/failure */}
                 {!searchParams.get('payment') && state.status !== 'completed' && (
-                  <Card className="mb-8 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-0 shadow-xl">
-                    <CardHeader className="text-center pb-2">
-                      <CardTitle className="text-2xl font-bold flex items-center justify-center gap-3">
-                        <Crown className="h-6 w-6 text-yellow-500" />
-                        Choisissez votre abonnement
-                      </CardTitle>
-                      <CardDescription className="text-lg">
-                        Sélectionnez la durée qui vous convient le mieux
-                      </CardDescription>
-                    </CardHeader>
-                  <CardContent>
-                    <RadioGroup
-                      value={state.subscriptionType}
-                      onValueChange={handleSubscriptionTypeChange}
-                      className="grid grid-cols-1 lg:grid-cols-2 gap-6"
-                    >
-                      {/* Semester Plan */}
-                      <Label 
-                        htmlFor="semester" 
-                        className={`relative group cursor-pointer transition-all duration-300 ${
-                          state.subscriptionType === 'semester' 
-                            ? 'scale-105' 
-                            : 'hover:scale-102'
-                        }`}
-                      >
-                        <div className={`p-8 rounded-2xl border-2 transition-all duration-300 ${
-                          state.subscriptionType === 'semester'
-                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-950 shadow-xl'
-                            : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-blue-300 hover:shadow-lg'
-                        }`}>
-                          <RadioGroupItem value="semester" id="semester" className="absolute top-4 right-4" />
-                          <div className="text-center">
-                            <div className="flex justify-center mb-4">
-                              <div className="p-3 bg-blue-100 dark:bg-blue-900 rounded-full">
-                                <Calendar className="h-6 w-6 text-blue-600" />
-                              </div>
-                            </div>
-                            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Semestriel</h3>
-                            <div className="text-4xl font-bold text-blue-600 mb-4">
-                              {pricing.isDiscountActive ? (
-                                <div className="space-y-2">
-                                  <div className="text-xl text-gray-500 line-through">
-                                    {pricing.semester.originalPrice} {pricing.currency}
-                                  </div>
-                                  <div className="text-4xl font-bold text-green-600">
-                                    {pricing.semester.finalPrice} {pricing.currency}
-                                  </div>
-                                </div>
-                              ) : (
-                                `${pricing.semester.finalPrice} ${pricing.currency}`
-                              )}
-                            </div>
-                            <p className="text-gray-600 dark:text-gray-300 text-lg">
-                              Accès premium pour {pricing.semester.duration}
-                            </p>
+                  <div className="mb-20">
+                    <div className="text-center mb-12">
+                      <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">
+                        Pourquoi choisir Premium ?
+                      </h2>
+                      <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+                        Découvrez tous les avantages qui vous attendent avec MedQ Premium
+                      </p>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                      {/* Feature 1 */}
+                      <div className="group relative">
+                        <div className="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-3xl blur-xl group-hover:blur-2xl transition-all duration-300"></div>
+                        <div className="relative p-8 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-3xl border border-white/20 dark:border-gray-700/30 hover:bg-white/90 dark:hover:bg-gray-800/90 transition-all duration-500 group-hover:scale-105">
+                          <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl mb-6 shadow-xl">
+                            <Star className="h-8 w-8 text-white" />
                           </div>
+                          <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3">
+                            Contenu Exclusif
+                          </h3>
+                          <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
+                            Plus de 500 QCM premium avec explications détaillées et références médicales
+                          </p>
                         </div>
-                      </Label>
+                      </div>
 
-                      {/* Annual Plan */}
-                      <Label 
-                        htmlFor="annual" 
-                        className={`relative group cursor-pointer transition-all duration-300 ${
-                          state.subscriptionType === 'annual' 
-                            ? 'scale-105' 
-                            : 'hover:scale-102'
-                        }`}
-                      >
-                        <div className={`p-8 rounded-2xl border-2 transition-all duration-300 relative ${
-                          state.subscriptionType === 'annual'
-                            ? 'border-purple-500 bg-purple-50 dark:bg-purple-950 shadow-xl'
-                            : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-purple-300 hover:shadow-lg'
-                        }`}>
-                          {/* Popular Badge */}
-                          <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                            <Badge className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-4 py-1 text-sm font-semibold">
-                              Le plus populaire
-                            </Badge>
+                      {/* Feature 2 */}
+                      <div className="group relative">
+                        <div className="absolute inset-0 bg-gradient-to-r from-green-500/20 to-emerald-500/20 rounded-3xl blur-xl group-hover:blur-2xl transition-all duration-300"></div>
+                        <div className="relative p-8 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-3xl border border-white/20 dark:border-gray-700/30 hover:bg-white/90 dark:hover:bg-gray-800/90 transition-all duration-500 group-hover:scale-105">
+                          <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl mb-6 shadow-xl">
+                            <Shield className="h-8 w-8 text-white" />
                           </div>
-                          <RadioGroupItem value="annual" id="annual" className="absolute top-4 right-4" />
-                          <div className="text-center">
-                            <div className="flex justify-center mb-4">
-                              <div className="p-3 bg-purple-100 dark:bg-purple-900 rounded-full">
-                                <CalendarDays className="h-6 w-6 text-purple-600" />
+                          <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3">
+                            Analytics Avancées
+                          </h3>
+                          <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
+                            Suivi détaillé de vos performances avec graphiques et recommandations personnalisées
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Feature 3 */}
+                      <div className="group relative">
+                        <div className="absolute inset-0 bg-gradient-to-r from-purple-500/20 to-indigo-500/20 rounded-3xl blur-xl group-hover:blur-2xl transition-all duration-300"></div>
+                        <div className="relative p-8 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-3xl border border-white/20 dark:border-gray-700/30 hover:bg-white/90 dark:hover:bg-gray-800/90 transition-all duration-500 group-hover:scale-105">
+                          <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl mb-6 shadow-xl">
+                            <Zap className="h-8 w-8 text-white" />
+                          </div>
+                          <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3">
+                            Mises à Jour
+                          </h3>
+                          <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
+                            Contenu médical actualisé régulièrement selon les dernières découvertes
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Feature 4 */}
+                      <div className="group relative">
+                        <div className="absolute inset-0 bg-gradient-to-r from-amber-500/20 to-orange-500/20 rounded-3xl blur-xl group-hover:blur-2xl transition-all duration-300"></div>
+                        <div className="relative p-8 bg-white/70 dark:bg-gray-800/70 backdrop-blur-xl rounded-3xl border border-white/20 dark:border-gray-700/30 hover:bg-white/90 dark:hover:bg-gray-800/90 transition-all duration-500 group-hover:scale-105">
+                          <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl mb-6 shadow-xl">
+                            <Trophy className="h-8 w-8 text-white" />
+                          </div>
+                          <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3">
+                            Support Priority
+                          </h3>
+                          <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
+                            Assistance prioritaire et accès aux sessions de révision en live
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Modern Subscription Plans - Hide on success/failure */}
+                {!searchParams.get('payment') && state.status !== 'completed' && (
+                  <div className="mb-16">
+                    <div className="text-center mb-12">
+                      <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">
+                        Choisissez votre plan Premium
+                      </h2>
+                      <p className="text-lg text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+                        Débloquez l'accès complet à MedQ avec le plan qui correspond à vos besoins
+                      </p>
+                    </div>
+                    
+                    <div className="max-w-5xl mx-auto">
+                      <RadioGroup
+                        value={state.subscriptionType}
+                        onValueChange={handleSubscriptionTypeChange}
+                        className="grid grid-cols-1 lg:grid-cols-2 gap-8"
+                    >
+                        {/* Semester Plan */}
+                        <Label htmlFor="semester" className="relative group cursor-pointer">
+                          {/* Discount Badge */}
+                          {pricing.isDiscountActive && (
+                            <div className="absolute -top-4 left-6 z-10">
+                              <div className="bg-gradient-to-r from-red-500 to-orange-500 text-white px-4 py-2 rounded-full text-sm font-bold shadow-xl animate-pulse">
+                                🔥 -{pricing.discountPercentage}% OFF
                               </div>
                             </div>
-                            <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Annuel</h3>
-                            <div className="text-4xl font-bold text-purple-600 mb-2">
-                              {pricing.isDiscountActive ? (
-                                <div className="space-y-2">
-                                  <div className="text-xl text-gray-500 line-through">
-                                    {pricing.annual.originalPrice} {pricing.currency}
+                          )}
+                          
+                          <div className={`relative overflow-hidden rounded-3xl border-2 transition-all duration-500 ${
+                            state.subscriptionType === 'semester'
+                              ? 'border-blue-500 shadow-2xl shadow-blue-500/25 scale-105'
+                              : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 hover:shadow-xl hover:scale-102'
+                          }`}>
+                            {/* Background gradient */}
+                            <div className={`absolute inset-0 transition-opacity duration-500 ${
+                              state.subscriptionType === 'semester'
+                                ? 'bg-gradient-to-br from-blue-50 via-white to-blue-50 dark:from-blue-950 dark:via-gray-900 dark:to-blue-950 opacity-100'
+                                : 'bg-white dark:bg-gray-800 group-hover:bg-gradient-to-br group-hover:from-blue-50/50 group-hover:via-white group-hover:to-blue-50/50 dark:group-hover:from-blue-950/30 dark:group-hover:via-gray-800 dark:group-hover:to-blue-950/30'
+                            }`}></div>
+                            
+                            {/* Content */}
+                            <div className="relative p-10">
+                              <div className="flex justify-between items-start mb-8">
+                                <div className="flex items-center gap-3">
+                                  <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl shadow-lg">
+                                    <Calendar className="h-6 w-6 text-white" />
                                   </div>
-                                  <div className="text-4xl font-bold text-green-600">
-                                    {pricing.annual.finalPrice} {pricing.currency}
+                                  <div>
+                                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white">Semestriel</h3>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400">Plan standard</p>
                                   </div>
                                 </div>
-                              ) : (
-                                `${pricing.annual.finalPrice} ${pricing.currency}`
-                              )}
-                            </div>
-                            <div className="mb-4">
-                              <Badge variant="secondary" className="bg-green-100 text-green-800 text-sm px-3 py-1">
-                                {pricing.isDiscountActive ? (
-                                  `Remise ${pricing.discountPercentage}%`
-                                ) : (
-                                  `Économisez ${pricing.annual.savings} ${pricing.currency}`
+                                <RadioGroupItem value="semester" id="semester" className="w-6 h-6" />
+                              </div>
+                              
+                              <div className="mb-8">
+                                <div className="flex items-baseline gap-2">
+                                  {pricing.isDiscountActive ? (
+                                    <>
+                                      <span className="text-lg text-gray-500 line-through">
+                                        {pricing.semester.originalPrice}
+                                      </span>
+                                      <span className="text-5xl font-black text-green-600 drop-shadow-lg">
+                                        {pricing.semester.finalPrice}
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <span className="text-5xl font-black text-blue-600">
+                                      {pricing.semester.finalPrice}
+                                    </span>
+                                  )}
+                                  <span className="text-xl font-medium text-gray-600 dark:text-gray-400">
+                                    {pricing.currency}
+                                  </span>
+                                </div>
+                                <p className="text-gray-600 dark:text-gray-300 mt-2">
+                                  pour {pricing.semester.duration}
+                                </p>
+                                
+                                {/* Discount Savings Indicator */}
+                                {pricing.isDiscountActive && (
+                                  <div className="mt-3">
+                                    <div className="inline-flex items-center gap-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-3 py-2 rounded-full text-sm font-semibold">
+                                      <Sparkles className="w-4 h-4" />
+                                      Économisez {pricing.semester.discountAmount} {pricing.currency}
+                                    </div>
+                                  </div>
                                 )}
-                              </Badge>
+                              </div>
+                              
+                              <div className="space-y-3">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-5 h-5 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+                                    <Check className="w-3 h-3 text-blue-600" />
+                                  </div>
+                                  <span className="text-sm text-gray-600 dark:text-gray-300">Accès illimité aux QCM premium</span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <div className="w-5 h-5 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+                                    <Check className="w-3 h-3 text-blue-600" />
+                                  </div>
+                                  <span className="text-sm text-gray-600 dark:text-gray-300">Analytics détaillées</span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <div className="w-5 h-5 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+                                    <Check className="w-3 h-3 text-blue-600" />
+                                  </div>
+                                  <span className="text-sm text-gray-600 dark:text-gray-300">Support par email</span>
+                                </div>
+                              </div>
                             </div>
-                            <p className="text-gray-600 dark:text-gray-300 text-lg">
-                              Accès premium pour {pricing.annual.duration}
-                            </p>
                           </div>
-                        </div>
-                      </Label>
-                    </RadioGroup>
-                  </CardContent>
-                </Card>
+                        </Label>
+
+                        {/* Annual Plan */}
+                        <Label htmlFor="annual" className="relative group cursor-pointer">
+                          {/* Popular Badge or Discount Badge */}
+                          <div className="absolute -top-4 left-1/2 transform -translate-x-1/2 z-10">
+                            {pricing.isDiscountActive ? (
+                              <div className="bg-gradient-to-r from-red-500 to-orange-500 text-white px-6 py-2 rounded-full text-sm font-bold shadow-xl animate-pulse">
+                                🔥 SUPER PROMO -{pricing.discountPercentage}%
+                              </div>
+                            ) : (
+                              <div className="bg-gradient-to-r from-purple-500 to-indigo-500 text-white px-6 py-2 rounded-full text-sm font-bold shadow-xl">
+                                ⭐ Le plus populaire
+                              </div>
+                            )}
+                          </div>
+                          
+                          <div className={`relative overflow-hidden rounded-3xl border-2 transition-all duration-500 ${
+                            state.subscriptionType === 'annual'
+                              ? 'border-purple-500 shadow-2xl shadow-purple-500/25 scale-105'
+                              : 'border-gray-200 dark:border-gray-700 hover:border-purple-300 hover:shadow-xl hover:scale-102'
+                          }`}>
+                            {/* Background gradient */}
+                            <div className={`absolute inset-0 transition-opacity duration-500 ${
+                              state.subscriptionType === 'annual'
+                                ? 'bg-gradient-to-br from-purple-50 via-white to-indigo-50 dark:from-purple-950 dark:via-gray-900 dark:to-indigo-950 opacity-100'
+                                : 'bg-white dark:bg-gray-800 group-hover:bg-gradient-to-br group-hover:from-purple-50/50 group-hover:via-white group-hover:to-indigo-50/50 dark:group-hover:from-purple-950/30 dark:group-hover:via-gray-800 dark:group-hover:to-indigo-950/30'
+                            }`}></div>
+                            
+                            {/* Accent decoration */}
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-purple-400/20 to-indigo-400/20 rounded-full blur-3xl"></div>
+                            
+                            {/* Content */}
+                            <div className="relative p-10 pt-12">
+                              <div className="flex justify-between items-start mb-8">
+                                <div className="flex items-center gap-3">
+                                  <div className="p-3 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl shadow-lg">
+                                    <CalendarDays className="h-6 w-6 text-white" />
+                                  </div>
+                                  <div>
+                                    <h3 className="text-2xl font-bold text-gray-900 dark:text-white">Annuel</h3>
+                                    <p className="text-sm text-purple-600 dark:text-purple-400 font-medium">Meilleur rapport qualité-prix</p>
+                                  </div>
+                                </div>
+                                <RadioGroupItem value="annual" id="annual" className="w-6 h-6" />
+                              </div>
+                              
+                              <div className="mb-6">
+                                <div className="flex items-baseline gap-2 mb-2">
+                                  {pricing.isDiscountActive ? (
+                                    <>
+                                      <span className="text-lg text-gray-500 line-through">
+                                        {pricing.annual.originalPrice}
+                                      </span>
+                                      <span className="text-5xl font-black text-green-600 drop-shadow-lg">
+                                        {pricing.annual.finalPrice}
+                                      </span>
+                                    </>
+                                  ) : (
+                                    <span className="text-5xl font-black text-purple-600">
+                                      {pricing.annual.finalPrice}
+                                    </span>
+                                  )}
+                                  <span className="text-xl font-medium text-gray-600 dark:text-gray-400">
+                                    {pricing.currency}
+                                  </span>
+                                </div>
+                                <p className="text-gray-600 dark:text-gray-300 mb-3">
+                                  pour {pricing.annual.duration}
+                                </p>
+                                <div className="space-y-2">
+                                  {pricing.isDiscountActive ? (
+                                    <>
+                                      <div className="inline-flex items-center gap-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 px-4 py-2 rounded-full text-sm font-semibold">
+                                        <Sparkles className="w-4 h-4" />
+                                        PROMO: Économisez {pricing.annual.discountAmount} {pricing.currency}
+                                      </div>
+                                      <div className="inline-flex items-center gap-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-4 py-2 rounded-full text-sm font-semibold ml-2">
+                                        💰 + {pricing.annual.savings} {pricing.currency} vs semestriel
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <div className="inline-flex items-center gap-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-4 py-2 rounded-full text-sm font-semibold">
+                                      <Sparkles className="w-4 h-4" />
+                                      Économisez {pricing.annual.savings} {pricing.currency}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              
+                              <div className="space-y-3">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-5 h-5 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center">
+                                    <Check className="w-3 h-3 text-purple-600" />
+                                  </div>
+                                  <span className="text-sm text-gray-600 dark:text-gray-300">Tout du plan semestriel</span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <div className="w-5 h-5 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center">
+                                    <Check className="w-3 h-3 text-purple-600" />
+                                  </div>
+                                  <span className="text-sm text-gray-600 dark:text-gray-300">Sessions de révision en live</span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <div className="w-5 h-5 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center">
+                                    <Check className="w-3 h-3 text-purple-600" />
+                                  </div>
+                                  <span className="text-sm text-gray-600 dark:text-gray-300">Support prioritaire 24/7</span>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <div className="w-5 h-5 bg-purple-100 dark:bg-purple-900 rounded-full flex items-center justify-center">
+                                    <Check className="w-3 h-3 text-purple-600" />
+                                  </div>
+                                  <span className="text-sm text-gray-600 dark:text-gray-300">Accès anticipé aux nouvelles fonctionnalités</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </Label>
+                      </RadioGroup>
+                    </div>
+                  </div>
                 )}
 
                 {state.status === 'selecting' && !searchParams.get('payment') && (
