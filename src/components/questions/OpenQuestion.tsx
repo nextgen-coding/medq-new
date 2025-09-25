@@ -57,6 +57,7 @@ interface OpenQuestionProps {
   onFocus?: () => void; // callback when any part of the question receives focus
   autoFocus?: boolean; // control initial autofocus of textarea when active
   showEyeButton?: boolean; // control whether to show the eye button in header
+  isRevisionMode?: boolean; // when true, allow free navigation without requiring submission
 }
 
 export function OpenQuestion({ 
@@ -89,6 +90,7 @@ export function OpenQuestion({
   onFocus,
   autoFocus = true,
   showEyeButton = false,
+  isRevisionMode = false,
 }: OpenQuestionProps) {
   const [answer, setAnswer] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -687,6 +689,16 @@ export function OpenQuestion({
         // Don't show the card wrapper for already answered questions - let OpenQuestionSelfAssessment handle results
         // Only show for new simple QROC submissions
         const shouldShowInline = (submitted && isSimpleQroc && !showSelfAssessment && !assessmentCompleted && !isAnswered);
+        
+        console.log('shouldShowInline debug:', {
+          submitted,
+          isSimpleQroc,
+          showSelfAssessment,
+          assessmentCompleted,
+          isAnswered,
+          shouldShowInline
+        });
+        
         if (!shouldShowInline) return null;
 
         return (
@@ -736,10 +748,18 @@ export function OpenQuestion({
               hideMeta={hideMeta}
               correctAnswers={question.correct_answers || question.correctAnswers}
               showEyeButton={showEyeButton}
+              hideQuestionText={true}
             />
           )}
           {/* Show inline question text when hideMeta is true - with optional eye button */}
-          {hideMeta && (
+          {/* But NOT for simple QROC questions during evaluation (when they use card wrapper) */}
+          {/* Still show for simple QROC when user is entering answer */}
+          {(() => {
+            const isSimpleQroc = !hideImmediateResults && !disableIndividualSubmit;
+            const isInEvaluationPhase = submitted && isSimpleQroc;
+            console.log('hideMeta inline check:', { hideMeta, isSimpleQroc, submitted, isInEvaluationPhase, shouldShow: hideMeta && !isInEvaluationPhase });
+            return hideMeta && !isInEvaluationPhase;
+          })() && (
             <>
               <div className="flex items-start gap-3 mb-2">
                 <div className="flex-1 min-w-0">
@@ -875,6 +895,7 @@ export function OpenQuestion({
                 return rating;
               })()}
               correctAnswer={(question.correct_answers || question.correctAnswers || []).join(', ') || question.explanation || ''}
+              questionText={question.text}
             />
           </div>
         );
@@ -942,33 +963,63 @@ export function OpenQuestion({
 
     {/* Self-assessment panel is now rendered inline above, replacing the input */}
 
-      {!hideActions && (
-        <OpenQuestionActions
-          isSubmitted={submitted}
-          canSubmit={!hasSubmitted}
-          onSubmit={handleSubmit}
-          onNext={onNext}
-          showNext={submitted} // Show "Suivant" immediately after submission
-          hasSubmitted={hasSubmitted}
-          assessmentCompleted={assessmentCompleted}
-          assessmentResult={deferredAssessmentResult || (showDeferredSelfAssessment ? null : (answerResult !== undefined ? answerResult : null))}
-          onResubmit={handleResubmit}
-          userAnswerText={userAnswer || answer}
-          correctAnswer={question.correctAnswers?.[0]}
-          currentAnswer={answer}
-          showNotesArea={showNotesArea}
-          hideNotesButton={false} // Always show notes button so users can hide/show notes
-          onToggleNotes={() => {
-            setShowNotesArea(prev => !prev);
-            setNotesManuallyControlled(true);
-            setTimeout(() => {
-              if (!showNotesArea && notesRef.current) {
-                notesRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              }
-            }, 30);
-          }}
-        />
-      )}
+    {/* Show actions right after question content in revision mode */}
+    {!hideActions && isRevisionMode && (
+      <OpenQuestionActions
+        isSubmitted={submitted}
+        canSubmit={!hasSubmitted}
+        onSubmit={handleSubmit}
+        onNext={onNext}
+        showNext={submitted || isRevisionMode} // Show "Suivant" immediately after submission, or always in revision mode
+        hasSubmitted={hasSubmitted}
+        assessmentCompleted={assessmentCompleted}
+        assessmentResult={deferredAssessmentResult || (showDeferredSelfAssessment ? null : (answerResult !== undefined ? answerResult : null))}
+        onResubmit={handleResubmit}
+        userAnswerText={userAnswer || answer}
+        correctAnswer={question.correctAnswers?.[0]}
+        currentAnswer={answer}
+        showNotesArea={showNotesArea}
+        hideNotesButton={false} // Always show notes button so users can hide/show notes
+        onToggleNotes={() => {
+          setShowNotesArea(prev => !prev);
+          setNotesManuallyControlled(true);
+          setTimeout(() => {
+            if (!showNotesArea && notesRef.current) {
+              notesRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+          }, 30);
+        }}
+      />
+    )}
+
+  {/* Actions positioned above "Rappel du cours" in normal mode only */}
+  {!hideActions && !isRevisionMode && (
+    <OpenQuestionActions
+      isSubmitted={submitted}
+      canSubmit={!hasSubmitted}
+      onSubmit={handleSubmit}
+      onNext={onNext}
+      showNext={submitted || isRevisionMode} // Show "Suivant" immediately after submission, or always in revision mode
+      hasSubmitted={hasSubmitted}
+      assessmentCompleted={assessmentCompleted}
+      assessmentResult={deferredAssessmentResult || (showDeferredSelfAssessment ? null : (answerResult !== undefined ? answerResult : null))}
+      onResubmit={handleResubmit}
+      userAnswerText={userAnswer || answer}
+      correctAnswer={question.correctAnswers?.[0]}
+      currentAnswer={answer}
+      showNotesArea={showNotesArea}
+      hideNotesButton={false} // Always show notes button so users can hide/show notes
+      onToggleNotes={() => {
+        setShowNotesArea(prev => !prev);
+        setNotesManuallyControlled(true);
+        setTimeout(() => {
+          if (!showNotesArea && notesRef.current) {
+            notesRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 30);
+      }}
+    />
+  )}
 
   {/* Rappel du cours (après soumission) */}
   {submitted && !suppressReminder && !showSelfAssessment && (() => {

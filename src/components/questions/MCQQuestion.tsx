@@ -52,6 +52,7 @@ interface MCQQuestionProps {
   showNotesAfterSubmit?: boolean; // show notes area after submit (for task page)
   onFocus?: () => void; // callback when any part of the question receives focus
   customActionButton?: React.ReactNode; // custom button to render between actions and rappel du cours
+  isRevisionMode?: boolean; // when true, allow free navigation without requiring submission
 }
 
 export function MCQQuestion({ 
@@ -78,7 +79,8 @@ export function MCQQuestion({
   allowEnterSubmit = true,
   isActive = false,
   onFocus,
-  customActionButton
+  customActionButton,
+  isRevisionMode = false
 }: MCQQuestionProps) {
   const [selectedOptionIds, setSelectedOptionIds] = useState<string[]>([]);
   const [submitted, setSubmitted] = useState(false);
@@ -746,6 +748,7 @@ export function MCQQuestion({
             showNotesArea={showNotesArea}
             hideNotesButton={false} // Always show notes button so users can hide/show notes
             onResubmit={handleResubmit}
+            showNext={submitted || isRevisionMode} // Show "Suivant" after submission or always in revision mode
             onToggleNotes={() => {
               setShowNotesArea(prev => !prev);
               setNotesManuallyControlled(true);

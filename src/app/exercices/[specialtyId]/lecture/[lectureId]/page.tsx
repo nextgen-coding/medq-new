@@ -309,6 +309,7 @@ export default function LecturePageRoute() {
           onQuestionUpdate={handleQuestionUpdate}
           highlightConfirm
           enableOptionHighlighting={true}
+          isRevisionMode={mode === 'revision'}
         />
       );
     } else {
@@ -326,6 +327,7 @@ export default function LecturePageRoute() {
           onQuestionUpdate={handleQuestionUpdate}
           highlightConfirm
           enableAnswerHighlighting={true}
+          isRevisionMode={mode === 'revision'}
         />
       );
     }

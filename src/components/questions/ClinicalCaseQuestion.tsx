@@ -126,8 +126,8 @@ export function ClinicalCaseQuestion({
   const { t } = useTranslation();
   const [answers, setAnswers] = useState<Record<string, any>>(userAnswers);
   const [questionResults, setQuestionResults] = useState<Record<string, boolean | 'partial'>>(answerResults);
-  const [isCaseComplete, setIsCaseComplete] = useState(isAnswered);
-  const [showResults, setShowResults] = useState(isAnswered);
+  const [isCaseComplete, setIsCaseComplete] = useState(revisionMode ? true : isAnswered);
+  const [showResults, setShowResults] = useState(revisionMode ? true : isAnswered);
   const [showCaseDialog, setShowCaseDialog] = useState(false);
   const [groupPinned, setGroupPinned] = useState(false);
   const [groupHidden, setGroupHidden] = useState(false);
@@ -193,6 +193,22 @@ export function ClinicalCaseQuestion({
       scrollIntoViewWithOffset(caseTextRef.current, 'smooth');
     }
   }, [clinicalCase.caseNumber, revisionMode]);
+
+  // Initialize revision mode with all questions marked as correct (but don't populate answers)
+  useEffect(() => {
+    if (revisionMode) {
+      const revisionResults: Record<string, boolean> = {};
+      
+      clinicalCase.questions.forEach(question => {
+        revisionResults[question.id] = true;
+      });
+      
+      setQuestionResults(revisionResults);
+      setEvaluationComplete(true);
+      setShowResults(true);
+      setIsCaseComplete(true);
+    }
+  }, [revisionMode, clinicalCase.questions]);
 
   // Initialize evaluation completion state based on existing results
   useEffect(() => {
@@ -552,6 +568,9 @@ export function ClinicalCaseQuestion({
   };
   // Allow resubmission: keep current answers, hide results, reset evaluation state and per-question results
   const handleResubmit = () => {
+    // Don't allow resubmission in revision mode
+    if (revisionMode) return;
+    
     setIsCaseComplete(false);
     setShowResults(false);
     setEvaluationOrder([]);
@@ -808,8 +827,8 @@ export function ClinicalCaseQuestion({
     return 'unanswered';
   };
   const renderQuestion = (question: Question, index: number) => {
-    const isAnsweredQ = answers[question.id] !== undefined;
-    const answerResultQ = questionResults[question.id];
+    const isAnsweredQ = revisionMode ? true : (answers[question.id] !== undefined);
+    const answerResultQ = revisionMode ? true : questionResults[question.id];
     const userAnswerQ = answers[question.id];
   const isCurrentEvaluationTarget = showResults && !evaluationComplete && evaluationOrder[evaluationIndex] === question.id;
   const isActiveAnswerTarget = !showResults && index === activeIndex;
@@ -922,10 +941,11 @@ export function ClinicalCaseQuestion({
                     lectureId={lectureId}
                     lectureTitle={lectureTitle}
                     specialtyName={specialtyName}
-                    isAnswered={showResults ? isAnsweredQ : false}
-                    answerResult={showResults ? answerResultQ : undefined}
+                    // In revision mode, always show as answered; otherwise use normal logic  
+                    isAnswered={revisionMode || (showResults ? isAnsweredQ : false)}
+                    answerResult={revisionMode ? true : (showResults ? answerResultQ : undefined)}
                     userAnswer={userAnswerQ as any}
-                    hideImmediateResults={!showResults}
+                    hideImmediateResults={revisionMode ? false : !showResults}
                     hideActions
                     hideNotes={true} // Always hide individual question notes in clinical cases
                     hideComments={true}
@@ -950,10 +970,11 @@ export function ClinicalCaseQuestion({
                     lectureId={lectureId}
                     lectureTitle={lectureTitle}
                     specialtyName={specialtyName}
-                    isAnswered={showResults ? isAnsweredQ : false}
-                    answerResult={showResults ? answerResultQ : undefined}
+                    // In revision mode, always show as answered; otherwise use normal logic  
+                    isAnswered={revisionMode || (showResults ? isAnsweredQ : false)}
+                    answerResult={revisionMode ? true : (showResults ? answerResultQ : undefined)}
                     userAnswer={userAnswerQ as any}
-                    hideImmediateResults={!showResults}
+                    hideImmediateResults={revisionMode ? false : !showResults}
                     disableIndividualSubmit={!showResults}
                     showDeferredSelfAssessment={
                       showResults &&
@@ -1053,12 +1074,12 @@ export function ClinicalCaseQuestion({
                 lectureId={lectureId}
                 lectureTitle={lectureTitle}
                 specialtyName={specialtyName}
-                // Before group submit, keep UI in answering mode (no answered state)
-                isAnswered={showResults ? isAnsweredQ : false}
-                answerResult={showResults ? answerResultQ : undefined}
+                // In revision mode, always show as answered; otherwise use normal logic
+                isAnswered={revisionMode || (showResults ? isAnsweredQ : false)}
+                answerResult={revisionMode ? true : (showResults ? answerResultQ : undefined)}
                 userAnswer={userAnswerQ as any}
-                // Hide immediate results until the whole group is submitted
-                hideImmediateResults={!showResults}
+                // Hide immediate results until the whole group is submitted, but always show in revision mode
+                hideImmediateResults={revisionMode ? false : !showResults}
                 // Hide per-question actions; we submit once for all
                 hideActions
                 hideNotes={true} // Always hide individual question notes in clinical cases
@@ -1084,10 +1105,11 @@ export function ClinicalCaseQuestion({
                 lectureId={lectureId}
                 lectureTitle={lectureTitle}
                 specialtyName={specialtyName}
-                isAnswered={showResults ? isAnsweredQ : false}
-                answerResult={showResults ? answerResultQ : undefined}
+                // In revision mode, always show as answered; otherwise use normal logic
+                isAnswered={revisionMode || (showResults ? isAnsweredQ : false)}
+                answerResult={revisionMode ? true : (showResults ? answerResultQ : undefined)}
                 userAnswer={userAnswerQ as any}
-                hideImmediateResults={!showResults}
+                hideImmediateResults={revisionMode ? false : !showResults}
                 disableIndividualSubmit={!showResults}
                 showDeferredSelfAssessment={
                   showResults &&

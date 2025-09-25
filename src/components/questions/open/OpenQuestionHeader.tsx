@@ -20,11 +20,14 @@ interface OpenQuestionHeaderProps {
   hideMeta?: boolean;
   correctAnswers?: string[];
   showEyeButton?: boolean; // Whether to show the eye button (clinical/multi contexts)
+  hideQuestionText?: boolean; // Whether to hide the question text from header
 }
 
-export function OpenQuestionHeader({ questionText, questionNumber, session, lectureTitle, specialtyName, questionId, highlightConfirm, hideMeta, correctAnswers, showEyeButton }: OpenQuestionHeaderProps) {
+export function OpenQuestionHeader({ questionText, questionNumber, session, lectureTitle, specialtyName, questionId, highlightConfirm, hideMeta, correctAnswers, showEyeButton, hideQuestionText = false }: OpenQuestionHeaderProps) {
   const { t } = useTranslation();
   const [showAnswer, setShowAnswer] = useState(false);
+  
+  console.log('OpenQuestionHeader received:', { hideQuestionText, questionText: questionText ? 'has text' : 'no text' });
   
   // Enhanced session formatting to preserve full session information
   const formatSession = (sessionValue?: string) => {
@@ -136,8 +139,8 @@ export function OpenQuestionHeader({ questionText, questionNumber, session, lect
         </div>
       )}
       
-      {/* Show question text - always show when component is used as main header */}
-      {questionId ? (
+      {/* Show question text only when not hidden */}
+      {!hideQuestionText && (questionId ? (
         <div data-question-text={questionId}>
           <HighlightableQuestionText
             questionId={questionId}
@@ -148,7 +151,7 @@ export function OpenQuestionHeader({ questionText, questionNumber, session, lect
         </div>
       ) : (
         <h3 className={`${hideMeta ? 'mt-0' : 'mt-3'} text-base sm:text-lg font-medium text-foreground dark:text-gray-200 break-words whitespace-pre-wrap`}>{questionText}</h3>
-      )}
+      ))}
     </div>
   );
 }

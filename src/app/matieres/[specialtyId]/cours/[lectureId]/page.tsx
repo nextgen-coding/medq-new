@@ -570,8 +570,8 @@ export default function CoursPageRoute() {
           lectureTitle={lecture?.title}
           specialtyName={lecture?.specialty?.name}
           displayMode={(clinicalCase.questions.every((q: any)=> q.type==='clinic_croq') ? 'multi_qroc' : clinicalCase.questions.every((q: any)=> q.type==='clinic_mcq') ? 'multi_qcm' : 'clinical') as any}
-          isAnswered={clinicalCase.questions.every((q: any)=> answers[q.id] !== undefined)}
-          answerResult={(() => {
+          isAnswered={mode === 'revision' ? true : clinicalCase.questions.every((q: any)=> answers[q.id] !== undefined)}
+          answerResult={mode === 'revision' ? true : (() => {
             const resVals = clinicalCase.questions.map((q: any) => answerResults[q.id]).filter((r: any) => r !== undefined);
             if (!resVals.length) return undefined;
             if (resVals.every((r: any) => r === true)) return true;

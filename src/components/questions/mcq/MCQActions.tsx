@@ -20,6 +20,7 @@ interface MCQActionsProps {
   onToggleNotes?: () => void;
   hideNotesButton?: boolean; // Hide notes button when notes have content
   onResubmit?: () => void; // Allow resubmitting the question
+  showNext?: boolean; // Control when to show the next button (for revision mode)
 }
 
 export function MCQActions({
@@ -33,7 +34,8 @@ export function MCQActions({
   showNotesArea,
   onToggleNotes,
   hideNotesButton = false,
-  onResubmit
+  onResubmit,
+  showNext = true
 }: MCQActionsProps) {
   return (
     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 pt-4">
@@ -78,29 +80,31 @@ export function MCQActions({
         >
           {hasSubmitted ? "Répondu" : "Soumettre la réponse"}
         </Button>
-      ) : (
+      ) : (isSubmitted || showNext) ? (
         <div className="w-full sm:w-auto sm:ml-auto flex flex-col gap-3">
           {/* Action buttons - responsive layout */}
           <div className="flex flex-col xs:flex-row gap-2 xs:justify-between xs:items-center">
             {/* Result indicator - positioned on the left */}
-            <div className="flex items-center justify-center xs:justify-start">
-              {isCorrect === true ? (
-                <div className="flex items-center text-green-600">
-                  <CheckCircle className="h-5 w-5 mr-2" />
-                  <span className="font-medium text-sm sm:text-base">Correcte!</span>
-                </div>
-              ) : isCorrect === 'partial' ? (
-                <div className="flex items-center text-yellow-600">
-                  <AlertCircle className="h-5 w-5 mr-2" />
-                  <span className="font-medium text-sm sm:text-base">Partiellement correcte</span>
-                </div>
-              ) : (
-                <div className="flex items-center text-red-600">
-                  <XCircle className="h-5 w-5 mr-2" />
-                  <span className="font-medium text-sm sm:text-base">Incorrecte</span>
-                </div>
-              )}
-            </div>
+            {isSubmitted && (
+              <div className="flex items-center justify-center xs:justify-start">
+                {isCorrect === true ? (
+                  <div className="flex items-center text-green-600">
+                    <CheckCircle className="h-5 w-5 mr-2" />
+                    <span className="font-medium text-sm sm:text-base">Correcte!</span>
+                  </div>
+                ) : isCorrect === 'partial' ? (
+                  <div className="flex items-center text-yellow-600">
+                    <AlertCircle className="h-5 w-5 mr-2" />
+                    <span className="font-medium text-sm sm:text-base">Partiellement correcte</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center text-red-600">
+                    <XCircle className="h-5 w-5 mr-2" />
+                    <span className="font-medium text-sm sm:text-base">Incorrecte</span>
+                  </div>
+                )}
+              </div>
+            )}
             
             {/* Right side buttons container */}
             <div className="flex flex-col xs:flex-row gap-2 items-stretch xs:items-center">
@@ -127,7 +131,7 @@ export function MCQActions({
             </div>
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
