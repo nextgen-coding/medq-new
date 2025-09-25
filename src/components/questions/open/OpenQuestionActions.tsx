@@ -105,19 +105,6 @@ export function OpenQuestionActions({
 
             {/* Action buttons container - positioned on the right */}
             <div className="flex flex-col xs:flex-row gap-2 items-stretch xs:items-center xs:justify-end">
-              {/* Resubmit Button */}
-              {onResubmit && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={onResubmit}
-                  className="flex items-center gap-1 justify-center text-xs sm:text-sm min-w-0 flex-shrink-0"
-                >
-                  <span className="hidden xs:inline truncate">Soumettre à nouveau</span>
-                  <span className="xs:hidden truncate">Réessayer</span>
-                </Button>
-              )}
-
               {/* Notes Button */}
               {onToggleNotes && !hideNotesButton && (
                 <Button

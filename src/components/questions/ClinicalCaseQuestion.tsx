@@ -1255,16 +1255,6 @@ export function ClinicalCaseQuestion({
 
                     {/* Action buttons in responsive layout */}
                     <div className="flex flex-col xs:flex-row gap-2 w-full xs:w-auto">
-                      {/* Resubmit button */}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleResubmit}
-                        className="flex items-center justify-center gap-1 w-full xs:w-auto text-xs xs:text-sm"
-                      >
-                        Soumettre à nouveau
-                      </Button>
-
                       {/* Notes toggle: positioned before next button like in MCQActions */}
                       <Button
                         variant="outline"
@@ -1291,7 +1281,7 @@ export function ClinicalCaseQuestion({
                       {/* Next button: show immediately when case is complete or no open questions, and show after evaluation for multi-mode with open questions */}
                       {(isCaseComplete || (!hasOpen || evaluationComplete)) && (
                         <Button onClick={onNext} size="sm" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold w-full xs:w-auto text-xs xs:text-sm">
-                          Question suivante
+                          Suivant
                           <ChevronRight className="h-4 w-4 ml-2" />
                         </Button>
                       )}

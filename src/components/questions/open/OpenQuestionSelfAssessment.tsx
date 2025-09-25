@@ -83,7 +83,7 @@ export function OpenQuestionSelfAssessment({ onAssessment, userAnswerText, quest
               {/* Reference Answer Section - Same style as evaluation */}
               {correctAnswer && showCorrectAnswer && (
                 <div className="mb-4">
-                  <div className="bg-green-100 dark:bg-green-900/30 rounded-lg p-4 border-l-4 border-green-500">
+                  <div className="bg-green-100 dark:bg-green-900/30 rounded-lg p-4">
                     <h5 className="text-sm font-semibold text-green-800 dark:text-green-200 mb-2 uppercase tracking-wide">
                       Réponse de référence
                     </h5>
@@ -94,26 +94,14 @@ export function OpenQuestionSelfAssessment({ onAssessment, userAnswerText, quest
                 </div>
               )}
 
-              {/* User Answer Section - Same style as evaluation */}
-              {userAnswerText && (
-                <div className="mb-4">
-                  <div className="bg-blue-100 dark:bg-blue-900/30 rounded-lg p-4 border-l-4 border-blue-500">
-                    <h5 className="text-sm font-semibold mb-2 uppercase tracking-wide text-blue-800 dark:text-blue-200">
-                      Votre réponse
-                    </h5>
-                    <div className="leading-relaxed text-blue-700 dark:text-blue-300">
-                      <RichTextDisplay text={userAnswerText} enableImageZoom={true} />
-                    </div>
-                  </div>
-                </div>
-              )}
+
             </div>
           )}
 
           {/* Show boxed answers only during evaluation (before completion) */}
           {!isCompleted && correctAnswer && showCorrectAnswer && (
             <div className="mb-4">
-              <div className="bg-green-100 dark:bg-green-900/30 rounded-lg p-4 border-l-4 border-green-500">
+              <div className="bg-green-100 dark:bg-green-900/30 rounded-lg p-4">
                 <h5 className="text-sm font-semibold text-green-800 dark:text-green-200 mb-2 uppercase tracking-wide">
                   Réponse de référence
                 </h5>
@@ -126,50 +114,42 @@ export function OpenQuestionSelfAssessment({ onAssessment, userAnswerText, quest
 
           {!isCompleted && userAnswerText && (
             <div className="mb-4">
-              <div className="bg-blue-100 dark:bg-blue-900/30 rounded-lg p-4 border-l-4 border-blue-500">
-                <h5 className="text-sm font-semibold mb-2 uppercase tracking-wide text-blue-800 dark:text-blue-200">
-                  Votre réponse
+              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+                <h5 className="text-sm font-semibold mb-2 uppercase tracking-wide text-blue-700 dark:text-blue-300">
+                  Évaluer votre réponse : {userAnswerText}
                 </h5>
-                <div className="leading-relaxed text-blue-700 dark:text-blue-300">
-                  <RichTextDisplay text={userAnswerText} enableImageZoom={true} />
+                
+                {/* Evaluation Buttons inside blue box */}
+                <div className="mt-4">
+                  <div className="flex flex-col xs:flex-row gap-3 w-full">
+                    <Button
+                      size="lg"
+                      className="flex items-center justify-center gap-2 px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-medium rounded-full transition-all duration-200 flex-1"
+                      onClick={() => handleRatingSelect('correct')}
+                    >
+                      <CheckCircle className="h-4 w-4" />
+                      Correct!
+                    </Button>
+
+                    <Button
+                      size="lg" 
+                      className="flex items-center justify-center gap-2 px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-full transition-all duration-200 flex-1"
+                      onClick={() => handleRatingSelect('partial')}
+                    >
+                      <MinusCircle className="h-4 w-4" />
+                      Partiellement correcte
+                    </Button>
+
+                    <Button
+                      size="lg"
+                      className="flex items-center justify-center gap-2 px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-medium rounded-full transition-all duration-200 flex-1"
+                      onClick={() => handleRatingSelect('wrong')}
+                    >
+                      <XCircle className="h-4 w-4" />
+                      Incorrect
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            </div>
-          )}
-
-          {/* Evaluation Section */}
-          {!isCompleted && (
-            <div className="mt-4">
-              <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                Évaluez votre réponse:
-              </h5>
-              <div className="flex flex-col xs:flex-row gap-3 w-full">
-                <Button
-                  size="lg"
-                  className="flex items-center justify-center gap-2 px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-medium rounded-full transition-all duration-200 flex-1"
-                  onClick={() => handleRatingSelect('correct')}
-                >
-                  <CheckCircle className="h-4 w-4" />
-                  Correct!
-                </Button>
-
-                <Button
-                  size="lg" 
-                  className="flex items-center justify-center gap-2 px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-full transition-all duration-200 flex-1"
-                  onClick={() => handleRatingSelect('partial')}
-                >
-                  <MinusCircle className="h-4 w-4" />
-                  Partiellement correcte
-                </Button>
-
-                <Button
-                  size="lg"
-                  className="flex items-center justify-center gap-2 px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-medium rounded-full transition-all duration-200 flex-1"
-                  onClick={() => handleRatingSelect('wrong')}
-                >
-                  <XCircle className="h-4 w-4" />
-                  Incorrect
-                </Button>
               </div>
             </div>
           )}
@@ -180,7 +160,7 @@ export function OpenQuestionSelfAssessment({ onAssessment, userAnswerText, quest
           {/* Reference Answer Section - Show when evaluation interface is visible */}
           {correctAnswer && showCorrectAnswer && (
             <div className="mb-4">
-              <div className="bg-green-100 dark:bg-green-900/30 rounded-lg p-4 border-l-4 border-green-500">
+              <div className="bg-green-100 dark:bg-green-900/30 rounded-lg p-4">
                 <h5 className="text-sm font-semibold text-green-800 dark:text-green-200 mb-2 uppercase tracking-wide">
                   Réponse de référence
                 </h5>
@@ -191,77 +171,45 @@ export function OpenQuestionSelfAssessment({ onAssessment, userAnswerText, quest
             </div>
           )}
 
-          {/* User Answer Section - Color based on evaluation result if completed */}
-          {userAnswerText && (
+          {/* User Answer Evaluation Section - Only show during evaluation (not after completion) */}
+          {!isCompleted && userAnswerText && (
             <div className="mb-4">
-              <div className={`rounded-lg p-4 border-l-4 ${
-                isCompleted && currentRating
-                  ? currentRating === 'correct'
-                    ? 'bg-green-100 dark:bg-green-900/30 border-green-500'
-                    : currentRating === 'partial'
-                    ? 'bg-orange-100 dark:bg-orange-900/30 border-orange-500'
-                    : 'bg-red-100 dark:bg-red-900/30 border-red-500'
-                  : 'bg-blue-100 dark:bg-blue-900/30 border-blue-500'
-              }`}>
-                <h5 className={`text-sm font-semibold mb-2 uppercase tracking-wide ${
-                  isCompleted && currentRating
-                    ? currentRating === 'correct'
-                      ? 'text-green-800 dark:text-green-200'
-                      : currentRating === 'partial'
-                      ? 'text-orange-800 dark:text-orange-200'
-                      : 'text-red-800 dark:text-red-200'
-                    : 'text-blue-800 dark:text-blue-200'
-                }`}>
-                  Votre réponse
+              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+                <h5 className="text-sm font-semibold mb-2 uppercase tracking-wide text-blue-700 dark:text-blue-300">
+                  Évaluer votre réponse : {userAnswerText}
                 </h5>
-                <div className={`leading-relaxed ${
-                  isCompleted && currentRating
-                    ? currentRating === 'correct'
-                      ? 'text-green-700 dark:text-green-300'
-                      : currentRating === 'partial'
-                      ? 'text-orange-700 dark:text-orange-300'
-                      : 'text-red-700 dark:text-red-300'
-                    : 'text-blue-700 dark:text-blue-300'
-                }`}>
-                  <RichTextDisplay text={userAnswerText} enableImageZoom={true} />
+                
+                {/* Evaluation Buttons inside blue box */}
+                <div className="mt-4">
+                  <div className="flex flex-col xs:flex-row gap-3 w-full">
+                    <Button
+                      size="lg"
+                      className="flex items-center justify-center gap-2 px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-medium rounded-full transition-all duration-200 flex-1"
+                      onClick={() => handleRatingSelect('correct')}
+                    >
+                      <CheckCircle className="h-4 w-4" />
+                      Correct!
+                    </Button>
+
+                    <Button
+                      size="lg" 
+                      className="flex items-center justify-center gap-2 px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-full transition-all duration-200 flex-1"
+                      onClick={() => handleRatingSelect('partial')}
+                    >
+                      <MinusCircle className="h-4 w-4" />
+                      Partiellement correcte
+                    </Button>
+
+                    <Button
+                      size="lg"
+                      className="flex items-center justify-center gap-2 px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-medium rounded-full transition-all duration-200 flex-1"
+                      onClick={() => handleRatingSelect('wrong')}
+                    >
+                      <XCircle className="h-4 w-4" />
+                      Incorrect
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            </div>
-          )}
-
-          {/* Evaluation Section */}
-          {!isCompleted && (
-            <div className="mt-4">
-              <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-                Évaluez votre réponse:
-              </h5>
-              <div className="flex flex-col xs:flex-row gap-3 w-full">
-                <Button
-                  size="lg"
-                  className="flex items-center justify-center gap-2 px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-medium rounded-full transition-all duration-200 flex-1"
-                  onClick={() => handleRatingSelect('correct')}
-                >
-                  <CheckCircle className="h-4 w-4" />
-                  Correct!
-                </Button>
-
-                <Button
-                  size="lg" 
-                  className="flex items-center justify-center gap-2 px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-full transition-all duration-200 flex-1"
-                  onClick={() => handleRatingSelect('partial')}
-                >
-                  <MinusCircle className="h-4 w-4" />
-                  Partiellement correcte
-                </Button>
-
-                <Button
-                  size="lg"
-                  className="flex items-center justify-center gap-2 px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-medium rounded-full transition-all duration-200 flex-1"
-                  onClick={() => handleRatingSelect('wrong')}
-                >
-                  <XCircle className="h-4 w-4" />
-                  Incorrect
-                </Button>
               </div>
             </div>
           )}

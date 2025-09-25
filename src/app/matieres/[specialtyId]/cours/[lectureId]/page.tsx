@@ -622,6 +622,13 @@ export default function CoursPageRoute() {
           allowEnterSubmit={!revisionMode}
           disableKeyboardHandlers={revisionMode}
           isActive={!revisionMode}
+          customActionButton={revisionMode ? (
+            <div className="flex justify-end">
+              <Button onClick={handleNext} className="bg-blue-600 hover:bg-blue-700 text-white">
+                Suivant
+              </Button>
+            </div>
+          ) : undefined}
         />
       );
     } else {
@@ -943,8 +950,9 @@ export default function CoursPageRoute() {
                 {currentQuestion && renderCurrentQuestion()}
               </div>
 
-              {/* In revision, show persistent Next only for single questions (not grouped/clinical) */}
-              {mode === 'revision' && currentQuestion && !('questions' in (currentQuestion as any)) && (
+              {/* In revision, show persistent Next only for QROC questions (MCQ handles its own button now) */}
+              {mode === 'revision' && currentQuestion && !('questions' in (currentQuestion as any)) && 
+               (currentQuestion as Question).type !== 'mcq' && (
                 <div className="mt-4 sm:mt-6 flex justify-end">
                   <Button onClick={handleNext} className="bg-blue-600 hover:bg-blue-700 text-white">
                     Suivant
