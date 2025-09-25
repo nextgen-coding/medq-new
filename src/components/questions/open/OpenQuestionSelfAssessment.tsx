@@ -24,11 +24,22 @@ export function OpenQuestionSelfAssessment({ onAssessment, userAnswerText, quest
   const [assessmentCompleted, setAssessmentCompleted] = useState(false);
   const [userRating, setUserRating] = useState<'correct' | 'wrong' | 'partial' | null>(null);
 
+  // DEBUG: Log props to console
+  console.log('OpenQuestionSelfAssessment props:', {
+    selectedRating,
+    assessmentCompleted,
+    userAnswerText,
+    correctAnswer,
+    variant
+  });
+
   // Check if assessment is completed based on selectedRating prop or local state
   // selectedRating null means not completed, any other value (true/false/'partial') means completed
   const hasSelectedRating = selectedRating !== null && selectedRating !== undefined;
   const isCompleted = assessmentCompleted || hasSelectedRating;
   const currentRating = userRating || (selectedRating === true ? 'correct' : selectedRating === 'partial' ? 'partial' : selectedRating === false ? 'wrong' : null);
+
+  
 
   // Keyboard shortcuts for self-assessment
   useEffect(() => {
@@ -67,7 +78,7 @@ export function OpenQuestionSelfAssessment({ onAssessment, userAnswerText, quest
         <div className="space-y-4">
 
           {/* Show results after evaluation completion - styled like evaluation boxes */}
-          {(isCompleted || assessmentCompleted || hasSelectedRating) && (
+          {isCompleted && (
             <div className="space-y-4">
               {/* Reference Answer Section - Same style as evaluation */}
               {correctAnswer && showCorrectAnswer && (

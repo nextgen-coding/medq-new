@@ -42,7 +42,7 @@ export function OpenQuestionActions({
   currentAnswer = ''
 }: OpenQuestionActionsProps) {
   return (
-    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mt-6">
+    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mt-8">
       <div className="hidden sm:flex items-center text-xs text-muted-foreground">
         <Keyboard className="h-3.5 w-3.5 mr-1" />
         <span>
@@ -78,70 +78,73 @@ export function OpenQuestionActions({
           </div>
         )}
 
-        {/* Assessment Result Indicator - full width on mobile */}
-        {isSubmitted && assessmentCompleted && assessmentResult !== undefined && (
-          <div className="flex items-center justify-center sm:justify-start">
-            {assessmentResult === true ? (
-              <div className="flex items-center text-green-600">
-                <CheckCircle className="h-5 w-5 mr-2" />
-                <span className="font-medium text-sm sm:text-base">Correcte!</span>
-              </div>
-            ) : assessmentResult === 'partial' ? (
-              <div className="flex items-center text-yellow-600">
-                <AlertCircle className="h-5 w-5 mr-2" />
-                <span className="font-medium text-sm sm:text-base">Partiellement correcte</span>
-              </div>
-            ) : (
-              <div className="flex items-center text-red-600">
-                <XCircle className="h-5 w-5 mr-2" />
-                <span className="font-medium text-sm sm:text-base">Incorrecte</span>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Action buttons for submitted questions - responsive layout */}
+        {/* Action buttons for submitted questions with assessment result inline */}
         {isSubmitted && assessmentCompleted && (
-          <div className="flex flex-col xs:flex-row gap-2 items-stretch xs:items-center xs:justify-end">
-            {/* Resubmit Button */}
-            {onResubmit && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onResubmit}
-                className="flex items-center gap-1 justify-center text-xs sm:text-sm min-w-0 flex-shrink-0"
-              >
-                <span className="hidden xs:inline truncate">Soumettre à nouveau</span>
-                <span className="xs:hidden truncate">Réessayer</span>
-              </Button>
+          <div className="flex flex-col xs:flex-row gap-2 items-stretch xs:items-center xs:justify-between">
+            {/* Assessment Result Indicator - positioned on the left */}
+            {assessmentResult !== undefined && (
+              <div className="flex items-center justify-center xs:justify-start">
+                {assessmentResult === true ? (
+                  <div className="flex items-center text-green-600">
+                    <CheckCircle className="h-5 w-5 mr-2" />
+                    <span className="font-medium text-sm sm:text-base">Correcte!</span>
+                  </div>
+                ) : assessmentResult === 'partial' ? (
+                  <div className="flex items-center text-yellow-600">
+                    <AlertCircle className="h-5 w-5 mr-2" />
+                    <span className="font-medium text-sm sm:text-base">Partiellement correcte</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center text-red-600">
+                    <XCircle className="h-5 w-5 mr-2" />
+                    <span className="font-medium text-sm sm:text-base">Incorrecte</span>
+                  </div>
+                )}
+              </div>
             )}
 
-            {/* Notes Button */}
-            {onToggleNotes && !hideNotesButton && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={onToggleNotes}
-                className="flex items-center gap-1 justify-center text-xs sm:text-sm min-w-0 flex-shrink-0"
-              >
-                <StickyNote className="h-4 w-4 flex-shrink-0" />
-                <span className="truncate">{showNotesArea ? 'Fermer les notes' : 'Mes notes'}</span>
-              </Button>
-            )}
+            {/* Action buttons container - positioned on the right */}
+            <div className="flex flex-col xs:flex-row gap-2 items-stretch xs:items-center xs:justify-end">
+              {/* Resubmit Button */}
+              {onResubmit && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onResubmit}
+                  className="flex items-center gap-1 justify-center text-xs sm:text-sm min-w-0 flex-shrink-0"
+                >
+                  <span className="hidden xs:inline truncate">Soumettre à nouveau</span>
+                  <span className="xs:hidden truncate">Réessayer</span>
+                </Button>
+              )}
 
-            {/* Next Button */}
-            {showNext && (
-              <Button
-                size="sm"
-                onClick={onNext}
-                className="flex items-center gap-1 justify-center text-xs sm:text-sm min-w-0 flex-shrink-0"
-              >
-                <span className="hidden xs:inline truncate">Suivant</span>
-                <span className="xs:hidden truncate">Suivant</span>
-                <ChevronRight className="h-4 w-4 flex-shrink-0" />
-              </Button>
-            )}
+              {/* Notes Button */}
+              {onToggleNotes && !hideNotesButton && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={onToggleNotes}
+                  className="flex items-center gap-1 justify-center text-xs sm:text-sm min-w-0 flex-shrink-0"
+                >
+                  <StickyNote className="h-4 w-4 flex-shrink-0" />
+                  <span className="truncate">{showNotesArea ? 'Fermer les notes' : 'Mes notes'}</span>
+                </Button>
+              )}
+
+              {/* Next Button */}
+              {showNext && (
+                <Button
+                  size="sm"
+                  onClick={onNext}
+                  className="flex items-center gap-1 justify-center text-xs sm:text-sm min-w-0 flex-shrink-0"
+                >
+                  <span className="hidden xs:inline truncate">Suivant</span>
+                  <span className="xs:hidden truncate">Suivant</span>
+                  <ChevronRight className="h-4 w-4 flex-shrink-0" />
+                </Button>
+              )}
+            </div>
           </div>
         )}
       </div>

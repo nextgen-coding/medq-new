@@ -362,32 +362,36 @@ export function OpenQuestion({
       hasSubmittedRef.current = true;
       if (showDeferredSelfAssessment) {
         if (answerResult === undefined) {
-          // Pending self-evaluation
-            setAssessmentCompleted(false);
-            setShowSelfAssessment(true);
+          // Pending self-evaluation for clinical case questions only
+          setAssessmentCompleted(false);
+          setShowSelfAssessment(true);
         } else {
-          // Evaluation done – hide buttons
+          // Evaluation done – show results
           setAssessmentCompleted(true);
           setShowSelfAssessment(false);
           setShouldShowUserAnswer(true); // Show user's answer when evaluation is completed
         }
       } else {
-        // Immediate mode or clinical case after refresh
+        // Immediate mode - question is answered, show the results not self-assessment
         setAssessmentCompleted(answerResult !== undefined);
         setShowSelfAssessment(false);
+        setShouldShowUserAnswer(answerResult !== undefined); // Show user answer if there's a result
         // In clinical cases (identified by hideActions + hideMeta), always show user answer if evaluation is complete
         if (hideActions && hideMeta && answerResult !== undefined) {
           setShouldShowUserAnswer(true);
         }
       }
     } else {
-      if (!userAnswer) setAnswer('');
-      setSubmitted(false);
-      setShowSelfAssessment(false);
-      setAssessmentCompleted(false);
-      setHasSubmitted(false);
-      hasSubmittedRef.current = false;
-      setShouldShowUserAnswer(false); // Reset flag when not answered
+      // Only reset states if question hasn't been submitted locally
+      if (!hasSubmitted) {
+        if (!userAnswer) setAnswer('');
+        setSubmitted(false);
+        setShowSelfAssessment(false);
+        setAssessmentCompleted(false);
+        setHasSubmitted(false);
+        hasSubmittedRef.current = false;
+        setShouldShowUserAnswer(false); // Reset flag when not answered
+      }
     }
   }, [question.id, isAnswered, answerResult, showDeferredSelfAssessment, userAnswer, hideActions, hideMeta]);
 
@@ -421,6 +425,7 @@ export function OpenQuestion({
         onSubmit(answer, false); // false indicates incorrect/no answer (empty submission)
       } else {
         // For non-empty answers, show self-assessment
+        setAssessmentCompleted(false); // Reset assessment state for new evaluation
         setShowSelfAssessment(true);
       }
       // Intentionally no scroll to "Rappel du cours"; keep the question and its answer visible in place
@@ -676,10 +681,13 @@ export function OpenQuestion({
         const expected = expectedFromArray || (question as any).course_reminder || (question as any).courseReminder || question.explanation || (question as any).correctAnswer || '';
         expectedReferenceInline = expected || '';
         
-        const canShowReferenceInline = submitted && expectedReferenceInline && (!hideImmediateResults || (showSelfAssessment && showDeferredSelfAssessment) || assessmentCompleted) && !showSelfAssessment;
+        // Show reference inline only for new submissions, not for already answered questions
+        const canShowReferenceInline = submitted && expectedReferenceInline && (!hideImmediateResults || (showSelfAssessment && showDeferredSelfAssessment) || assessmentCompleted) && !showSelfAssessment && !isAnswered;
 
-        // Don't show the card wrapper - we want the original question format with inline evaluation
-        if (!(submitted && isSimpleQroc && !showSelfAssessment && !assessmentCompleted)) return null;
+        // Don't show the card wrapper for already answered questions - let OpenQuestionSelfAssessment handle results
+        // Only show for new simple QROC submissions
+        const shouldShowInline = (submitted && isSimpleQroc && !showSelfAssessment && !assessmentCompleted && !isAnswered);
+        if (!shouldShowInline) return null;
 
         return (
           <div className="rounded-xl border border-gray-200/80 dark:border-gray-700/60 bg-white dark:bg-neutral-900 p-4 sm:p-5 shadow-sm space-y-3">
@@ -834,9 +842,13 @@ export function OpenQuestion({
     {(() => {
       const showInput = (!submitted || keepInputAfterSubmit) && (!hideActions || disableIndividualSubmit);
       const showSelfAssessmentInPlace = showSelfAssessment && (!hideImmediateResults || showDeferredSelfAssessment);
+      // Show self-assessment results for active evaluation OR for pre-answered questions with results
       const showSelfAssessmentResults = assessmentCompleted && submitted;
       
-      if (showSelfAssessmentInPlace || showSelfAssessmentResults) {
+      // Debug: Always show self-assessment if submitted and not already answered (for new submissions)
+      const shouldShowSelfAssessment = showSelfAssessmentInPlace || showSelfAssessmentResults || (submitted && !isAnswered && hasSubmitted);
+      
+      if (shouldShowSelfAssessment) {
         return (
           <div ref={selfAssessmentRef} className="pt-2">
             <OpenQuestionSelfAssessment
@@ -845,7 +857,23 @@ export function OpenQuestion({
               questionId={question.id}
               enableHighlighting={enableAnswerHighlighting}
               highlightConfirm={highlightConfirm}
-              selectedRating={deferredAssessmentResult}
+              selectedRating={(() => {
+                // For QROC questions with self-assessment, only use deferredAssessmentResult
+                // Ignore answerResult since these questions need manual evaluation
+                const useOnlyDeferredResult = showDeferredSelfAssessment || (!hideImmediateResults && showSelfAssessment);
+                const rating = isAnswered ? 
+                  (useOnlyDeferredResult ? deferredAssessmentResult : (deferredAssessmentResult || answerResult)) : 
+                  (assessmentCompleted ? (deferredAssessmentResult || null) : null);
+                console.log('selectedRating calculation:', {
+                  isAnswered,
+                  assessmentCompleted,
+                  answerResult,
+                  deferredAssessmentResult,
+                  useOnlyDeferredResult,
+                  finalRating: rating
+                });
+                return rating;
+              })()}
               correctAnswer={(question.correct_answers || question.correctAnswers || []).join(', ') || question.explanation || ''}
             />
           </div>
@@ -870,25 +898,44 @@ export function OpenQuestion({
   {/* Persistent reference + user answer block (including during self-assessment) */}
   {(() => {
     // Avoid duplicate reference/self-assessment when wrapped in simple QROC container
-    const usingWrapper = submitted && !hideImmediateResults && !disableIndividualSubmit;
+    // But always show results for already answered questions with results
+    const usingWrapper = submitted && !hideImmediateResults && !disableIndividualSubmit && !isAnswered;
     if (usingWrapper) return null;
-    const canShowReference = submitted && expectedReference && (!hideImmediateResults || (showSelfAssessment && showDeferredSelfAssessment) || assessmentCompleted) && !showSelfAssessment && !assessmentCompleted;
+    // Show results only for new submissions, not for already answered questions  
+    // Already answered questions use the OpenQuestionSelfAssessment component for results
+    const canShowReference = submitted && expectedReference && (!hideImmediateResults || (showSelfAssessment && showDeferredSelfAssessment) || assessmentCompleted) && !showSelfAssessment && !isAnswered;
+    
     if (!canShowReference) return null;
     
     // After self-assessment completion, show user's answer instead of correct answer
-    const displayText = shouldShowUserAnswer ? (submittedAnswer || answer || "Aucune réponse saisie") : expectedReference;
-    const titleText = shouldShowUserAnswer ? "Votre réponse" : "Réponse";
+    const showUserAnswerForResults = shouldShowUserAnswer;
+    const displayText = showUserAnswerForResults ? (submittedAnswer || userAnswer || answer || "Aucune réponse saisie") : expectedReference;
+    const titleText = showUserAnswerForResults ? "Votre réponse" : "Réponse de référence";
     
     return (
       <div className="mt-0.5">
-        <div className={`rounded-xl border ${shouldShowUserAnswer ? getEvaluationColors(deferredAssessmentResult || answerResult).border : 'border-emerald-300/60 dark:border-emerald-600/70'} ${shouldShowUserAnswer ? getEvaluationColors(deferredAssessmentResult || answerResult).background : 'bg-emerald-50/80 dark:bg-emerald-900/50'} px-6 py-2 shadow-sm`}>
+        <div className={`rounded-xl border ${showUserAnswerForResults ? getEvaluationColors(deferredAssessmentResult || answerResult).border : 'border-emerald-300/60 dark:border-emerald-600/70'} ${showUserAnswerForResults ? getEvaluationColors(deferredAssessmentResult || answerResult).background : 'bg-emerald-50/80 dark:bg-emerald-900/50'} px-6 py-2 shadow-sm`}>
           <div className="mb-2">
-            <h3 className={`text-base md:text-lg font-bold tracking-tight ${shouldShowUserAnswer ? getEvaluationColors(deferredAssessmentResult || answerResult).text : 'text-emerald-800 dark:text-emerald-50'}`}>{titleText}</h3>
+            <h3 className={`text-base md:text-lg font-bold tracking-tight ${showUserAnswerForResults ? getEvaluationColors(deferredAssessmentResult || answerResult).text : 'text-emerald-800 dark:text-emerald-50'}`}>{titleText}</h3>
           </div>
-          <div className={`prose prose-sm md:prose-base dark:prose-invert max-w-none leading-relaxed ${shouldShowUserAnswer ? getEvaluationColors(deferredAssessmentResult || answerResult).text : 'text-emerald-800 dark:text-emerald-50'}`}>
+          <div className={`prose prose-sm md:prose-base dark:prose-invert max-w-none leading-relaxed ${showUserAnswerForResults ? getEvaluationColors(deferredAssessmentResult || answerResult).text : 'text-emerald-800 dark:text-emerald-50'}`}>
             <RichTextDisplay text={displayText} enableImageZoom={true} />
           </div>
         </div>
+        
+        {/* Show reference answer when displaying user results and reference exists */}
+        {showUserAnswerForResults && expectedReference && (
+          <div className="mt-3">
+            <div className="rounded-xl border border-emerald-300/60 dark:border-emerald-600/70 bg-emerald-50/80 dark:bg-emerald-900/50 px-6 py-2 shadow-sm">
+              <div className="mb-2">
+                <h3 className="text-base md:text-lg font-bold tracking-tight text-emerald-800 dark:text-emerald-50">Réponse de référence</h3>
+              </div>
+              <div className="prose prose-sm md:prose-base dark:prose-invert max-w-none leading-relaxed text-emerald-800 dark:text-emerald-50">
+                <RichTextDisplay text={expectedReference} enableImageZoom={true} />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   })()}
@@ -924,7 +971,7 @@ export function OpenQuestion({
       )}
 
   {/* Rappel du cours (après soumission) */}
-  {submitted && !suppressReminder && (() => {
+  {submitted && !suppressReminder && !showSelfAssessment && (() => {
     const text = (question as any).course_reminder || (question as any).courseReminder || question.explanation;
     const reminderMediaUrl = (question as any).course_reminder_media_url || (question as any).courseReminderMediaUrl;
     const reminderMediaType = (question as any).course_reminder_media_type || (question as any).courseReminderMediaType;
