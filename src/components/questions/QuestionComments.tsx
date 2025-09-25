@@ -35,22 +35,21 @@ export function QuestionComments({ questionId, commentType = 'regular' }: Questi
   const [comments, setComments] = useState<QComment[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [text, setText] = useState('');
   const [postAnonymous, setPostAnonymous] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState('');
   const [replyParentId, setReplyParentId] = useState<string | null>(null);
-  const [replyText, setReplyText] = useState('');
   const [replyImages, setReplyImages] = useState<any[]>([]); // Images for replies
   const [images, setImages] = useState<string[]>([]); // base64 or hosted URLs
   const [expandedReplies, setExpandedReplies] = useState<Set<string>>(new Set());
+  const [lastFocusedInput, setLastFocusedInput] = useState<'main' | 'reply' | null>(null);
+  const [mainInputHasContent, setMainInputHasContent] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const commentsEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // --- Text direction helpers: simply strip bidi control chars (no LRM insertion) ---
+  // --- Text direction helpers: minimal processing ---
   const stripControlChars = (val: string) => val.replace(/[\u202A-\u202E\u2066-\u2069\u200E\u200F]/g, '');
-  const normalizeLTR = (val: string) => stripControlChars(val);
   const displayText = (val: string) => stripControlChars(val);
 
   // Auto-resize function for textareas
@@ -83,20 +82,12 @@ export function QuestionComments({ questionId, commentType = 'regular' }: Questi
     textarea.style.overflowY = scrollHeight > maxHeight ? 'auto' : 'hidden';
   };
 
-  const canPostRoot = !!ownerId && (displayText(text).trim().length > 0 || images.length > 0) && !submitting;
-  const canPostReply = !!ownerId && replyParentId && (displayText(replyText).trim().length > 0 || replyImages.length > 0) && !submitting;
+  const canPostRoot = !!ownerId && (mainInputHasContent || images.length > 0) && !submitting;
 
-  // Main comment input handlers
-  const handleMainInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    e.target.style.direction = 'ltr';
-    const value = normalizeLTR(e.target.value);
-    setText(value);
-  };
+
 
   const handleMainInputFocus = (e: React.FocusEvent<HTMLTextAreaElement>) => {
-    e.target.style.direction = 'ltr';
-    e.target.style.textAlign = 'left';
-    e.target.style.unicodeBidi = 'plaintext';
+    setLastFocusedInput('main');
   };  const load = useMemo(() => async () => {
     try {
       setLoading(true);
@@ -141,12 +132,7 @@ export function QuestionComments({ questionId, commentType = 'regular' }: Questi
     }
   }, [replyParentId, comments]);
 
-  // Auto-resize main textarea when text changes
-  useEffect(() => {
-    if (textareaRef.current) {
-      autoResizeTextarea(textareaRef.current);
-    }
-  }, [text]);
+
 
   const insertReply = (nodes: QComment[], parentId: string, newNode: QComment): QComment[] =>
     nodes.map(n => n.id === parentId
@@ -165,8 +151,10 @@ export function QuestionComments({ questionId, commentType = 'regular' }: Questi
       return; 
     }
     
-  const contentRaw = parentId ? (contentOverride || replyText) : text;
-  const content = displayText(contentRaw).trim();
+    const contentRaw = parentId 
+      ? (contentOverride || '') 
+      : (textareaRef.current?.value || '');
+    const content = contentRaw.trim();
     const imgs = imageList || (parentId ? replyImages.map(img => img.url) : images);
     
     if (!content && imgs.length === 0) return;
@@ -194,12 +182,16 @@ export function QuestionComments({ questionId, commentType = 'regular' }: Questi
       if (parentId) {
         setComments(prev => insertReply(prev, parentId, created));
         setReplyParentId(null);
-        setReplyText('');
         setReplyImages([]);
+        // Reply input will be cleared by the ReplyComponent itself
       } else {
         setComments(prev => [created, ...prev]);
-        setText('');
         setImages([]);
+        if (textareaRef.current) {
+          textareaRef.current.value = '';
+          autoResizeTextarea(textareaRef.current);
+          setMainInputHasContent(false);
+        }
       }
     } catch { 
       toast({ title: 'Erreur', description: 'Échec de l\'ajout du commentaire', variant: 'destructive' }); 
@@ -210,7 +202,7 @@ export function QuestionComments({ questionId, commentType = 'regular' }: Questi
 
   const beginEdit = (c: QComment) => {
     setEditingId(c.id);
-    setEditText(normalizeLTR(displayText(c.content)));
+    setEditText(displayText(c.content));
   };
   const cancelEdit = () => {
     setEditingId(null);
@@ -218,14 +210,14 @@ export function QuestionComments({ questionId, commentType = 'regular' }: Questi
   };
   
   const saveEdit = async (id: string) => {
-    if (!displayText(editText).trim()) return;
+    if (!editText.trim()) return;
     try {
       const apiEndpoint = commentType === 'clinical-case' ? '/api/clinical-case-comments' : '/api/question-comments';
       const res = await fetch(`${apiEndpoint}/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          content: displayText(editText).trim(),
+          content: editText.trim(),
           imageUrls: [] // Keep existing images, don't modify them in edit mode
         })
       });
@@ -252,7 +244,6 @@ export function QuestionComments({ questionId, commentType = 'regular' }: Questi
 
   const startReply = (id: string) => { 
     setReplyParentId(id); 
-    setReplyText('');
     setReplyImages([]);
   };
 
@@ -270,7 +261,6 @@ export function QuestionComments({ questionId, commentType = 'regular' }: Questi
   
   const cancelReply = () => { 
     setReplyParentId(null); 
-    setReplyText('');
     setReplyImages([]);
   };
 
@@ -302,46 +292,52 @@ export function QuestionComments({ questionId, commentType = 'regular' }: Questi
   // Enhanced Reply Component with Image Support
   const ReplyComponent = ({ parentId, parentUserName }: { parentId: string; parentUserName: string }) => {
     const replyInputRef = useRef<HTMLTextAreaElement>(null);
+    const [replyInputHasContent, setReplyInputHasContent] = useState(false);
+    
+    const canPostReply = !!ownerId && (replyInputHasContent || replyImages.length > 0) && !submitting;
     
     useEffect(() => {
       if (replyInputRef.current) {
-        replyInputRef.current.focus();
-        replyInputRef.current.style.direction = 'ltr';
         autoResizeReplyTextarea(replyInputRef.current);
+        // Only auto-focus if the user wasn't just typing in the main input
+        if (lastFocusedInput !== 'main') {
+          setTimeout(() => {
+            if (replyInputRef.current && document.activeElement !== textareaRef.current) {
+              replyInputRef.current.focus();
+            }
+          }, 100);
+        }
       }
-    }, []);
+    }, [lastFocusedInput]);
 
-    // Auto-resize when reply text changes
-    useEffect(() => {
-      if (replyInputRef.current) {
-        autoResizeReplyTextarea(replyInputRef.current);
-      }
-    }, [replyText]);
 
-    const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      e.target.style.direction = 'ltr';
-      const value = normalizeLTR(e.target.value);
-      setReplyText(value);
-    };
+
+
 
     const handleFocus = (e: React.FocusEvent<HTMLTextAreaElement>) => {
-      e.target.style.direction = 'ltr';
-      e.target.style.textAlign = 'left';
-      e.target.style.unicodeBidi = 'plaintext';
+      setLastFocusedInput('reply');
     };    const handleSubmitReply = () => {
-      if (canPostReply) {
-        add(parentId, replyText);
+      const value = replyInputRef.current?.value.trim() || '';
+      if (value || replyImages.length > 0) {
+        add(parentId, value);
       }
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
+      // Always stop propagation for navigation-sensitive keys
+      if (['Enter', 'Escape', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+        e.stopPropagation();
+      }
+      
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        if (canPostReply) {
+        const value = replyInputRef.current?.value.trim() || '';
+        if (value || replyImages.length > 0) {
           handleSubmitReply();
         }
       }
       if (e.key === 'Escape') {
+        e.preventDefault();
         cancelReply();
       }
     };
@@ -352,35 +348,33 @@ export function QuestionComments({ questionId, commentType = 'regular' }: Questi
         <div className="absolute -left-6 sm:-left-8 top-0 w-2 sm:w-3 h-5 border-l-2 border-b-2 border-gray-300 dark:border-gray-600 rounded-bl-lg"></div>
         
         <div className="flex-1 space-y-2 min-w-0">
-        <div className="comments-ltr-override bg-gray-100 dark:bg-gray-800 rounded-full px-3 sm:px-4 py-2 min-h-[32px] sm:min-h-[36px] flex items-center">
+        <div className="bg-gray-100 dark:bg-gray-800 rounded-full px-3 sm:px-4 py-2 min-h-[32px] sm:min-h-[36px] flex items-center">
           <textarea
             ref={replyInputRef}
-            value={replyText}
-            onChange={handleInputChange}
+            defaultValue=""
             onInput={(e) => {
               if (replyInputRef.current) {
                 autoResizeReplyTextarea(replyInputRef.current);
+                setReplyInputHasContent(replyInputRef.current.value.trim().length > 0);
               }
             }}
-            onFocus={handleFocus}
+            onFocus={(e) => {
+              e.stopPropagation(); // Prevent focus events from affecting parent navigation
+              handleFocus(e);
+            }}
             onKeyDown={handleKeyDown}
             placeholder={`Répondre à ${parentUserName}...`}
-            className="force-ltr flex-1 bg-transparent border-none outline-none resize-none text-xs sm:text-sm placeholder:text-gray-500 dark:placeholder:text-gray-400"
+            className="flex-1 bg-transparent border-none outline-none resize-none text-xs sm:text-sm placeholder:text-gray-500 dark:placeholder:text-gray-400"
             style={{ 
               minHeight: '18px', 
-              maxHeight: '100px', 
-              direction: 'ltr', 
-              textAlign: 'left', 
-              unicodeBidi: 'plaintext',
-              writingMode: 'horizontal-tb',
-              textOrientation: 'mixed'
+              maxHeight: '100px',
+              direction: 'ltr',
+              textAlign: 'left'
             }}
             rows={1}
             dir="ltr"
-            lang="en"
             autoCorrect="off"
-            autoCapitalize="none"
-            inputMode="text"
+            autoCapitalize="off"
             autoComplete="off"
             spellCheck="false"
           />
@@ -409,7 +403,7 @@ export function QuestionComments({ questionId, commentType = 'regular' }: Questi
           
           {/* Reply Actions */}
           <div className="flex items-center justify-between pl-4">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <input
                 type="file"
                 accept="image/*"
@@ -452,16 +446,14 @@ export function QuestionComments({ questionId, commentType = 'regular' }: Questi
                 <ImageIcon className="h-3 w-3" />
                 <span className="hidden xs:inline">Photo</span>
               </label>
-            </div>
-            
-            <div className="flex items-center gap-1.5 sm:gap-2">
+
               <button
                 type="button"
                 onClick={cancelReply}
-                className="text-xs text-gray-500 hover:text-gray-700 transition-colors px-1"
+                className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
               >
+                <X className="h-3 w-3" />
                 <span className="hidden xs:inline">Annuler</span>
-                <span className="xs:hidden">×</span>
               </button>
             </div>
           </div>
@@ -471,7 +463,7 @@ export function QuestionComments({ questionId, commentType = 'regular' }: Questi
           size="sm"
           disabled={!canPostReply}
           onClick={handleSubmitReply}
-          className="h-8 w-8 sm:h-9 sm:w-auto sm:px-3 rounded-full bg-blue-500 hover:bg-blue-600 text-white flex-shrink-0 p-0 sm:p-2"
+          className="h-8 w-8 sm:h-9 sm:w-auto sm:px-3 sm:rounded-lg rounded-full bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white flex-shrink-0 p-0 sm:p-2 transition-all duration-200"
         >
           {submitting ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -589,7 +581,7 @@ export function QuestionComments({ questionId, commentType = 'regular' }: Questi
               <div className="bg-gray-100 dark:bg-gray-800 rounded-2xl px-4 py-3">
                 <textarea
                   value={editText}
-                  onChange={(e) => setEditText(normalizeLTR(e.target.value))}
+                  onChange={(e) => setEditText(e.target.value)}
                   placeholder="Modifier votre commentaire..."
                   className="w-full bg-transparent border-none outline-none resize-none text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400"
                   rows={3}
@@ -763,41 +755,53 @@ export function QuestionComments({ questionId, commentType = 'regular' }: Questi
 
                 {/* Input Area */}
                 <div className="flex-1 min-w-0">
-                  <div className="comments-ltr-override bg-gray-100 dark:bg-gray-800 rounded-full px-3 sm:px-4 py-2 min-h-[36px] sm:min-h-[40px] flex items-center">
+                  <div className="bg-gray-100 dark:bg-gray-800 rounded-full px-3 sm:px-4 py-2 min-h-[36px] sm:min-h-[40px] flex items-center">
                     <textarea
                       ref={textareaRef}
-                      value={text}
-                      onChange={handleMainInputChange}
+                      defaultValue=""
                       onInput={(e) => {
                         if (textareaRef.current) {
                           autoResizeTextarea(textareaRef.current);
+                          setMainInputHasContent(textareaRef.current.value.trim().length > 0);
                         }
                       }}
-                      onFocus={handleMainInputFocus}
+                      onFocus={(e) => {
+                        e.stopPropagation(); // Prevent focus events from affecting parent navigation
+                        handleMainInputFocus(e);
+                      }}
                       onKeyDown={(e) => {
+                        // Always stop propagation for navigation-sensitive keys
+                        if (['Enter', 'Escape', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+                          e.stopPropagation();
+                        }
+                        
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();
-                          if (canPostRoot) add();
+                          const value = textareaRef.current?.value.trim() || '';
+                          if (value || images.length > 0) {
+                            add();
+                          }
                         }
                         if (e.key === 'Escape') {
-                          setText('');
+                          e.preventDefault();
+                          if (textareaRef.current) {
+                            textareaRef.current.value = '';
+                            autoResizeTextarea(textareaRef.current);
+                            setMainInputHasContent(false);
+                          }
                           setImages([]);
                         }
                       }}
                       placeholder="Écrire un commentaire..."
-                      className="force-ltr flex-1 bg-transparent border-none outline-none resize-none text-xs sm:text-sm placeholder:text-gray-500 dark:placeholder:text-gray-400"
+                      className="flex-1 bg-transparent border-none outline-none resize-none text-xs sm:text-sm placeholder:text-gray-500 dark:placeholder:text-gray-400"
                       style={{ 
                         minHeight: '20px', 
-                        maxHeight: '100px', 
-                        direction: 'ltr', 
-                        textAlign: 'left', 
-                        unicodeBidi: 'plaintext',
-                        writingMode: 'horizontal-tb',
-                        textOrientation: 'mixed'
+                        maxHeight: '100px',
+                        direction: 'ltr',
+                        textAlign: 'left'
                       }}
                       rows={1}
                       dir="ltr"
-                      lang="en"
                       autoCorrect="off"
                       autoCapitalize="none"
                       inputMode="text"
@@ -812,7 +816,7 @@ export function QuestionComments({ questionId, commentType = 'regular' }: Questi
                   size="sm"
                   disabled={!canPostRoot}
                   onClick={() => add()}
-                  className="h-9 w-9 sm:h-10 sm:w-auto sm:px-4 rounded-full bg-blue-500 hover:bg-blue-600 text-white flex-shrink-0 p-0 sm:p-2"
+                  className="h-9 w-9 sm:h-10 sm:w-auto sm:px-4 sm:rounded-lg rounded-full bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white flex-shrink-0 p-0 sm:p-2 transition-all duration-200"
                 >
                   {submitting ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
