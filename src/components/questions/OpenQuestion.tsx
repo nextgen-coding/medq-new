@@ -412,8 +412,17 @@ export function OpenQuestion({
       // The actual result will be determined when "Show Results" is clicked
       onSubmit(answer, 'partial'); // Use 'partial' as default for clinic questions
     } else {
-      // For regular questions, show self-assessment; do not auto-scroll away from the question
-      setShowSelfAssessment(true);
+      // For regular questions, check if answer is empty
+      const isEmpty = !answer || answer.trim() === '';
+      
+      if (isEmpty) {
+        // If answer is empty, skip self-assessment and go directly to results
+        setAssessmentCompleted(true);
+        onSubmit(answer, false); // false indicates incorrect/no answer (empty submission)
+      } else {
+        // For non-empty answers, show self-assessment
+        setShowSelfAssessment(true);
+      }
       // Intentionally no scroll to "Rappel du cours"; keep the question and its answer visible in place
     }
 
@@ -622,12 +631,8 @@ export function OpenQuestion({
       if (!submitted && !isTyping && event.key === 'Enter' && !event.shiftKey) {
         if (disableIndividualSubmit && hideImmediateResults) return; // blocked in grouped mode
         event.preventDefault();
-        if (answer.trim()) {
-          handleSubmit();
-        } else {
-          // Allow skipping to next question even if no answer provided
-          onNext();
-        }
+        // Always call handleSubmit, it now properly handles empty answers
+        handleSubmit();
         return;
       }
 
@@ -853,7 +858,6 @@ export function OpenQuestion({
           setAnswer={setAnswer}
           isSubmitted={submitted && !keepInputAfterSubmit}
           onSubmit={handleSubmit}
-          onSkip={onNext}
           onBlur={handleBlur}
           isActive={autoFocus}
           disableEnterKey={disableEnterHandlers}
