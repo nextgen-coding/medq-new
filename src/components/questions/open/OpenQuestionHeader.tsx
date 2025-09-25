@@ -53,12 +53,8 @@ export function OpenQuestionHeader({ questionText, questionNumber, session, lect
   const buildMetadataLine = () => {
     const parts: string[] = [];
     
-    // Always start with QROC
-    if (questionNumber !== undefined) {
-      parts.push(`QROC ${questionNumber}`);
-    } else {
-      parts.push('QROC');
-    }
+    // Always start with QROC (without number)
+    parts.push('qroc');
     
     // Add session info if available
     const formattedSession = formatSession(session);

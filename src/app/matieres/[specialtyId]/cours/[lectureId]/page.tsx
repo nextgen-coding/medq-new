@@ -732,11 +732,11 @@ export default function CoursPageRoute() {
                           const question = currentQuestion as any;
                           const parts: string[] = [];
                           
-                          // Add question type and number
+                          // Add question type (without number for QROC)
                           if (question.type === 'mcq') {
                             parts.push(`QCM ${question.number ?? currentQuestionIndex + 1}`);
                           } else if (question.type === 'qroc' || question.type === 'open') {
-                            parts.push(`QROC ${question.number ?? currentQuestionIndex + 1}`);
+                            parts.push(`qroc`);
                           } else {
                             parts.push(`${(question.type || '').toUpperCase()} ${question.number ?? currentQuestionIndex + 1}`);
                           }

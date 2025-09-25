@@ -508,11 +508,11 @@ export default function QuestionsEpingleesTestPage() {
                           {(() => {
                             const parts: string[] = [];
                             
-                            // Add question type and number
+                            // Add question type (without number for QROC)
                             if (currentQuestion.type === 'mcq') {
                               parts.push(`QCM ${currentQuestion.number ?? currentQuestionIndex + 1}`);
                             } else if (currentQuestion.type === 'qroc' || currentQuestion.type === 'open') {
-                              parts.push(`QROC ${currentQuestion.number ?? currentQuestionIndex + 1}`);
+                              parts.push(`qroc`);
                             } else {
                               parts.push(`${(currentQuestion.type || '').toUpperCase()} ${currentQuestion.number ?? currentQuestionIndex + 1}`);
                             }

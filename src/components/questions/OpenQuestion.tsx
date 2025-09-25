@@ -673,7 +673,8 @@ export function OpenQuestion({
         
         const canShowReferenceInline = submitted && expectedReferenceInline && (!hideImmediateResults || (showSelfAssessment && showDeferredSelfAssessment) || assessmentCompleted) && !showSelfAssessment;
 
-        if (!(submitted && isSimpleQroc)) return null;
+        // Don't show the card wrapper - we want the original question format with inline evaluation
+        if (!(submitted && isSimpleQroc && !showSelfAssessment && !assessmentCompleted)) return null;
 
         return (
           <div className="rounded-xl border border-gray-200/80 dark:border-gray-700/60 bg-white dark:bg-neutral-900 p-4 sm:p-5 shadow-sm space-y-3">
@@ -702,21 +703,7 @@ export function OpenQuestion({
               </div>
             )}
 
-            {/* Self assessment within the card (flat variant) */}
-            {showSelfAssessment && (!hideImmediateResults || showDeferredSelfAssessment) && (
-              <div ref={selfAssessmentRef}>
-                <OpenQuestionSelfAssessment
-                  onAssessment={handleSelfAssessment}
-                  userAnswerText={submittedAnswer || (submitted ? answer : undefined)}
-                  questionId={question.id}
-                  enableHighlighting={enableAnswerHighlighting}
-                  highlightConfirm={highlightConfirm}
-                  variant="flat"
-                  selectedRating={deferredAssessmentResult}
-                  correctAnswer={(question.correct_answers || question.correctAnswers || []).join(', ') || question.explanation || ''}
-                />
-              </div>
-            )}
+            {/* Self assessment is now shown in place of the input area */}
           </div>
         );
       })()}
@@ -724,8 +711,7 @@ export function OpenQuestion({
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
         <div className="flex-1 min-w-0 max-w-5xl">
           {/* Always ensure question text is visible - either in header or inline */}
-          {!hideMeta && 
-           !(submitted && !hideImmediateResults && !disableIndividualSubmit) && (
+          {!hideMeta && (
             <OpenQuestionHeader 
               questionText={question.text} 
               questionNumber={question.number}
@@ -740,15 +726,9 @@ export function OpenQuestion({
             />
           )}
           {/* Show inline question text when hideMeta is true - with optional eye button */}
-          {hideMeta && 
-           !(submitted && !hideImmediateResults && !disableIndividualSubmit) && (
+          {hideMeta && (
             <>
               <div className="flex items-start gap-3 mb-2">
-                {question.number && (
-                  <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold tracking-wide flex-shrink-0 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                    Question {question.number}
-                  </span>
-                )}
                 <div className="flex-1 min-w-0">
                   <HighlightableQuestionText
                     questionId={question.id}
@@ -829,8 +809,8 @@ export function OpenQuestion({
       </div>
     )}
 
-    {/* Show user answer in clinical/grouped mode after self-assessment */}
-    {hideActions && isAnswered && userAnswer && disableIndividualSubmit && hideImmediateResults && (assessmentCompleted || shouldShowUserAnswer) && (
+    {/* Show user answer in clinical/grouped mode after self-assessment - but not when showing self-assessment inline */}
+    {hideActions && isAnswered && userAnswer && disableIndividualSubmit && hideImmediateResults && (assessmentCompleted || shouldShowUserAnswer) && !showSelfAssessment && (
       <div className="mt-4">
         <div className={`rounded-xl border ${shouldShowUserAnswer ? getEvaluationColors(deferredAssessmentResult || answerResult).border : 'border-emerald-300/60 dark:border-emerald-600/70'} ${shouldShowUserAnswer ? getEvaluationColors(deferredAssessmentResult || answerResult).background : 'bg-emerald-50/80 dark:bg-emerald-900/50'} px-6 py-3 shadow-sm`}>
           <div className="mb-2">
@@ -845,12 +825,29 @@ export function OpenQuestion({
       </div>
     )}
 
-    {/* Show input field: even when actions are hidden in grouped clinical cases (disableIndividualSubmit),
-        we still need the input visible so users can type their answer. */}
+    {/* Show input field OR self-assessment */}
     {(() => {
       const showInput = (!submitted || keepInputAfterSubmit) && (!hideActions || disableIndividualSubmit);
-      return showInput;
-    })() && (
+      const showSelfAssessmentInPlace = showSelfAssessment && (!hideImmediateResults || showDeferredSelfAssessment);
+      const showSelfAssessmentResults = assessmentCompleted && submitted;
+      
+      if (showSelfAssessmentInPlace || showSelfAssessmentResults) {
+        return (
+          <div ref={selfAssessmentRef} className="pt-2">
+            <OpenQuestionSelfAssessment
+              onAssessment={handleSelfAssessment}
+              userAnswerText={submittedAnswer || (submitted ? answer : undefined)}
+              questionId={question.id}
+              enableHighlighting={enableAnswerHighlighting}
+              highlightConfirm={highlightConfirm}
+              selectedRating={deferredAssessmentResult}
+              correctAnswer={(question.correct_answers || question.correctAnswers || []).join(', ') || question.explanation || ''}
+            />
+          </div>
+        );
+      }
+      
+      return showInput ? (
         <OpenQuestionInput
           answer={answer}
           setAnswer={setAnswer}
@@ -861,7 +858,8 @@ export function OpenQuestion({
           isActive={autoFocus}
           disableEnterKey={disableEnterHandlers}
         />
-      )}
+      ) : null;
+    })()}
 
   {/* Reference answer now shown inside self-assessment panel */}
 
@@ -870,7 +868,7 @@ export function OpenQuestion({
     // Avoid duplicate reference/self-assessment when wrapped in simple QROC container
     const usingWrapper = submitted && !hideImmediateResults && !disableIndividualSubmit;
     if (usingWrapper) return null;
-    const canShowReference = submitted && expectedReference && (!hideImmediateResults || (showSelfAssessment && showDeferredSelfAssessment) || assessmentCompleted) && !showSelfAssessment;
+    const canShowReference = submitted && expectedReference && (!hideImmediateResults || (showSelfAssessment && showDeferredSelfAssessment) || assessmentCompleted) && !showSelfAssessment && !assessmentCompleted;
     if (!canShowReference) return null;
     
     // After self-assessment completion, show user's answer instead of correct answer
@@ -891,24 +889,7 @@ export function OpenQuestion({
     );
   })()}
 
-  {(() => {
-    const usingWrapper = submitted && !hideImmediateResults && !disableIndividualSubmit;
-    if (usingWrapper) return null;
-    if (!(showSelfAssessment && (!hideImmediateResults || showDeferredSelfAssessment))) return null;
-    return (
-      <div ref={selfAssessmentRef} className="pt-4 -mx-3 px-3">
-        <OpenQuestionSelfAssessment
-          onAssessment={handleSelfAssessment}
-          userAnswerText={submittedAnswer || (submitted ? answer : undefined)}
-          questionId={question.id}
-          enableHighlighting={enableAnswerHighlighting}
-          highlightConfirm={highlightConfirm}
-          selectedRating={deferredAssessmentResult}
-          correctAnswer={(question.correct_answers || question.correctAnswers || []).join(', ') || question.explanation || ''}
-        />
-      </div>
-    );
-  })()}
+    {/* Self-assessment panel is now rendered inline above, replacing the input */}
 
       {!hideActions && (
         <OpenQuestionActions

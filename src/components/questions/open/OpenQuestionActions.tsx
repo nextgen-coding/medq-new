@@ -68,7 +68,7 @@ export function OpenQuestionActions({
           <div className="flex justify-end">
             <Button
               onClick={onSubmit}
-              disabled={!canSubmit || !currentAnswer.trim()}
+              disabled={!canSubmit}
               className="flex items-center gap-1 w-full xs:w-auto text-xs sm:text-sm"
             >
               <SendHorizontal className="h-4 w-4" />
