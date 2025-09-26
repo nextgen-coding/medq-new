@@ -81,6 +81,7 @@ model User {
   commentLikes          CommentLike[]
   activities            UserActivity[]
   highlightColor        String?         @map("highlight_color")
+  showSelfAssessment    Boolean         @default(true) @map("show_self_assessment")
   // Added reverse relations for session corrections
   sessionCorrections            SessionCorrection[]
   sessionCorrectionSubmissions  SessionCorrectionSubmission[]

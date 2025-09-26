@@ -163,7 +163,7 @@ export function OpenQuestionSelfAssessment({ onAssessment, userAnswerText, quest
                         <div className="flex flex-col xs:flex-row gap-3 w-full">
                           <Button
                             size="lg"
-                            className="flex items-center justify-center gap-2 px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-medium rounded-full transition-all duration-200 flex-1"
+                            className="flex items-center justify-center gap-2 px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-medium rounded-lg transition-all duration-200 flex-1"
                             onClick={() => handleRatingSelect('correct')}
                           >
                             <CheckCircle className="h-4 w-4" />
@@ -172,7 +172,7 @@ export function OpenQuestionSelfAssessment({ onAssessment, userAnswerText, quest
 
                           <Button
                             size="lg" 
-                            className="flex items-center justify-center gap-2 px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-full transition-all duration-200 flex-1"
+                            className="flex items-center justify-center gap-2 px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-lg transition-all duration-200 flex-1"
                             onClick={() => handleRatingSelect('partial')}
                           >
                             <MinusCircle className="h-4 w-4" />
@@ -181,7 +181,7 @@ export function OpenQuestionSelfAssessment({ onAssessment, userAnswerText, quest
 
                           <Button
                             size="lg"
-                            className="flex items-center justify-center gap-2 px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-medium rounded-full transition-all duration-200 flex-1"
+                            className="flex items-center justify-center gap-2 px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-medium rounded-lg transition-all duration-200 flex-1"
                             onClick={() => handleRatingSelect('wrong')}
                           >
                             <XCircle className="h-4 w-4" />
@@ -226,7 +226,7 @@ export function OpenQuestionSelfAssessment({ onAssessment, userAnswerText, quest
                   <div className="flex flex-col xs:flex-row gap-3 w-full">
                     <Button
                       size="lg"
-                      className="flex items-center justify-center gap-2 px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-medium rounded-full transition-all duration-200 flex-1"
+                      className="flex items-center justify-center gap-2 px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-medium rounded-lg transition-all duration-200 flex-1"
                       onClick={() => handleRatingSelect('correct')}
                     >
                       <CheckCircle className="h-4 w-4" />
@@ -235,7 +235,7 @@ export function OpenQuestionSelfAssessment({ onAssessment, userAnswerText, quest
 
                     <Button
                       size="lg" 
-                      className="flex items-center justify-center gap-2 px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-full transition-all duration-200 flex-1"
+                      className="flex items-center justify-center gap-2 px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-lg transition-all duration-200 flex-1"
                       onClick={() => handleRatingSelect('partial')}
                     >
                       <MinusCircle className="h-4 w-4" />
@@ -244,7 +244,7 @@ export function OpenQuestionSelfAssessment({ onAssessment, userAnswerText, quest
 
                     <Button
                       size="lg"
-                      className="flex items-center justify-center gap-2 px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-medium rounded-full transition-all duration-200 flex-1"
+                      className="flex items-center justify-center gap-2 px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-medium rounded-lg transition-all duration-200 flex-1"
                       onClick={() => handleRatingSelect('wrong')}
                     >
                       <XCircle className="h-4 w-4" />

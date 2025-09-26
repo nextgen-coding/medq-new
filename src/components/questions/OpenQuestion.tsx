@@ -421,14 +421,21 @@ export function OpenQuestion({
       // For regular questions, check if answer is empty
       const isEmpty = !answer || answer.trim() === '';
       
+      // Check user's self-assessment preference
+      const shouldShowSelfAssessment = (user as any)?.showSelfAssessment ?? true;
+      
       if (isEmpty) {
         // If answer is empty, skip self-assessment and go directly to results
         setAssessmentCompleted(true);
         onSubmit(answer, false); // false indicates incorrect/no answer (empty submission)
-      } else {
-        // For non-empty answers, show self-assessment
+      } else if (shouldShowSelfAssessment) {
+        // For non-empty answers, show self-assessment if user prefers it
         setAssessmentCompleted(false); // Reset assessment state for new evaluation
         setShowSelfAssessment(true);
+      } else {
+        // Skip self-assessment if user disabled it, auto-submit with partial result
+        setAssessmentCompleted(true);
+        onSubmit(answer, 'partial'); // Default to partial when self-assessment is disabled
       }
       // Intentionally no scroll to "Rappel du cours"; keep the question and its answer visible in place
     }
@@ -734,7 +741,7 @@ export function OpenQuestion({
       })()}
       
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
-        <div className="flex-1 min-w-0 max-w-5xl">
+        <div className="flex-1 min-w-0 w-full">
           {/* Always ensure question text is visible - either in header or inline */}
           {!hideMeta && (
             <OpenQuestionHeader 

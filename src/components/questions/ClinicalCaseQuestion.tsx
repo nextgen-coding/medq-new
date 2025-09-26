@@ -915,6 +915,26 @@ export function ClinicalCaseQuestion({
     }
   }, [evaluationIndex, evaluationOrder, showResults, evaluationComplete, clinicalCase.questions]);
 
+  // Auto-advance evaluation when self-assessment is disabled
+  useEffect(() => {
+    const userShowsSelfAssessment = (user as any)?.showSelfAssessment ?? true;
+    
+    if (!showResults || evaluationComplete || userShowsSelfAssessment) return;
+    
+    // If self-assessment is disabled, auto-advance through unevaluated questions
+    if (evaluationIndex >= 0 && evaluationIndex < evaluationOrder.length) {
+      const currentQuestionId = evaluationOrder[evaluationIndex];
+      
+      // Check if current question is answered but not evaluated
+      if (answers[currentQuestionId] !== undefined && questionResults[currentQuestionId] === undefined) {
+        // Auto-evaluate as 'partial' when self-assessment is disabled
+        setTimeout(() => {
+          handleSelfAssessmentUpdate(currentQuestionId, 'partial');
+        }, 100);
+      }
+    }
+  }, [showResults, evaluationComplete, evaluationIndex, evaluationOrder, answers, questionResults, user, handleSelfAssessmentUpdate]);
+
   // Scroll to case text when evaluation is complete
   useEffect(() => {
     if (evaluationComplete && showResults) {
@@ -1021,17 +1041,15 @@ export function ClinicalCaseQuestion({
                 <span className="ml-1 text-xs">👈</span>
               )}
             </span>
-            <div className="w-full">
-              {/* Question text line with natural width and evaluation indicator */}
-              <div className="flex items-start flex-wrap gap-2 mb-1">
-                <div className="-mt-1 inline-block">
+            <div className="flex-1 min-w-0 pl-2">
+              {/* Question text line with constrained width to prevent overflow under number */}
+              <div className="flex items-start gap-2 mb-1">
+                <div className="w-full max-w-[calc(100%-3rem)]">
                   {/* Just render the question text here inline */}
                   {((question.type as any) === 'clinic_croq' || (displayMode === 'multi_qroc' && (question.type as any) === 'clinic_croq')) && (
-                    <div className="inline-block">
-                      <span className="text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100 leading-relaxed">
-                        {question.text}
-                      </span>
-                    </div>
+                    <span className="text-base sm:text-lg font-medium text-gray-900 dark:text-gray-100 leading-relaxed break-words block">
+                      {question.text}
+                    </span>
                   )}
                 </div>
                 {/* Removed inline textual evaluation label for QROC after evaluation per request */}
@@ -1097,7 +1115,8 @@ export function ClinicalCaseQuestion({
                       evaluationIndex >= 0 &&
                       evaluationIndex < evaluationOrder.length &&
                       evaluationOrder[evaluationIndex] === question.id &&
-                      questionResults[question.id] === undefined
+                      questionResults[question.id] === undefined &&
+                      ((user as any)?.showSelfAssessment ?? true)
                     }
                     onSelfAssessmentUpdate={handleSelfAssessmentUpdate}
                     hideNotes={true}
@@ -1235,7 +1254,8 @@ export function ClinicalCaseQuestion({
                   evaluationIndex >= 0 &&
                   evaluationIndex < evaluationOrder.length &&
                   evaluationOrder[evaluationIndex] === question.id &&
-                  questionResults[question.id] === undefined
+                  questionResults[question.id] === undefined &&
+                  ((user as any)?.showSelfAssessment ?? true)
                 }
                 onSelfAssessmentUpdate={handleSelfAssessmentUpdate}
                 hideNotes={!showResults}

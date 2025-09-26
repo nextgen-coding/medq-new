@@ -667,7 +667,7 @@ export function MCQQuestion({
     >
       
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
-        <div className="flex-1 min-w-0 max-w-3xl">
+        <div className="flex-1 min-w-0 w-full">
           {!hideMeta && (
             <MCQHeader
               questionText={question.text}

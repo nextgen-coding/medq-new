@@ -13,7 +13,7 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const { name, sexe, niveauId, semesterId, faculty, image, highlightColor, email } = await request.json();
+    const { name, sexe, niveauId, semesterId, faculty, image, highlightColor, email, showSelfAssessment } = await request.json();
 
     // Validate input
     if (!name || !sexe || !niveauId) {
@@ -75,6 +75,7 @@ export async function PUT(request: NextRequest) {
         faculty: faculty ?? null,
         image: image ?? undefined,
         highlightColor: highlightColor ?? undefined,
+        showSelfAssessment: showSelfAssessment !== undefined ? showSelfAssessment : undefined,
         profileCompleted: true,
       },
       select: {
@@ -89,6 +90,7 @@ export async function PUT(request: NextRequest) {
         faculty: true,
         image: true,
         highlightColor: true,
+        showSelfAssessment: true,
         profileCompleted: true,
         createdAt: true,
         updatedAt: true,
@@ -131,6 +133,7 @@ export async function PUT(request: NextRequest) {
       faculty: updatedUser.faculty ?? null,
       image: updatedUser.image ?? null,
       highlightColor: updatedUser.highlightColor ?? null,
+      showSelfAssessment: updatedUser.showSelfAssessment ?? true,
       profileCompleted: updatedUser.profileCompleted,
       createdAt: updatedUser.createdAt,
       updatedAt: updatedUser.updatedAt

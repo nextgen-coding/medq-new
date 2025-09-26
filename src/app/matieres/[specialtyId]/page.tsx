@@ -767,11 +767,14 @@ export default function SpecialtyPageRoute() {
                                 </TableCell>
                               )}
                               <TableCell>
-                                <div className="flex items-center gap-2">
+                                <div 
+                                  className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg p-2 -m-2 transition-colors"
+                                  onClick={() => goToLectureMode(lecture.id)}
+                                >
                                   <File className="w-4 h-4 text-gray-500 flex-shrink-0" />
                                   <div className="min-w-0 flex-1">
                                     {/* Mobile: truncate to half, desktop: full */}
-                                    <div className="font-medium truncate">
+                                    <div className="font-medium truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
                                       <span className="block sm:hidden">{lecture.title.length > 16 ? lecture.title.slice(0, Math.ceil(lecture.title.length/2)) + '…' : lecture.title}</span>
                                       <span className="hidden sm:block">{lecture.title}</span>
                                     </div>
@@ -914,10 +917,13 @@ export default function SpecialtyPageRoute() {
                                    </TableCell>
                                 )}
                                 <TableCell>
-                                  <div className="flex items-center gap-2 pl-4 sm:pl-6">
+                                  <div 
+                                    className="flex items-center gap-2 pl-4 sm:pl-6 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg p-2 -m-2 transition-colors"
+                                    onClick={() => goToLectureMode(lecture.id)}
+                                  >
                                     <File className="w-4 h-4 text-gray-500 flex-shrink-0" />
                                     <div className="min-w-0 flex-1">
-                                      <div className="font-medium truncate">
+                                      <div className="font-medium truncate hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
                                         <span className="block sm:hidden">{lecture.title.length > 16 ? lecture.title.slice(0, Math.ceil(lecture.title.length/2)) + '…' : lecture.title}</span>
                                         <span className="hidden sm:block">{lecture.title}</span>
                                       </div>
