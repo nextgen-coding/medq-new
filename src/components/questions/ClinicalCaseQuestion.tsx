@@ -463,7 +463,7 @@ export function ClinicalCaseQuestion({
     }
 
     // Check if this was the last unanswered question and complete immediately if so
-    // But only for MCQ-only cases - QROC cases require explicit Enter key submission
+    // But only for MCQ-only cases without manual submit requirement - QROC cases require explicit Enter key submission
     setTimeout(() => {
       // Don't auto-complete for multi-QROC mode or cases containing QROC questions
       const hasQrocQuestions = clinicalCase.questions.some(q => (q.type as any) === 'clinic_croq');
@@ -479,7 +479,8 @@ export function ClinicalCaseQuestion({
         return Boolean(currentAnswer);
       });
       
-      if (allAnswered && !isCaseComplete && !showResults) {
+      // Don't auto-submit if manual submission is required (cas clinic with all QCM)
+      if (allAnswered && !isCaseComplete && !showResults && !manualSubmitRequired) {
         handleCompleteCase();
       }
     }, 50); // Small delay to ensure state updates are processed
@@ -488,8 +489,14 @@ export function ClinicalCaseQuestion({
     // This allows users to press 1/2 for QCM without jumping to QROC
   };
 
-  // Auto-submit when all questions are answered (only for MCQ-only cases)
+  // Determine if manual submission is required based on case type
+  // For cas clinic with all QCM questions, always require manual Enter key submission
+  const hasQrocQuestions = clinicalCase.questions.some(q => (q.type as any) === 'clinic_croq');
+  const manualSubmitRequired = !hasQrocQuestions && displayMode !== 'multi_qroc';
+  
+  // Auto-submit when all questions are answered (only for non-manual cases)
   const autoSubmitTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
   useEffect(() => {
     // Clear any existing timeout
     if (autoSubmitTimeoutRef.current) {
@@ -502,12 +509,16 @@ export function ClinicalCaseQuestion({
 
     // Don't auto-submit for multi-QROC mode or cases containing QROC questions
     // Users should explicitly press Enter to submit QROC answers
-    const hasQrocQuestions = clinicalCase.questions.some(q => (q.type as any) === 'clinic_croq');
     if (displayMode === 'multi_qroc' || hasQrocQuestions) {
       return; // No auto-submit for QROC cases
     }
 
-    // For MCQ-only cases, use auto-submission with meaningful answers check
+    // Don't auto-submit if manual submission is required (cas clinic with all QCM)
+    if (manualSubmitRequired) {
+      return; // No auto-submit for manual submission cases
+    }
+
+    // For other MCQ-only cases that don't require manual submission, use auto-submission
     const allMeaningfullyAnswered = clinicalCase.questions.every(question => {
       const answer = answers[question.id];
       if (answer === undefined || answer === null) return false;
@@ -523,7 +534,7 @@ export function ClinicalCaseQuestion({
     });
     
     if (allMeaningfullyAnswered && clinicalCase.questions.length > 0) {
-      // Debounced auto-submission - only for MCQ-only cases
+      // Debounced auto-submission - only for non-manual cases
       autoSubmitTimeoutRef.current = setTimeout(() => {
         handleCompleteCase();
       }, 1000);
@@ -536,16 +547,29 @@ export function ClinicalCaseQuestion({
         autoSubmitTimeoutRef.current = null;
       }
     };
-  }, [answers, isCaseComplete, showResults, clinicalCase.questions]);
+  }, [answers, isCaseComplete, showResults, clinicalCase.questions, manualSubmitRequired, displayMode, hasQrocQuestions]);
 
   const handleCompleteCase = () => {
     setIsCaseComplete(true);
     setShowResults(true); // enter evaluation phase (results visible)
+    
     // Build evaluation order (only open questions that require self assessment)
     const openIds = clinicalCase.questions
       .filter(q => (q.type as any) === 'clinic_croq')
       .map(q => q.id);
+    
+    console.log('🔍 Multi QROC Evaluation Setup:', {
+      displayMode,
+      openIds,
+      totalQuestions: clinicalCase.questions.length,
+      qrocCount: openIds.length,
+      existingResults: questionResults
+    });
+    
     setEvaluationOrder(openIds);
+    
+    // Reset evaluation state
+    setEvaluationComplete(false);
     
     // For multi-QROC cases, always start evaluation from the first QROC
     // For mixed clinical cases, start from current QROC if applicable
@@ -561,7 +585,10 @@ export function ClinicalCaseQuestion({
     }
     
     // In revision mode, auto-complete evaluation to align with "show correct and move on"
-    setEvaluationComplete(revisionMode ? true : openIds.length === 0);
+    if (revisionMode || openIds.length === 0) {
+      setEvaluationComplete(true);
+    }
+    
     onSubmit(clinicalCase.caseNumber, answers, questionResults); // results will be updated as user evaluates
     
     // Don't manually scroll here - let the evaluation effect handle scrolling to the correct question
@@ -592,26 +619,76 @@ export function ClinicalCaseQuestion({
   };
   const handleShowResults = () => setShowResults(true);
   const handleSelfAssessmentUpdate = (questionId: string, result: boolean | 'partial') => {
+    console.log('📝 Self Assessment Update:', {
+      questionId,
+      result,
+      currentIndex: evaluationIndex,
+      currentTarget: evaluationOrder[evaluationIndex],
+      evaluationOrder,
+      evaluationComplete
+    });
+    
     setQuestionResults(prev => ({ ...prev, [questionId]: result }));
     if (onAnswerUpdate) {
       const userAnswer = answers[questionId];
       onAnswerUpdate(questionId, userAnswer, result);
     }
+    
+    // Handle evaluation advancement for multi QROC
     if (showResults && !evaluationComplete) {
       const currentId = evaluationOrder[evaluationIndex];
-      if (currentId === questionId) {
-        // Advance to next unanswered
-        for (let i = evaluationIndex + 1; i < evaluationOrder.length; i++) {
-          const id = evaluationOrder[i];
-          if (id !== questionId && questionResults[id] === undefined) {
-            setEvaluationIndex(i);
-            return;
+      
+      // Always update the results first, then check advancement
+      setTimeout(() => {
+        setQuestionResults(currentResults => {
+          const updatedResults = { ...currentResults, [questionId]: result };
+          
+          console.log('🔄 Evaluation State Check:', {
+            questionId,
+            currentId,
+            isCurrentTarget: currentId === questionId,
+            updatedResults,
+            evaluationOrder
+          });
+          
+          // Check if this was the current evaluation target
+          if (currentId === questionId) {
+            // Find next unanswered question in evaluation order
+            let nextIndex = -1;
+            for (let i = evaluationIndex + 1; i < evaluationOrder.length; i++) {
+              const id = evaluationOrder[i];
+              if (updatedResults[id] === undefined) {
+                nextIndex = i;
+                break;
+              }
+            }
+            
+            console.log('🎯 Advancing Evaluation:', {
+              currentIndex: evaluationIndex,
+              nextIndex,
+              totalQuestions: evaluationOrder.length
+            });
+            
+            if (nextIndex !== -1) {
+              // Move to next unanswered question
+              setEvaluationIndex(nextIndex);
+            } else {
+              // All questions in evaluation order have been evaluated
+              const remaining = evaluationOrder.filter(id => updatedResults[id] === undefined);
+              console.log('✅ Evaluation Check Complete:', {
+                remaining: remaining.length,
+                isComplete: remaining.length === 0
+              });
+              
+              if (remaining.length === 0) {
+                setEvaluationComplete(true);
+              }
+            }
           }
-        }
-        // If none left after this update, mark complete
-        const remaining = evaluationOrder.filter(id => id !== questionId && questionResults[id] === undefined);
-        if (remaining.length === 0) setEvaluationComplete(true);
-      }
+          
+          return updatedResults;
+        });
+      }, 50); // Small delay to ensure state consistency
     }
   };
 
@@ -668,6 +745,17 @@ export function ClinicalCaseQuestion({
       const currentQuestion = clinicalCase.questions[activeIndex];
       const isCurrentAnswered = currentQuestion ? isQuestionAnswered(currentQuestion) : false;
 
+      // Special case: if all questions answered and manual submit required, 
+      // check if Enter was pressed on case text or general area to submit
+      if (manualSubmitRequired && !isTextInput && !isEditable) {
+        const allAnswered = clinicalCase.questions.every(q => isQuestionAnswered(q));
+        if (allAnswered) {
+          e.preventDefault();
+          handleCompleteCase();
+          return;
+        }
+      }
+
       // For QROC (textarea) and other text inputs: Enter always navigates (Shift+Enter for newlines in textarea)
       if ((isTextarea && !e.shiftKey) || isTextInput) {
         e.preventDefault();
@@ -713,8 +801,15 @@ export function ClinicalCaseQuestion({
           }, 300);
         }
       } else {
-        // All questions answered - submit the case
-        handleCompleteCase();
+        // All questions answered - check if manual submission is required
+        if (manualSubmitRequired) {
+          // For cas clinic with all QCM, all questions are answered but require Enter to submit
+          // User pressed Enter, so they want to submit the case
+          handleCompleteCase();
+        } else {
+          // All questions answered - submit the case
+          handleCompleteCase();
+        }
       }
     };
 
@@ -757,10 +852,17 @@ export function ClinicalCaseQuestion({
             }, 300);
           }
         } else {
-          // All questions answered - submit the case immediately
-          setTimeout(() => {
-            handleCompleteCase();
-          }, 100); // Small delay to ensure UI updates
+          // All questions answered - check if manual submission is required
+          if (manualSubmitRequired) {
+            // For cas clinic with all QCM, all questions are answered but require Enter to submit
+            // Don't auto-submit, just show the user that they can submit
+            // The user must press Enter again or click the Submit button
+          } else {
+            // All questions answered - submit the case immediately
+            setTimeout(() => {
+              handleCompleteCase();
+            }, 100); // Small delay to ensure UI updates
+          }
         }
       }
     };
@@ -792,14 +894,26 @@ export function ClinicalCaseQuestion({
   // Scroll to current evaluation question when evaluation index changes
   useEffect(() => {
     if (!showResults || evaluationComplete) return;
+    
+    // Ensure evaluation index is within bounds
+    if (evaluationIndex < 0 || evaluationIndex >= evaluationOrder.length) return;
+    
     const currentEvalId = evaluationOrder[evaluationIndex];
     if (!currentEvalId) return;
+    
+    // Ensure the question still exists and is a QROC question
+    const currentQuestion = clinicalCase.questions.find(q => q.id === currentEvalId);
+    if (!currentQuestion || (currentQuestion.type as any) !== 'clinic_croq') return;
+    
     const element = questionRefs.current[currentEvalId];
     if (element) {
-      scrollIntoViewWithOffset(element, 'smooth');
+      // Add a small delay to ensure the question has rendered properly
+      setTimeout(() => {
+        scrollIntoViewWithOffset(element, 'smooth');
+      }, 100);
       // Focus nothing specific to avoid accidental typing; user uses 1/2/3
     }
-  }, [evaluationIndex, evaluationOrder, showResults, evaluationComplete]);
+  }, [evaluationIndex, evaluationOrder, showResults, evaluationComplete, clinicalCase.questions]);
 
   // Scroll to case text when evaluation is complete
   useEffect(() => {
@@ -980,7 +1094,10 @@ export function ClinicalCaseQuestion({
                       showResults &&
                       (question.type as any) === 'clinic_croq' &&
                       !evaluationComplete &&
-                      evaluationOrder[evaluationIndex] === question.id
+                      evaluationIndex >= 0 &&
+                      evaluationIndex < evaluationOrder.length &&
+                      evaluationOrder[evaluationIndex] === question.id &&
+                      questionResults[question.id] === undefined
                     }
                     onSelfAssessmentUpdate={handleSelfAssessmentUpdate}
                     hideNotes={true}
@@ -1115,7 +1232,10 @@ export function ClinicalCaseQuestion({
                   showResults &&
                   (question.type as any) === 'clinic_croq' &&
                   !evaluationComplete &&
-                  evaluationOrder[evaluationIndex] === question.id
+                  evaluationIndex >= 0 &&
+                  evaluationIndex < evaluationOrder.length &&
+                  evaluationOrder[evaluationIndex] === question.id &&
+                  questionResults[question.id] === undefined
                 }
                 onSelfAssessmentUpdate={handleSelfAssessmentUpdate}
                 hideNotes={!showResults}
@@ -1206,7 +1326,9 @@ export function ClinicalCaseQuestion({
               <div className="text-sm text-muted-foreground">
                 {!showResults && (
                   answeredQuestions === clinicalCase.totalQuestions
-                    ? 'Toutes les réponses saisies — Soumettre pour valider'
+                    ? (manualSubmitRequired 
+                        ? 'Toutes les réponses saisies — Appuyez sur Entrée ou cliquez Soumettre pour valider'
+                        : 'Toutes les réponses saisies — Soumettre pour valider')
                     : `${clinicalCase.totalQuestions - answeredQuestions} question(s) restante(s) — répondez puis Soumettre`
                 )}
                 {hasOpen && showResults && !evaluationComplete && `Phase d'évaluation: ${evaluationOrder.filter(id => questionResults[id] !== undefined).length}/${evaluationOrder.length} évaluées`}
