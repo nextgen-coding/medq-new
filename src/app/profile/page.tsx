@@ -14,8 +14,10 @@ import { toast } from '@/hooks/use-toast'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Textarea } from '@/components/ui/textarea'
 import { useTranslation } from 'react-i18next'
-import { User, Mail, GraduationCap, Calendar, Shield, Crown, Clock, Camera, Save, Eye, EyeOff, Lock, Settings } from 'lucide-react'
+import { User, Mail, GraduationCap, Calendar, Shield, Crown, Clock, Camera, Save, Eye, EyeOff, Lock, Settings, AlertCircle, CheckCircle2, XCircle } from 'lucide-react'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { ProfileCompletionGuard } from '@/components/ProfileCompletionGuard'
 
@@ -51,6 +53,11 @@ export default function ProfilePageRoute() {
   // Niveaux state
   const [niveaux, setNiveaux] = useState<{ id: string; name: string }[]>([])
 
+  // Level change request state
+  const [pendingLevelRequest, setPendingLevelRequest] = useState<any>(null)
+  const [showLevelChangeRequest, setShowLevelChangeRequest] = useState(false)
+  const [levelChangeReason, setLevelChangeReason] = useState('')
+
   // Fetch niveaux from backend
   useEffect(() => {
     fetch('/api/niveaux')
@@ -61,6 +68,18 @@ export default function ProfilePageRoute() {
         setProfile(prev => ({ ...prev, niveauId: prev.niveauId || (data[0]?.id || '') }))
       })
       .catch(() => setNiveaux([]))
+  }, [])
+
+  // Fetch pending level change request
+  useEffect(() => {
+    fetch('/api/level-change-requests?status=pending')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.length > 0) {
+          setPendingLevelRequest(data[0]) // Get the first pending request
+        }
+      })
+      .catch(console.error)
   }, [])
 
   // Update form fields when user changes (after login/refresh)
@@ -192,6 +211,43 @@ export default function ProfilePageRoute() {
       toast({ title: 'Erreur', description: 'Impossible de mettre à jour la photo', variant: 'destructive' })
     }
     setIsUploading(false)
+  }
+
+  const handleLevelChangeRequest = async (newLevelId: string) => {
+    if (newLevelId === user?.niveauId) return // No change needed
+    
+    try {
+      const res = await fetch('/api/level-change-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requestedLevelId: newLevelId,
+          reason: levelChangeReason || undefined,
+        }),
+      })
+      
+      if (!res.ok) {
+        const errorData = await res.json()
+        throw new Error(errorData.error || 'Erreur lors de la création de la demande')
+      }
+      
+      const newRequest = await res.json()
+      setPendingLevelRequest(newRequest)
+      setShowLevelChangeRequest(false)
+      setLevelChangeReason('')
+      
+      toast({ 
+        title: 'Demande envoyée', 
+        description: 'Votre demande de changement de niveau a été envoyée aux administrateurs.', 
+        variant: 'default' 
+      })
+    } catch (error: any) {
+      toast({ 
+        title: 'Erreur', 
+        description: error.message || 'Impossible d\'envoyer la demande', 
+        variant: 'destructive' 
+      })
+    }
   }
 
   return (
@@ -428,22 +484,105 @@ export default function ProfilePageRoute() {
                               <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                                 Niveau d'études
                               </Label>
-                              <Select value={profile.niveauId} onValueChange={val => setProfile(prev => ({ ...prev, niveauId: val }))}>
-                                <SelectTrigger className="bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 focus:border-blue-500 focus:ring-blue-500/20 transition-all duration-200">
-                                  <SelectValue placeholder="Sélectionnez votre niveau" />
-                                </SelectTrigger>
-                                <SelectContent className="bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600">
-                                  {niveaux.length === 0 ? (
-                                    <div className="px-2 py-1.5 text-sm text-gray-500 dark:text-gray-400">
-                                      Aucun niveau disponible
-                                    </div>
-                                  ) : (
-                                    niveaux.map(niv => (
-                                      <SelectItem key={niv.id} value={niv.id}>{niv.name}</SelectItem>
-                                    ))
-                                  )}
-                                </SelectContent>
-                              </Select>
+                              
+                              {/* Current Level Display */}
+                              <div className="flex items-center justify-between h-10 px-3 py-2 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md transition-all duration-200">
+                                <div className="flex items-center space-x-3 min-w-0 flex-1">
+                                  <GraduationCap className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                                  <div className="min-w-0 flex-1">
+                                    <p className="font-medium text-gray-900 dark:text-white truncate">
+                                      {niveaux.find(n => n.id === user?.niveauId)?.name || 'Niveau non défini'}
+                                    </p>
+                                    {pendingLevelRequest && (
+                                      <div className="flex items-center space-x-2 mt-0.5">
+                                        <AlertCircle className="h-3 w-3 text-orange-500 flex-shrink-0" />
+                                        <p className="text-xs text-orange-600 dark:text-orange-400 truncate">
+                                          En cours: {niveaux.find(n => n.id === pendingLevelRequest.requestedLevelId)?.name}
+                                        </p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                
+                                {!pendingLevelRequest && (
+                                  <Dialog open={showLevelChangeRequest} onOpenChange={setShowLevelChangeRequest}>
+                                    <DialogTrigger asChild>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-400 dark:hover:bg-blue-900/20"
+                                      >
+                                        <Settings className="h-3 w-3 mr-1" />
+                                        Modifier
+                                      </Button>
+                                    </DialogTrigger>
+                                    <DialogContent className="sm:max-w-md">
+                                      <DialogHeader>
+                                        <DialogTitle>Demande de changement de niveau</DialogTitle>
+                                      </DialogHeader>
+                                      <div className="space-y-4">
+                                        <div>
+                                          <Label className="text-sm font-medium">Nouveau niveau souhaité</Label>
+                                          <Select value={profile.niveauId} onValueChange={val => setProfile(prev => ({ ...prev, niveauId: val }))}>
+                                            <SelectTrigger className="mt-1">
+                                              <SelectValue placeholder="Sélectionnez le nouveau niveau" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              {niveaux.map(niv => (
+                                                <SelectItem key={niv.id} value={niv.id}>
+                                                  {niv.name}
+                                                  {niv.id === user?.niveauId && ' (Actuel)'}
+                                                </SelectItem>
+                                              ))}
+                                            </SelectContent>
+                                          </Select>
+                                        </div>
+                                        
+                                        <div>
+                                          <Label className="text-sm font-medium">Raison du changement (optionnel)</Label>
+                                          <Textarea
+                                            value={levelChangeReason}
+                                            onChange={(e) => setLevelChangeReason(e.target.value)}
+                                            placeholder="Expliquez pourquoi vous souhaitez changer de niveau..."
+                                            className="mt-1"
+                                            rows={3}
+                                          />
+                                        </div>
+                                        
+                                        <div className="flex items-center space-x-2 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
+                                          <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                                          <p className="text-xs text-yellow-700 dark:text-yellow-300">
+                                            Votre demande sera examinée par un administrateur avant d'être approuvée.
+                                          </p>
+                                        </div>
+                                        
+                                        <div className="flex space-x-2">
+                                          <Button
+                                            onClick={() => handleLevelChangeRequest(profile.niveauId)}
+                                            disabled={profile.niveauId === user?.niveauId}
+                                            className="flex-1"
+                                          >
+                                            Envoyer la demande
+                                          </Button>
+                                          <Button
+                                            variant="outline"
+                                            onClick={() => setShowLevelChangeRequest(false)}
+                                            className="flex-1"
+                                          >
+                                            Annuler
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    </DialogContent>
+                                  </Dialog>
+                                )}
+                                
+                                {pendingLevelRequest && (
+                                  <Badge variant="outline" className="text-orange-600 border-orange-300 bg-orange-50 dark:bg-orange-900/20">
+                                    En attente
+                                  </Badge>
+                                )}
+                              </div>
                             </div>
                           </div>
 
