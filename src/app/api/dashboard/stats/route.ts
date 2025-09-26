@@ -110,8 +110,18 @@ async function getHandler(request: AuthenticatedRequest) {
   const lastLecture = progressData.length > 0 ? (progressData[0] as any) : null;
     let lastLecturePayload: any = null;
     if (lastLecture) {
+      // Get the actual total questions count from the lecture
+      const actualLecture = await prisma.lecture.findUnique({
+        where: { id: lastLecture.lectureId },
+        select: {
+          _count: {
+            select: { questions: true }
+          }
+        }
+      });
+      
+      const lectureTotalQuestions = actualLecture?._count?.questions || 0;
       const lectureEntries = questionProgress.filter(p => p.lectureId === lastLecture.lectureId);
-      const lectureTotalQuestions = lectureEntries.length;
       const lectureCompleted = lectureEntries.filter(p => p.completed).length;
       const lectureProgressPct = lectureTotalQuestions === 0 ? 0 : Math.round((lectureCompleted / lectureTotalQuestions) * 100);
       lastLecturePayload = {

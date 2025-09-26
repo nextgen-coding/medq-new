@@ -58,7 +58,7 @@ export default function DashboardPage() {
                   {/* Welcome Text (inline, inside container) */}
                   {user && (
                     <div className="mb-4 sm:mb-6">
-                      <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-blue-900 dark:text-blue-200">
+                      <h1 className="text-sm sm:text-base md:text-lg font-normal text-blue-900 dark:text-blue-200">
                         Bonjour {user.name}! MedQ vous souhaite un bon travail.
                       </h1>
                     </div>
