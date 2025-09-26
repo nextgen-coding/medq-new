@@ -243,11 +243,14 @@ export function PersistentAiJob({ onJobCreated }: PersistentAiJobProps) {
       const response = await fetch(`/api/validation/ai-progress?aiId=${encodeURIComponent(session.id)}&action=download`);
       if (response.ok) {
         const blob = await response.blob();
+        const cd = response.headers.get('Content-Disposition') || '';
+        const match = cd.match(/filename="?([^";]+)"?/i);
+        const suggested = match ? match[1] : undefined;
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.style.display = 'none';
         a.href = url;
-        a.download = `ai_fixed_${session.fileName || 'result'}.xlsx`;
+        a.download = suggested || `ai_fixed_${session.fileName || 'result'}.xlsx`;
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);

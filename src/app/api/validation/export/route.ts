@@ -3,7 +3,7 @@ import { utils, write } from 'xlsx';
 
 // Canonical import headers expected by /api/questions/bulk-import-progress
 const IMPORT_HEADERS = [
-  'matiere', 'cours', 'question n', 'cas n', 'texte du cas', 'texte de la question',
+  'matiere', 'cours', 'question n', 'cas n', 'source', 'texte du cas', 'texte de la question',
   'reponse', 'option a', 'option b', 'option c', 'option d', 'option e',
   'rappel', 'explication', 'explication a', 'explication b', 'explication c', 'explication d', 'explication e',
   'image', 'niveau', 'semestre'
@@ -17,6 +17,7 @@ export async function POST(request: NextRequest) {
     const mode = (body.mode as 'good'|'bad') || 'good';
     const good = Array.isArray(body.good) ? body.good : [];
     const bad = Array.isArray(body.bad) ? body.bad : [];
+    const originalName: string | undefined = typeof body.fileName === 'string' ? body.fileName : undefined;
 
     if (mode === 'good') {
       if (!Array.isArray(good) || good.length === 0) {
@@ -37,6 +38,7 @@ export async function POST(request: NextRequest) {
           cours: rec?.['cours'] ?? '',
           'question n': rec?.['question n'] ?? '',
           'cas n': rec?.['cas n'] ?? '',
+          source: rec?.['source'] ?? '',
           'texte du cas': rec?.['texte du cas'] ?? '',
           'texte de la question': qText,
           reponse: rec?.['reponse'] ?? '',
@@ -72,10 +74,12 @@ export async function POST(request: NextRequest) {
 
       const arrayBuffer = write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
       const bytes = new Uint8Array(arrayBuffer);
+      const base = (originalName || '').replace(/\.[^.]+$/, '') || 'validation_good';
+      const outName = `${base}-valide.xlsx`;
       return new NextResponse(bytes, {
         headers: {
           'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          'Content-Disposition': 'attachment; filename="validation_good.xlsx"'
+          'Content-Disposition': `attachment; filename="${outName}"`
         }
       });
     }
@@ -119,10 +123,12 @@ export async function POST(request: NextRequest) {
     utils.book_append_sheet(wbErr, wsErr, 'Erreurs');
     const arrayBuffer = write(wbErr, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
     const bytes = new Uint8Array(arrayBuffer);
+    const base = (originalName || '').replace(/\.[^.]+$/, '') || 'validation_bad';
+    const outName = `${base}-erreurs.xlsx`;
     return new NextResponse(bytes, {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition': 'attachment; filename="validation_bad.xlsx"'
+        'Content-Disposition': `attachment; filename="${outName}"`
       }
     });
   } catch (error: any) {

@@ -148,11 +148,14 @@ export function FilePreviewDialog({ job, open, onOpenChange }: FilePreviewDialog
       const response = await fetch(`/api/validation/ai-progress?aiId=${job.id}&action=download`);
       if (response.ok) {
         const blob = await response.blob();
+        const cd = response.headers.get('Content-Disposition') || '';
+        const match = cd.match(/filename="?([^";]+)"?/i);
+        const suggested = match ? match[1] : undefined;
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.style.display = 'none';
         a.href = url;
-        a.download = `enhanced_${job.fileName}`;
+        a.download = suggested || `enhanced_${job.fileName}`;
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);
