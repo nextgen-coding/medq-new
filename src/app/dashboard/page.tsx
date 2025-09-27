@@ -6,7 +6,6 @@ import { UniversalHeader } from '@/components/layout/UniversalHeader';
 import { AppSidebar, AppSidebarProvider } from '@/components/layout/AppSidebar';
 import { SidebarInset } from '@/components/ui/sidebar';
 import { UpsellBanner } from '@/components/subscription/UpsellBanner';
-import { UpgradeDialog } from '@/components/subscription/UpgradeDialog';
 import { useTranslation } from 'react-i18next';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { ProfileCompletionGuard } from '@/components/ProfileCompletionGuard';
@@ -25,7 +24,6 @@ export const dynamic = 'force-dynamic';
 export default function DashboardPage() {
   const { user, isAdmin } = useAuth();
   const { hasActiveSubscription } = useSubscription();
-  const [isUpgradeDialogOpen, setIsUpgradeDialogOpen] = useState(false);
   const [isUpsellDismissed, setIsUpsellDismissed] = useState(false);
   const { t } = useTranslation();
   const { stats, dailyActivity, coursesToReview, isLoading, error } = useDashboardData();
@@ -37,8 +35,6 @@ export default function DashboardPage() {
   }));
 
   const shouldShowUpsell = !hasActiveSubscription && !isAdmin && !isUpsellDismissed;
-  const handleUpgrade = () => setIsUpgradeDialogOpen(true);
-  const handleUpgradeComplete = () => setIsUpgradeDialogOpen(false);
 
   return (
     <ProtectedRoute>
@@ -67,7 +63,6 @@ export default function DashboardPage() {
             {/* Upsell Banner for Free Users */}
             {shouldShowUpsell && (
               <UpsellBanner
-                onUpgrade={handleUpgrade}
                 onDismiss={() => setIsUpsellDismissed(true)}
               />
             )}
@@ -130,11 +125,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <UpgradeDialog
-              isOpen={isUpgradeDialogOpen}
-              onOpenChange={setIsUpgradeDialogOpen}
-              onUpgrade={handleUpgradeComplete}
-            />
+
                   </div>
                 </div>
               </div>
