@@ -43,9 +43,9 @@ import 'react-pdf/dist/Page/TextLayer.css';
 // Configure PDF.js worker
 import { pdfjs } from 'react-pdf';
 
-// Set up the worker
+// Set up the worker to use the local public/pdf.worker.mjs file
 if (typeof window !== 'undefined') {
-  pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
+  pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.mjs';
 }
 
 type Session = {
@@ -136,8 +136,30 @@ export default function SessionViewerPage() {
   // Refs for auto-fit sizing
   const examViewerRef = useRef<HTMLDivElement | null>(null);
   const correctionViewerRef = useRef<HTMLDivElement | null>(null);
+  // Store last scroll position for correction PDF
+  const correctionScrollPos = useRef<number>(0);
 
-  // Auto-fit helpers (disabled to maintain 133% zoom)
+  // Save scroll position when hiding correction PDF
+  const prevShowCorrectionPdf = useRef(showCorrectionPdf);
+  useEffect(() => {
+    const ref = correctionViewerRef.current;
+    if (prevShowCorrectionPdf.current && !showCorrectionPdf && ref) {
+      correctionScrollPos.current = ref.scrollTop;
+    }
+    prevShowCorrectionPdf.current = showCorrectionPdf;
+  }, [showCorrectionPdf]);
+
+  // Restore scroll position only after PDF is loaded and visible
+  useEffect(() => {
+    if (!showCorrectionPdf || correctionLoading) return;
+    const ref = correctionViewerRef.current;
+    if (ref) {
+      ref.scrollTop = correctionScrollPos.current;
+      setTimeout(() => {
+        if (ref) ref.scrollTop = correctionScrollPos.current;
+      }, 400);
+    }
+  }, [showCorrectionPdf, correctionLoading]);
   const fitExamPage = useCallback(() => {
     // Disabled: always maintain 133% zoom
     setScale(1.33);
@@ -510,58 +532,8 @@ export default function SessionViewerPage() {
             <PDFProvider>
               <div className="flex h-screen w-full overflow-hidden">
             <AppSidebar />
-            <SidebarInset className="flex-1 flex flex-col bg-gray-50 dark:bg-gray-900 h-full max-h-screen overflow-hidden">
-              <UniversalHeader
-                title={session ? session.name : loading ? 'Chargement…' : (error || 'Session')}
-                hideSeparator
-                leftActions={(
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => router.push(specialtyId ? `/session/${specialtyId}` : '/session')} 
-                    className="group gap-2 hover:bg-accent/50 transition-all duration-200 text-foreground/70 hover:text-foreground"
-                  >
-                    <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform duration-200" /> 
-                    <span className="font-medium">Retour</span>
-                  </Button>
-                )}
-                rightActions={canShowCorrectionButton && (
-                  <Button
-                    variant={correctionModeEnabled ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => {
-                      const newCorrectionMode = !correctionModeEnabled;
-                      setCorrectionModeEnabled(newCorrectionMode);
-                      
-                      if (newCorrectionMode) {
-                        // When enabling correction mode, show the panel and zone (not PDF)
-                        setPanelCollapsed(false);
-                        // Default to Zone if available, otherwise PDF
-                        setShowCorrectionPdf(!canShowCorrectionZone && canShowCorrectionPdf);
-                      } else {
-                        // When disabling correction mode, also disable linking mode
-                        setIsLinkingMode(false);
-                      }
-                    }}
-                    className={`gap-1 sm:gap-2 transition-all duration-200 h-8 px-2 sm:px-3 text-xs sm:text-sm ${
-                      correctionModeEnabled 
-                        ? 'bg-green-600 hover:bg-green-700 text-white border-green-600' 
-                        : 'border-green-600 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20'
-                    }`}
-                  >
-                    <FileCheck2 className="h-3 w-3 sm:h-4 sm:w-4" />
-                    <span className="font-medium hidden sm:inline">Correction {correctionModeEnabled ? 'ON' : 'OFF'}</span>
-                    <span className="font-medium sm:hidden">{correctionModeEnabled ? 'ON' : 'OFF'}</span>
-                  </Button>
-                )}
-                actions={session && session.semester && (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <div className="hidden md:flex items-center gap-2">
-                      <Badge variant="outline" className="text-xs">S{session.semester.order}</Badge>
-                    </div>
-                  </div>
-                )}
-              />
+            <SidebarInset className="flex-1 flex flex-col bg-gray-50 dark:bg-gray-900 h-screen max-h-screen overflow-hidden">
+              {/* Custom header removed. Add Retour, session name, and correction toggle to PDF controls below. */}
               <div className="flex-1 flex flex-col h-full max-h-full overflow-hidden">
                 <div className="flex-1 overflow-auto p-2 sm:p-3 lg:p-4 h-full max-h-full scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600">
                   {loading ? (
@@ -599,24 +571,33 @@ export default function SessionViewerPage() {
                     </CardContent>
                   </Card>
                 ) : (
-                  <div className="w-full mx-auto max-w-[1600px] grid gap-3 xl:grid-cols-12 items-start h-full max-h-full overflow-auto">
+                  <div className="w-full mx-auto max-w-[1600px] grid gap-3 xl:grid-cols-12 items-start h-full max-h-full overflow-hidden"
+                    style={{height: '95vh', maxHeight: '95vh', overflow: 'hidden'}}>
                     {/* Exam PDF Viewer (responsive to sidebar) */}
                     <div
-                      className={`min-w-0 space-y-2 transition-all duration-300 xl:col-span-12 overflow-hidden
-                        ${!panelCollapsed 
-                          ? showCorrectionPdf 
-                            ? 'xl:col-span-7 2xl:col-span-7'  // 55% when showing correction PDF
-                            : 'xl:col-span-8 2xl:col-span-8'  // 70% when showing validation interface or message
-                          : 'xl:col-span-12'                  // 100% when panel collapsed
-                        }
+                      className={`min-w-0 space-y-2 transition-all duration-300 overflow-hidden
+                        ${!panelCollapsed ? (showCorrectionPdf ? 'xl:col-span-7 2xl:col-span-7' : 'xl:col-span-8 2xl:col-span-8') : 'xl:col-span-12'}
+                        ${showCorrectionPdf && !panelCollapsed ? 'xl:col-span-7 2xl:col-span-7' : ''}
                       `}
                     >
                       <Card className="border-border/50 bg-white/50 dark:bg-muted/30 backdrop-blur-sm shadow-lg">
                         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-blue-400/40 via-blue-600/10 to-blue-400/40" />
                         <CardContent className="p-3 sm:p-4">
                           <div className="flex items-center gap-2 flex-wrap text-xs sm:text-sm">
-                            {/* Left group: label + pages */}
+                            {/* Left group: Retour, session name, label, pages */}
                             <div className="flex items-center gap-2">
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => router.push(specialtyId ? `/session/${specialtyId}` : '/session')} 
+                                className="group gap-2 hover:bg-accent/50 transition-all duration-200 text-foreground/70 hover:text-foreground"
+                              >
+                                <ArrowLeft className="h-4 w-4 group-hover:-translate-x-0.5 transition-transform duration-200" />
+                                <span className="font-medium">Retour</span>
+                              </Button>
+                              {session && (
+                                <span className="font-semibold text-blue-900 dark:text-blue-100 text-base mr-2">{session.name}</span>
+                              )}
                               <Badge variant="default" className="bg-blue-600 text-white text-xs">Examen</Badge>
                               {numPages && (
                                 <span className="text-sm text-blue-800 dark:text-blue-200 font-medium whitespace-nowrap">{numPages} pages</span>
@@ -659,16 +640,39 @@ export default function SessionViewerPage() {
                                 </Button>
                               )}
                             </div>
-                            {/* Right group: show/hide correction panel */}
-                            <div className="ml-auto">
+                            {/* Right group: admin correction toggle and show/hide correction panel */}
+                            <div className="ml-auto flex items-center gap-2">
+                              {canShowCorrectionButton && (
+                                <Button
+                                  variant={correctionModeEnabled ? "default" : "outline"}
+                                  size="sm"
+                                  onClick={() => {
+                                    const newCorrectionMode = !correctionModeEnabled;
+                                    setCorrectionModeEnabled(newCorrectionMode);
+                                    if (newCorrectionMode) {
+                                      setPanelCollapsed(false);
+                                      setShowCorrectionPdf(!canShowCorrectionZone && canShowCorrectionPdf);
+                                    } else {
+                                      setIsLinkingMode(false);
+                                    }
+                                  }}
+                                  className={`gap-1 sm:gap-2 transition-all duration-200 h-8 px-2 sm:px-3 text-xs sm:text-sm ${
+                                    correctionModeEnabled 
+                                      ? 'bg-green-600 hover:bg-green-700 text-white border-green-600' 
+                                      : 'border-green-600 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20'
+                                  }`}
+                                >
+                                  <FileCheck2 className="h-3 w-3 sm:h-4 sm:w-4" />
+                                  <span className="font-medium hidden sm:inline">Correction {correctionModeEnabled ? 'ON' : 'OFF'}</span>
+                                  <span className="font-medium sm:hidden">{correctionModeEnabled ? 'ON' : 'OFF'}</span>
+                                </Button>
+                              )}
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => {
                                   setPanelCollapsed(c => !c);
-                                  // When opening panel, ensure appropriate content is shown
                                   if (panelCollapsed) {
-                                    // If correction mode is enabled, show zone; otherwise always show PDF
                                     if (correctionModeEnabled) {
                                       setShowCorrectionPdf(false);
                                     } else {
@@ -762,10 +766,12 @@ export default function SessionViewerPage() {
                       )}
 
                       {/* Exam PDF content */}
-                      <Card className="border-border/50 bg-white/50 dark:bg-muted/30 backdrop-blur-sm shadow-lg overflow-hidden" style={{ height: '70vh', maxHeight: '70vh' }}>
+                      <Card
+                        className="border-border/50 bg-white/50 dark:bg-muted/30 backdrop-blur-sm shadow-lg overflow-hidden h-[100dvh] sm:h-[100vh]"
+                        style={{ maxHeight: '100vh', overflow: 'hidden' }}>
                         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-blue-400/40 via-blue-600/10 to-blue-400/40" />
-                        <CardContent className="p-0 h-full flex flex-col">
-                          <div className="flex justify-center bg-gradient-to-br from-blue-50/80 via-white to-indigo-50/40 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 relative rounded-md overflow-hidden flex-1" style={{ height: '100%' }}>
+                        <CardContent className="p-0 h-full flex flex-col" style={{height: '100%'}}>
+                          <div className="flex justify-center bg-gradient-to-br from-blue-50/80 via-white to-indigo-50/40 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 relative rounded-md flex-1 overflow-visible" style={{ height: '100%' }}>
                             {pdfError ? (
                               <div className="flex flex-col items-center justify-center text-center p-8 gap-3 max-w-md">
                                 <div className="w-16 h-16 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center mb-2">
@@ -906,14 +912,13 @@ export default function SessionViewerPage() {
                     {session && !panelCollapsed && (
                       <div
                         className={`min-w-0 transition-all duration-300 flex flex-col min-h-0
-                          ${showCorrectionPdf 
-                            ? 'xl:col-span-5 2xl:col-span-5'
-                            : 'xl:col-span-4 2xl:col-span-4'
-                          }
-                        `}
-                        style={{ height: '85vh', maxHeight: '85vh' }}
+                          ${showCorrectionPdf ? 'xl:col-span-5 2xl:col-span-5' : 'xl:col-span-4 2xl:col-span-4'}
+                          h-[100dvh] sm:h-[100vh]`}
+                        style={{ height: undefined, maxHeight: undefined }}
                       >
-                        <Card className="border-border/50 bg-white/50 dark:bg-muted/30 backdrop-blur-sm shadow-lg flex flex-col min-h-0" style={{ height: '90vh', maxHeight: '90vh' }}>
+                        <Card
+                          className="border-border/50 bg-white/50 dark:bg-muted/30 backdrop-blur-sm shadow-lg flex flex-col min-h-0 h-[100dvh] sm:h-[100vh]"
+                          style={{ maxHeight: '100vh' }}>
                           <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-blue-400/40 via-blue-600/10 to-blue-400/40" />
                           <CardContent className="p-3 sm:p-4 flex flex-col h-full min-h-0">
                             <div className="hidden sm:flex items-center gap-2 mb-3 flex-shrink-0">
@@ -1031,7 +1036,7 @@ export default function SessionViewerPage() {
                             )}
                             {/* Show Correction PDF when enabled OR when correction mode is disabled */}
                             {(showCorrectionPdf || !correctionModeEnabled) && canShowCorrectionPdf && correctionUrl && (
-                              <div className="hidden sm:flex flex-col border border-blue-100 dark:border-blue-800 rounded-lg overflow-hidden bg-gradient-to-br from-blue-50/60 via-white to-indigo-50/40 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex-1 min-h-0">
+                              <div className="hidden sm:flex flex-col border border-blue-100 dark:border-blue-800 rounded-lg bg-gradient-to-br from-blue-50/60 via-white to-indigo-50/40 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex-1 min-h-0 overflow-hidden">
                                 <div className="flex items-center gap-2 px-3 py-2 border-b border-blue-200 dark:border-blue-800 bg-white/70 dark:bg-muted/40 text-xs flex-wrap flex-shrink-0">
                                   {correctionNumPages && <span className="text-blue-800 dark:text-blue-200 font-medium text-[11px]">{correctionNumPages} pages</span>}
                                   <Button variant="outline" size="sm" onClick={() => setCorrectionScale(s => Math.max(0.5, s - 0.2))} disabled={correctionScale <= 0.5}
