@@ -593,6 +593,13 @@ export default function CoursPageRoute() {
           answerResults={answerResults}
           onAnswerUpdate={(qid, ans, res) => handleAnswerSubmit(qid, ans as any, res as any)}
           revisionMode={mode === 'revision'}
+          customActionButton={mode === 'revision' ? (
+            <div className="flex justify-end">
+              <Button onClick={handleNext} className="bg-blue-600 hover:bg-blue-700 text-white">
+                Suivant
+              </Button>
+            </div>
+          ) : undefined}
         />
       );
     }
@@ -664,6 +671,14 @@ export default function CoursPageRoute() {
           showNotesAfterSubmit={isAnswered}
           // Disable internal Enter handlers so page-level Enter is the single source of truth
           disableEnterHandlers={revisionMode}
+          isRevisionMode={revisionMode}
+          customActionButton={revisionMode ? (
+            <div className="flex justify-end">
+              <Button onClick={handleNext} className="bg-blue-600 hover:bg-blue-700 text-white">
+                Suivant
+              </Button>
+            </div>
+          ) : undefined}
         />
       );
     }
@@ -780,12 +795,14 @@ export default function CoursPageRoute() {
                       <div className="md:hidden h-1 bg-blue-500 dark:bg-blue-600 rounded w-[200px] mt-2" />
                     </div>
                     <div className="flex items-center gap-2 flex-wrap justify-between">
-                      {/* Quit button - positioned at the far left */}
+                      {/* Quit button - positioned at the far left - hidden on desktop */}
+
                       <Button
                         variant="destructive"
                         size="sm"
                         onClick={handleBackToSpecialtyNested}
-                        className="whitespace-nowrap bg-red-600 hover:bg-red-700 text-white border-0 rounded-xl shadow-md"
+                        className="whitespace-nowrap bg-red-600 hover:bg-red-700 text-white border-0 rounded-xl shadow-md md:hidden"
+
                       >
                         <ArrowLeft className="h-4 w-4 mr-2" />
                         <span>Quitter</span>
@@ -810,13 +827,15 @@ export default function CoursPageRoute() {
                           </Button>
                         )}
                         
-                        {/* Signaler button for current question */}
+                        {/* Signaler button for current question - hidden on xs screens for admins to save space */}
+
                         {currentQuestion && (
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => setIsReportDialogOpen(true)}
-                            className="whitespace-nowrap backdrop-blur-sm bg-white/90 dark:bg-gray-800/90 border border-gray-200/60 dark:border-gray-700/60 rounded-xl shadow-md"
+                            className={`whitespace-nowrap backdrop-blur-sm bg-white/90 dark:bg-gray-800/90 border border-gray-200/60 dark:border-gray-700/60 rounded-xl shadow-md ${(user?.role === 'admin' || user?.role === 'maintainer') ? 'hidden xs:flex' : ''}`}
+
                           >
                             <Flag className="h-4 w-4 mr-2" />
                             <span className="hidden sm:inline">Signaler</span>
@@ -966,16 +985,6 @@ export default function CoursPageRoute() {
               <div ref={contentTopRef} className="space-y-4 sm:space-y-6">
                 {currentQuestion && renderCurrentQuestion()}
               </div>
-
-              {/* In revision, show persistent Next only for QROC questions (MCQ handles its own button now) */}
-              {mode === 'revision' && currentQuestion && !('questions' in (currentQuestion as any)) && 
-               (currentQuestion as Question).type !== 'mcq' && (
-                <div className="mt-4 sm:mt-6 flex justify-end">
-                  <Button onClick={handleNext} className="bg-blue-600 hover:bg-blue-700 text-white">
-                    Suivant
-                  </Button>
-                </div>
-              )}
             </div>
 
             {isLargeScreen && (

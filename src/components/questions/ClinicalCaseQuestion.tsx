@@ -105,6 +105,7 @@ interface ClinicalCaseQuestionProps {
   answerResults?: Record<string, boolean | 'partial'>;
   onAnswerUpdate?: (questionId: string, answer: any, result?: boolean | 'partial') => void;
   revisionMode?: boolean; // When true, disable Enter navigation (let parent handle)
+  customActionButton?: React.ReactNode; // custom button to render for revision mode
 }
 
 export function ClinicalCaseQuestion({
@@ -120,7 +121,8 @@ export function ClinicalCaseQuestion({
   userAnswers = {},
   answerResults = {},
   onAnswerUpdate,
-  revisionMode = false
+  revisionMode = false,
+  customActionButton
 }: ClinicalCaseQuestionProps) {
   const { user } = useAuth();
   const { t } = useTranslation();
@@ -726,7 +728,14 @@ export function ClinicalCaseQuestion({
         // For text inputs in revision mode, don't navigate (let parent handle)
         if (isTextInput || isEditable) return;
         
-        // For non-text elements (like MCQ options), allow navigation
+        // If there's a custom action button (like "Suivant"), trigger it instead of navigating within questions
+        if (customActionButton) {
+          e.preventDefault();
+          onNext();
+          return;
+        }
+        
+        // For non-text elements (like MCQ options), allow navigation within the case
         e.preventDefault();
         navigateToNextQuestion();
         return;
@@ -1344,20 +1353,21 @@ export function ClinicalCaseQuestion({
           <div className="mt-8 space-y-4">
             
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 flex-wrap">
-               {/* Progress / status */}
-              <div className="text-sm text-muted-foreground">
-                {!showResults && (
-                  answeredQuestions === clinicalCase.totalQuestions
-                    ? (manualSubmitRequired 
-                        ? 'Toutes les réponses saisies — Appuyez sur Entrée ou cliquez Soumettre pour valider'
-                        : 'Toutes les réponses saisies — Soumettre pour valider')
-                    : `${clinicalCase.totalQuestions - answeredQuestions} question(s) restante(s) — répondez puis Soumettre`
-                )}
-                {hasOpen && showResults && !evaluationComplete && `Phase d'évaluation: ${evaluationOrder.filter(id => questionResults[id] !== undefined).length}/${evaluationOrder.length} évaluées`}
-                {hasOpen && showResults && evaluationComplete && 'Évaluation terminée'}
-                {!hasOpen && showResults && 'Révision terminée'}
-              </div>
-
+               {/* Progress / status - hidden in revision mode with custom action button */}
+               {!(revisionMode && customActionButton) && (
+                 <div className="text-sm text-muted-foreground">
+                   {!showResults && (
+                     answeredQuestions === clinicalCase.totalQuestions
+                       ? (manualSubmitRequired 
+                           ? 'Toutes les réponses saisies — Appuyez sur Entrée ou cliquez Soumettre pour valider'
+                           : 'Toutes les réponses saisies — Soumettre pour valider')
+                       : `${clinicalCase.totalQuestions - answeredQuestions} question(s) restante(s) — répondez puis Soumettre`
+                   )}
+                   {hasOpen && showResults && !evaluationComplete && `Phase d'évaluation: ${evaluationOrder.filter(id => questionResults[id] !== undefined).length}/${evaluationOrder.length} évaluées`}
+                   {hasOpen && showResults && evaluationComplete && 'Évaluation terminée'}
+                   {!hasOpen && showResults && 'Révision terminée'}
+                 </div>
+               )}
               <div className="flex flex-col xs:flex-row gap-2 xs:justify-end items-stretch xs:items-center">
                 {/* Group submit: shown for any grouped block (MCQ or open) */}
                 {!showResults && (
@@ -1373,88 +1383,103 @@ export function ClinicalCaseQuestion({
                 {/* Result display and action buttons when submitted */}
                 {showResults && (
                   <>
-                    {/* Result display - full width on mobile, auto on desktop */}
-                    <div className="flex items-center justify-center xs:justify-start w-full xs:w-auto">
-                      {(() => {
-                        const overallResult = (() => {
-                          if (!hasOpen) {
-                            // For MCQ-only cases, use the case-level result
-                            return answerResult;
-                          } else {
-                            // For cases with open questions, check if evaluation is complete
-                            if (evaluationComplete) {
-                              const correctCount = Object.values(questionResults).filter(r => r === true).length;
-                              const totalCount = Object.keys(questionResults).length;
-                              if (correctCount === totalCount) return true;
-                              if (correctCount > 0) return 'partial';
-                              return false;
+                    {/* Result display - full width on mobile, auto on desktop - hidden in revision mode */}
+                    {!(revisionMode && customActionButton) && (
+                      <div className="flex items-center justify-center xs:justify-start w-full xs:w-auto">
+                        {(() => {
+                          const overallResult = (() => {
+                            if (!hasOpen) {
+                              // For MCQ-only cases, use the case-level result
+                              return answerResult;
+                            } else {
+                              // For cases with open questions, check if evaluation is complete
+                              if (evaluationComplete) {
+                                const correctCount = Object.values(questionResults).filter(r => r === true).length;
+                                const totalCount = Object.keys(questionResults).length;
+                                if (correctCount === totalCount) return true;
+                                if (correctCount > 0) return 'partial';
+                                return false;
+                              }
+                              return null;
                             }
-                            return null;
-                          }
-                        })();
+                          })();
 
-                        if (overallResult === true) {
-                          return (
-                            <div className="flex items-center text-green-600">
-                              <CheckCircle className="h-5 w-5 mr-2" />
-                              <span className="font-medium text-sm xs:text-base">Correcte!</span>
-                            </div>
-                          );
-                        } else if (overallResult === 'partial') {
-                          return (
-                            <div className="flex items-center text-yellow-600">
-                              <AlertCircle className="h-5 w-5 mr-2" />
-                              <span className="font-medium text-sm xs:text-base">Partiellement correcte</span>
-                            </div>
-                          );
-                        } else if (overallResult === false) {
-                          return (
-                            <div className="flex items-center text-red-600">
-                              <XCircle className="h-5 w-5 mr-2" />
-                              <span className="font-medium text-sm xs:text-base">Incorrecte</span>
-                            </div>
-                          );
-                        }
-                        return null;
-                      })()}
-                    </div>
+                          if (overallResult === true) {
+                            return (
+                              <div className="flex items-center text-green-600">
+                                <CheckCircle className="h-5 w-5 mr-2" />
+                                <span className="font-medium text-sm xs:text-base">Correcte!</span>
+                              </div>
+                            );
+                          } else if (overallResult === 'partial') {
+                            return (
+                              <div className="flex items-center text-yellow-600">
+                                <AlertCircle className="h-5 w-5 mr-2" />
+                                <span className="font-medium text-sm xs:text-base">Partiellement correcte</span>
+                              </div>
+                            );
+                          } else if (overallResult === false) {
+                            return (
+                              <div className="flex items-center text-red-600">
+                                <XCircle className="h-5 w-5 mr-2" />
+                                <span className="font-medium text-sm xs:text-base">Incorrecte</span>
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
+                      </div>
+                    )}
 
                     {/* Action buttons in responsive layout */}
-                    <div className="flex flex-col xs:flex-row gap-2 w-full xs:w-auto">
-                      {/* Notes toggle: positioned before next button like in MCQActions */}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          const newShowNotesArea = !showNotesArea;
-                          setShowNotesArea(newShowNotesArea);
-                          setNotesManuallyControlled(true);
-                          if (newShowNotesArea) {
-                            setTimeout(() => {
-                              const notesElement = document.getElementById(`clinical-case-notes-${clinicalCase.caseNumber}`);
-                              if (notesElement) {
-                                scrollIntoViewWithOffset(notesElement, 'smooth');
-                              }
-                            }, 30);
-                          }
-                        }}
-                        className="flex items-center justify-center gap-1 w-full xs:w-auto text-xs xs:text-sm"
-                      >
-                        <StickyNote className="h-4 w-4" />
-                        <span>{showNotesArea ? 'Fermer les notes' : 'Mes notes'}</span>
-                      </Button>
-
-                      {/* Next button: show immediately when case is complete or no open questions, and show after evaluation for multi-mode with open questions */}
-                      {(isCaseComplete || (!hasOpen || evaluationComplete)) && (
-                        <Button onClick={onNext} size="sm" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold w-full xs:w-auto text-xs xs:text-sm">
-                          Suivant
-                          <ChevronRight className="h-4 w-4 ml-2" />
-                        </Button>
+                    <div className="flex flex-col xs:flex-row gap-2 w-full xs:w-auto xs:justify-end">
+                      {/* In revision mode, show custom action button instead of regular buttons */}
+                      {revisionMode && customActionButton ? null : (
+                        <>
+                          {/* Notes toggle: positioned before next button like in MCQActions - hidden in revision mode */}
+                          {!revisionMode && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                const newShowNotesArea = !showNotesArea;
+                                setShowNotesArea(newShowNotesArea);
+                                setNotesManuallyControlled(true);
+                                if (newShowNotesArea) {
+                                  setTimeout(() => {
+                                    const notesElement = document.getElementById(`clinical-case-notes-${clinicalCase.caseNumber}`);
+                                    if (notesElement) {
+                                      scrollIntoViewWithOffset(notesElement, 'smooth');
+                                    }
+                                  }, 30);
+                                }
+                              }}
+                              className="flex items-center justify-center gap-1 w-full xs:w-auto text-xs xs:text-sm"
+                            >
+                              <StickyNote className="h-4 w-4" />
+                              <span>{showNotesArea ? 'Fermer les notes' : 'Mes notes'}</span>
+                            </Button>
+                          )}                          {/* Next button: show immediately when case is complete or no open questions, and show after evaluation for multi-mode with open questions */}
+                          {(isCaseComplete || (!hasOpen || evaluationComplete)) && (
+                            <Button onClick={onNext} size="sm" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold w-full xs:w-auto text-xs xs:text-sm">
+                              Suivant
+                              <ChevronRight className="h-4 w-4 ml-2" />
+                            </Button>
+                          )}
+                        </>
                       )}
                     </div>
                   </>
                 )}
               </div>
+
+              {/* Custom action button (e.g. for revision mode) */}
+              {customActionButton && (
+                <div className="mt-4">
+                  {customActionButton}
+                </div>
+              )}
+
             </div>
             {(hasOpen || displayMode === 'multi_qcm') && (
             <div id={`clinical-case-notes-${clinicalCase.caseNumber}`} className="space-y-6">
