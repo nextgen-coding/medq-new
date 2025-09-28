@@ -120,7 +120,7 @@ export function RegisterForm({ onToggleForm }: { onToggleForm: () => void }) {
       if (result.success) {
         toast({
           title: t('auth.registrationSuccess'),
-          description: t('auth.welcomeMessage'),
+          description: t('auth.checkEmail'),
         });
         // Redirect to dashboard after successful registration
         router.push('/dashboard');
