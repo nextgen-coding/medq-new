@@ -45,6 +45,9 @@ interface PaymentState {
   method: PaymentMethod | null
   subscriptionType: SubscriptionType
   voucherCode: string
+  couponCode: string
+  couponDiscount: number
+  couponError: string | null
   customPaymentDetails: string
   proofFileUrl: string | null
   proofFileName: string | null
@@ -97,6 +100,9 @@ export default function UpgradePage() {
     method: null,
     subscriptionType: 'semester',
     voucherCode: '',
+    couponCode: '',
+    couponDiscount: 0,
+    couponError: null,
     customPaymentDetails: '',
     proofFileUrl: null,
     proofFileName: null,
@@ -222,6 +228,55 @@ export default function UpgradePage() {
     }
   }, [searchParams, refreshUser, router])
 
+  const handleApplyCoupon = async () => {
+    if (!state.couponCode.trim()) {
+      setState(prev => ({ ...prev, couponError: 'Veuillez entrer un code de réduction' }))
+      return
+    }
+
+    setState(prev => ({ ...prev, isLoading: true, couponError: null }))
+
+    try {
+      const response = await fetch('/api/payments/validate-coupon', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          couponCode: state.couponCode,
+          subscriptionType: state.subscriptionType
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Code de réduction invalide')
+      }
+
+      const data = await response.json()
+      setState(prev => ({
+        ...prev,
+        couponDiscount: data.discountAmount,
+        couponError: null
+      }))
+
+      toast({
+        title: 'Succès',
+        description: `Code de réduction appliqué: -${data.discountAmount} TND`,
+        variant: 'default'
+      })
+    } catch (error) {
+      console.error('Coupon validation error:', error)
+      setState(prev => ({
+        ...prev,
+        couponError: error instanceof Error ? error.message : 'Erreur lors de la validation du code',
+        couponDiscount: 0
+      }))
+    } finally {
+      setState(prev => ({ ...prev, isLoading: false }))
+    }
+  }
+
   const handleInitiatePayment = async () => {
     if (!state.method) {
       toast({
@@ -271,6 +326,8 @@ export default function UpgradePage() {
           method: state.method,
           subscriptionType: state.subscriptionType,
           voucherCode: state.voucherCode,
+          couponCode: state.couponCode,
+          couponDiscount: state.couponDiscount,
           customPaymentDetails: state.customPaymentDetails,
           proofFileUrl: state.proofFileUrl
         })
@@ -894,6 +951,43 @@ export default function UpgradePage() {
                                     Vous allez être redirigé vers Konnect pour finaliser votre paiement en toute sécurité.
                                   </p>
                                 </div>
+
+                                {/* Coupon Input */}
+                                <div className="space-y-2">
+                                  <Label htmlFor="coupon" className="text-sm text-gray-700 dark:text-gray-300">Code de réduction (optionnel)</Label>
+                                  <div className="flex gap-2">
+                                    <Input
+                                      id="coupon"
+                                      value={state.couponCode}
+                                      onChange={(e) => setState(prev => ({ 
+                                        ...prev, 
+                                        couponCode: e.target.value.toUpperCase(),
+                                        couponError: null,
+                                        couponDiscount: 0
+                                      }))}
+                                      placeholder="Entrez un code de réduction"
+                                      className="text-center font-mono tracking-wider bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                                    />
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      onClick={handleApplyCoupon}
+                                      disabled={!state.couponCode || state.isLoading}
+                                      className="px-4"
+                                    >
+                                      {state.isLoading ? 'Vérification...' : 'Appliquer'}
+                                    </Button>
+                                  </div>
+                                  {state.couponError && (
+                                    <p className="text-sm text-red-600 dark:text-red-400">{state.couponError}</p>
+                                  )}
+                                  {state.couponDiscount > 0 && (
+                                    <p className="text-sm text-green-600 dark:text-green-400">
+                                      Réduction appliquée: -{state.couponDiscount} {pricing.currency}
+                                    </p>
+                                  )}
+                                </div>
+
                                 <div className="space-y-2 text-sm sm:text-base">
                                   <div className="flex justify-between items-center">
                                     <span className="text-left text-gray-900 dark:text-gray-100">Abonnement {state.subscriptionType === 'annual' ? 'annuel' : 'semestriel'}</span>
@@ -909,6 +1003,20 @@ export default function UpgradePage() {
                                       </span>
                                     </div>
                                   )}
+                                  {state.couponDiscount > 0 && (
+                                    <div className="flex justify-between items-center text-green-600 dark:text-green-400">
+                                      <span className="text-left">Code de réduction</span>
+                                      <span>-{state.couponDiscount} {pricing.currency}</span>
+                                    </div>
+                                  )}
+                                  <div className="border-t pt-2 mt-2">
+                                    <div className="flex justify-between items-center font-bold text-lg">
+                                      <span className="text-left text-gray-900 dark:text-gray-100">Total à payer</span>
+                                      <span className="text-medblue-600 dark:text-medblue-400">
+                                        {Math.max(0, (state.subscriptionType === 'annual' ? pricing.annual.finalPrice : pricing.semester.finalPrice) - state.couponDiscount)} {pricing.currency}
+                                      </span>
+                                    </div>
+                                  </div>
                                 </div>
                               </div>
                             </CardContent>
@@ -1166,11 +1274,21 @@ export default function UpgradePage() {
                                     {state.method === 'custom_payment' && 'Paiement personnalisé'}
                                   </span>
                                 </div>
-                                <hr className="border-gray-200 dark:border-gray-600" />
+                                {state.couponDiscount > 0 && (
+                                  <>
+                                    <div className="flex justify-between items-center">
+                                      <span className="text-gray-900 dark:text-gray-100">Réduction:</span>
+                                      <span className="font-semibold text-green-600 dark:text-green-400">
+                                        -{state.couponDiscount} {pricing.currency}
+                                      </span>
+                                    </div>
+                                    <hr className="border-gray-200 dark:border-gray-600" />
+                                  </>
+                                )}
                                 <div className="flex justify-between items-center text-base sm:text-lg font-bold">
                                   <span className="text-gray-900 dark:text-gray-100">Total:</span>
                                   <span className="text-medblue-600 dark:text-medblue-400">
-                                    {state.subscriptionType === 'annual' ? pricing.annual.finalPrice : pricing.semester.finalPrice} {pricing.currency}
+                                    {Math.max(0, (state.subscriptionType === 'annual' ? pricing.annual.finalPrice : pricing.semester.finalPrice) - state.couponDiscount)} {pricing.currency}
                                   </span>
                                 </div>
                               </CardContent>

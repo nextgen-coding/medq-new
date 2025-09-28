@@ -97,6 +97,8 @@ model User {
   usedVoucherCodes             VoucherCodeUsage[]
   verifiedPayments             Payment[]        @relation("PaymentVerifier")
   createdVoucherCodes          VoucherCode[]    @relation("VoucherCreator")
+  createdReductionCoupons      ReductionCoupon[] @relation("ReductionCouponCreator")
+  usedReductionCoupons         ReductionCoupon[] @relation("ReductionCouponUser")
   updatedPricingSettings       PricingSettings[]
   // Level change requests relation
   levelChangeRequests          LevelChangeRequest[]
@@ -625,6 +627,9 @@ model Payment {
   // Voucher code fields
   voucherCodeId         String?        @map("voucher_code_id") @db.Uuid
   
+  // Metadata for audit and additional data
+  metadata              Json?          @map("metadata")
+  
   // Custom payment fields
   customPaymentDetails  String?        @map("custom_payment_details") // Phone number, bank details, etc.
   proofImageUrl         String?        @map("proof_image_url")
@@ -677,6 +682,32 @@ model VoucherCodeUsage {
 
   @@unique([userId, voucherCodeId], map: "unique_user_voucher")
   @@map("voucher_code_usage")
+}
+
+enum DiscountType {
+  percentage
+  fixed
+}
+
+model ReductionCoupon {
+  id            String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code          String       @unique
+  discountType  DiscountType @map("discount_type")
+  discountValue Float        @map("discount_value") // Percentage (0-100) or fixed amount
+  isUsed        Boolean      @default(false) @map("is_used")
+  usedAt        DateTime?    @map("used_at") @db.Timestamptz(6)
+  expiresAt     DateTime?    @map("expires_at") @db.Timestamptz(6)
+  createdBy     String       @map("created_by") @db.Uuid
+  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  
+  // Relations
+  creator       User         @relation("ReductionCouponCreator", fields: [createdBy], references: [id])
+  usedBy        User?        @relation("ReductionCouponUser", fields: [usedById], references: [id])
+  usedById      String?      @map("used_by_id") @db.Uuid
+
+  @@index([code], map: "idx_reduction_coupon_code")
+  @@index([isUsed], map: "idx_reduction_coupon_used")
+  @@map("reduction_coupons")
 }
 
 model PricingSettings {

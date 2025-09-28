@@ -129,6 +129,24 @@ export async function GET(req: NextRequest) {
           data: { status: 'completed' }
         })
 
+        // Mark coupon as used if one was applied and not already used
+        const metadata = payment.metadata as { couponId?: string } | null
+        if (metadata && metadata.couponId) {
+          const coupon = await tx.reductionCoupon.findUnique({
+            where: { id: metadata.couponId }
+          })
+          if (coupon && !coupon.isUsed) {
+            await tx.reductionCoupon.update({
+              where: { id: metadata.couponId },
+              data: {
+                isUsed: true,
+                usedAt: new Date(),
+                usedById: payment.userId
+              }
+            })
+          }
+        }
+
         // Update user subscription
         const expiresAt = payment.subscriptionType === SubscriptionType.annual
           ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000) // 1 year
