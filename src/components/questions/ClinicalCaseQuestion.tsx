@@ -1090,6 +1090,7 @@ export function ClinicalCaseQuestion({
                     allowEnterSubmit={false}
                     isActive={index === activeIndex}
                     onFocus={() => { if (activeIndex !== index) setActiveIndex(index); }}
+                    isRevisionMode={revisionMode}
                   />
                 ) : (
                   <OpenQuestion
@@ -1228,6 +1229,7 @@ export function ClinicalCaseQuestion({
                 disableKeyboardHandlers={false}
                 allowEnterSubmit={false}
                 isActive={index === activeIndex}
+                isRevisionMode={revisionMode}
               />
             ) : (
               <OpenQuestion

@@ -560,6 +560,17 @@ export default function CoursPageRoute() {
     // Use original ClinicalCaseQuestion UI for clinical/grouped cases
     if (normalizedClinicalCase) {
       const clinicalCase = normalizedClinicalCase;
+      
+      // In revision mode, use correct answers instead of user answers
+      const revisionUserAnswers = mode === 'revision' ? clinicalCase.questions.reduce((acc, q) => {
+        if (q.type === 'clinic_mcq') {
+          acc[q.id] = q.correct_answers || q.correctAnswers || [];
+        } else {
+          acc[q.id] = (q as any).correctAnswers || (q as any).correct_answers || (q as any).course_reminder || (q as any).explanation || '';
+        }
+        return acc;
+      }, {} as Record<string, any>) : answers;
+      
       return (
         <ClinicalCaseQuestion
           key={`case-${clinicalCase.caseNumber}`}
@@ -578,7 +589,7 @@ export default function CoursPageRoute() {
             if (resVals.some((r: any) => r === true || r === 'partial')) return 'partial';
             return false;
           })() as any}
-          userAnswers={answers}
+          userAnswers={revisionUserAnswers}
           answerResults={answerResults}
           onAnswerUpdate={(qid, ans, res) => handleAnswerSubmit(qid, ans as any, res as any)}
           revisionMode={mode === 'revision'}
@@ -622,6 +633,7 @@ export default function CoursPageRoute() {
           allowEnterSubmit={!revisionMode}
           disableKeyboardHandlers={revisionMode}
           isActive={!revisionMode}
+          isRevisionMode={revisionMode}
           customActionButton={revisionMode ? (
             <div className="flex justify-end">
               <Button onClick={handleNext} className="bg-blue-600 hover:bg-blue-700 text-white">
