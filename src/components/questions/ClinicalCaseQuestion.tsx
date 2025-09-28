@@ -1368,7 +1368,6 @@ export function ClinicalCaseQuestion({
                    {!hasOpen && showResults && 'Révision terminée'}
                  </div>
                )}
-
               <div className="flex flex-col xs:flex-row gap-2 xs:justify-end items-stretch xs:items-center">
                 {/* Group submit: shown for any grouped block (MCQ or open) */}
                 {!showResults && (

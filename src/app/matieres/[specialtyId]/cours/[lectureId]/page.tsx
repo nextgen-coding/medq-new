@@ -796,11 +796,13 @@ export default function CoursPageRoute() {
                     </div>
                     <div className="flex items-center gap-2 flex-wrap justify-between">
                       {/* Quit button - positioned at the far left - hidden on desktop */}
+
                       <Button
                         variant="destructive"
                         size="sm"
                         onClick={handleBackToSpecialtyNested}
                         className="whitespace-nowrap bg-red-600 hover:bg-red-700 text-white border-0 rounded-xl shadow-md md:hidden"
+
                       >
                         <ArrowLeft className="h-4 w-4 mr-2" />
                         <span>Quitter</span>
@@ -826,12 +828,14 @@ export default function CoursPageRoute() {
                         )}
                         
                         {/* Signaler button for current question - hidden on xs screens for admins to save space */}
+
                         {currentQuestion && (
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => setIsReportDialogOpen(true)}
                             className={`whitespace-nowrap backdrop-blur-sm bg-white/90 dark:bg-gray-800/90 border border-gray-200/60 dark:border-gray-700/60 rounded-xl shadow-md ${(user?.role === 'admin' || user?.role === 'maintainer') ? 'hidden xs:flex' : ''}`}
+
                           >
                             <Flag className="h-4 w-4 mr-2" />
                             <span className="hidden sm:inline">Signaler</span>

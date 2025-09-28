@@ -213,17 +213,22 @@ export default function AdminValidationPage() {
     try {
       // Prefer session-based download (no long URLs)
       if (validationResult.sessionId) {
-        const res = await fetch(`/api/validation?mode=${mode}&sessionId=${validationResult.sessionId}`);
+        const urlParams = new URLSearchParams({ mode, sessionId: validationResult.sessionId! });
+        if (validationResult.fileName) urlParams.set('fileName', validationResult.fileName);
+        const res = await fetch(`/api/validation?${urlParams.toString()}`);
         if (!res.ok) throw new Error('Export failed');
         const blob = await res.blob();
-        const url = window.URL.createObjectURL(blob);
+        const cd = res.headers.get('Content-Disposition') || '';
+        const match = cd.match(/filename="?([^";]+)"?/i);
+        const suggested = match ? match[1] : undefined;
+        const objectUrl = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.style.display = 'none';
-        a.href = url;
-        a.download = `validation_${mode}.xlsx`;
+        a.href = objectUrl;
+        a.download = suggested || `validation_${mode}.xlsx`;
         document.body.appendChild(a);
         a.click();
-        window.URL.revokeObjectURL(url);
+        window.URL.revokeObjectURL(objectUrl);
         return;
       }
 
@@ -231,18 +236,21 @@ export default function AdminValidationPage() {
       const res = await fetch('/api/validation/export', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode, good: validationResult.good, bad: validationResult.bad })
+        body: JSON.stringify({ mode, good: validationResult.good, bad: validationResult.bad, fileName: validationResult.fileName })
       });
       if (!res.ok) throw new Error('Export failed');
       const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
+      const cd = res.headers.get('Content-Disposition') || '';
+      const match = cd.match(/filename="?([^";]+)"?/i);
+      const suggested = match ? match[1] : undefined;
+      const objectUrl = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.style.display = 'none';
-      a.href = url;
-      a.download = `validation_${mode}.xlsx`;
+      a.href = objectUrl;
+      a.download = suggested || `validation_${mode}.xlsx`;
       document.body.appendChild(a);
       a.click();
-      window.URL.revokeObjectURL(url);
+      window.URL.revokeObjectURL(objectUrl);
     } catch (e) {
       toast.error('Impossible de télécharger');
     }
@@ -259,14 +267,17 @@ export default function AdminValidationPage() {
       const response = await fetch(`/api/validation/ai-progress?aiId=${job.id}&action=download`);
       if (response.ok) {
         const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
+        const cd = response.headers.get('Content-Disposition') || '';
+        const match = cd.match(/filename="?([^";]+)"?/i);
+        const suggested = match ? match[1] : undefined;
+        const objectUrl = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.style.display = 'none';
-        a.href = url;
-        a.download = `enhanced_${job.fileName}`;
+        a.href = objectUrl;
+        a.download = suggested || `enhanced_${job.fileName}`;
         document.body.appendChild(a);
         a.click();
-        window.URL.revokeObjectURL(url);
+        window.URL.revokeObjectURL(objectUrl);
         
         toast.success("Le fichier amélioré a été téléchargé");
       }

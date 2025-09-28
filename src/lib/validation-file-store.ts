@@ -20,15 +20,21 @@ export function storeValidationFiles(sessionId: string, data: {
   reportBuffer: Buffer;
   fileName: string;
 }): void {
+  console.log('Storing validation files for sessionId:', sessionId, 'fileName:', data.fileName);
   validationFiles.set(sessionId, { ...data, createdAt: Date.now() });
+  console.log('Total sessions in store:', validationFiles.size);
   // Schedule cleanup
   setTimeout(() => {
+    console.log('Cleaning up validation files for sessionId:', sessionId);
     validationFiles.delete(sessionId);
   }, VALIDATION_FILES_TTL_MS).unref?.();
 }
 
 export function getValidationFiles(sessionId: string): StoredValidationFiles | null {
+  console.log('Getting validation files for sessionId:', sessionId);
+  console.log('Available sessions:', Array.from(validationFiles.keys()));
   const v = validationFiles.get(sessionId) || null;
+  console.log('Found validation files:', !!v);
   return v;
 }
 

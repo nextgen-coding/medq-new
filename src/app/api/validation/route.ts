@@ -252,7 +252,7 @@ export async function POST(request: NextRequest) {
     // Pre-generate and store downloadable files to avoid massive URL payloads
     // Build import-ready workbook for good rows: 4 sheets with canonical headers
     const IMPORT_HEADERS = [
-      'matiere', 'cours', 'question n', 'cas n', 'texte du cas', 'texte de la question',
+      'matiere', 'cours', 'question n', 'cas n', 'source', 'texte du cas', 'texte de la question',
       'reponse', 'option a', 'option b', 'option c', 'option d', 'option e',
       'rappel', 'explication', 'explication a', 'explication b', 'explication c', 'explication d', 'explication e',
       'image', 'niveau', 'semestre'
@@ -273,6 +273,7 @@ export async function POST(request: NextRequest) {
         cours: coursVal,
         'question n': rec?.['question n'] ?? '',
         'cas n': rec?.['cas n'] ?? '',
+        source: rec?.['source'] ?? '',
         'texte du cas': rec?.['texte du cas'] ?? '',
         'texte de la question': qText,
         reponse: rec?.['reponse'] ?? '',
@@ -304,7 +305,7 @@ export async function POST(request: NextRequest) {
     const bufGood = write(wbGood, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
 
     // Build error workbook (single sheet)
-    const errorHeader = ['sheet', 'row', 'reason', 'matiere', 'cours', 'question n', 'cas n', 'texte du cas', 'texte de la question', 'reponse', 'option a', 'option b', 'option c', 'option d', 'option e', 'rappel', 'explication', 'image'];
+  const errorHeader = ['sheet', 'row', 'reason', 'matiere', 'cours', 'question n', 'cas n', 'source', 'texte du cas', 'texte de la question', 'reponse', 'option a', 'option b', 'option c', 'option d', 'option e', 'rappel', 'explication', 'image'];
     const errRows = bad.map((r: any) => {
       const rec = r.original || {};
       const isCas = r.sheet === 'cas_qcm' || r.sheet === 'cas_qroc';
@@ -319,6 +320,7 @@ export async function POST(request: NextRequest) {
         cours: rec?.['cours'] ?? '',
         'question n': rec?.['question n'] ?? '',
         'cas n': rec?.['cas n'] ?? '',
+        source: rec?.['source'] ?? '',
         'texte du cas': rec?.['texte du cas'] ?? '',
         'texte de la question': qText,
         reponse: rec?.['reponse'] ?? '',
@@ -353,19 +355,28 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const mode = (searchParams.get('mode') as 'good' | 'bad') || 'good';
+  const mode = (searchParams.get('mode') as 'good' | 'bad') || 'good';
     const sessionId = searchParams.get('sessionId');
+    const originalName = searchParams.get('fileName') || undefined;
 
     // Prefer session-based buffers (safer than large payload URLs)
     if (sessionId) {
+      console.log('Looking for sessionId:', sessionId);
       const files = getValidationFiles(sessionId);
-      if (!files) return NextResponse.json({ error: 'Session not found or expired' }, { status: 404 });
+      console.log('Found files for session:', !!files);
+      if (!files) {
+        console.log('Session not found or expired for sessionId:', sessionId);
+        return NextResponse.json({ error: `Session not found or expired for sessionId: ${sessionId}` }, { status: 404 });
+      }
       const buffer = mode === 'good' ? files.goodFileBuffer : files.errorFileBuffer;
       const bytes = new Uint8Array(buffer);
+      const base = (originalName || files.fileName || '').replace(/\.[^.]+$/, '') || `validation_${mode}`;
+      const outName = `${base}-${mode === 'good' ? 'valide' : 'erreurs'}.xlsx`;
+      console.log('Serving download with filename:', outName);
       return new NextResponse(bytes, {
         headers: {
           'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          'Content-Disposition': `attachment; filename="validation_${mode}.xlsx"`,
+          'Content-Disposition': `attachment; filename="${outName}"`,
         },
       });
     }
@@ -380,8 +391,8 @@ export async function GET(request: NextRequest) {
     }
 
     const header = mode === 'good'
-      ? ['sheet', 'row', 'matiere', 'cours', 'question n', 'cas n', 'texte du cas', 'texte de la question', 'reponse', 'option a', 'option b', 'option c', 'option d', 'option e', 'rappel', 'explication', 'explication a', 'explication b', 'explication c', 'explication d', 'explication e', 'image', 'niveau', 'semestre']
-      : ['sheet', 'row', 'reason', 'matiere', 'cours', 'question n', 'cas n', 'texte du cas', 'texte de la question', 'reponse', 'option a', 'option b', 'option c', 'option d', 'option e', 'rappel', 'explication', 'image'];
+      ? ['sheet', 'row', 'matiere', 'cours', 'question n', 'cas n', 'source', 'texte du cas', 'texte de la question', 'reponse', 'option a', 'option b', 'option c', 'option d', 'option e', 'rappel', 'explication', 'explication a', 'explication b', 'explication c', 'explication d', 'explication e', 'image', 'niveau', 'semestre']
+      : ['sheet', 'row', 'reason', 'matiere', 'cours', 'question n', 'cas n', 'source', 'texte du cas', 'texte de la question', 'reponse', 'option a', 'option b', 'option c', 'option d', 'option e', 'rappel', 'explication', 'image'];
 
     const dataObjects = rows.map((r: any) => {
       const rec = mode === 'good' ? r.data : r.original;
@@ -397,6 +408,7 @@ export async function GET(request: NextRequest) {
         cours: rec?.['cours'] ?? '',
         'question n': rec?.['question n'] ?? '',
         'cas n': rec?.['cas n'] ?? '',
+        source: rec?.['source'] ?? '',
         'texte du cas': rec?.['texte du cas'] ?? '',
         'texte de la question': qText,
         reponse: rec?.['reponse'] ?? '',
@@ -428,10 +440,12 @@ export async function GET(request: NextRequest) {
     const arrayBuffer = write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
     const bytes = new Uint8Array(arrayBuffer);
 
+    const base = (originalName || '').replace(/\.[^.]+$/, '') || `validation_${mode}`;
+    const outName = `${base}-${mode === 'good' ? 'valide' : 'erreurs'}.xlsx`;
     return new NextResponse(bytes, {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition': `attachment; filename="validation_${mode}.xlsx"`,
+        'Content-Disposition': `attachment; filename="${outName}"`,
       },
     });
   } catch (error: any) {

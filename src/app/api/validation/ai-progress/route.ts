@@ -83,8 +83,9 @@ function canonicalizeHeader(h: string): string {
 import { read, utils, write } from 'xlsx';
 
 // Canonical import headers expected by /api/questions/bulk-import-progress
+// Include 'source' so the session info can round-trip through AI export -> import
 const IMPORT_HEADERS = [
-  'matiere', 'cours', 'question n', 'cas n', 'texte du cas', 'texte de la question',
+  'matiere', 'cours', 'question n', 'cas n', 'source', 'texte du cas', 'texte de la question',
   'reponse', 'option a', 'option b', 'option c', 'option d', 'option e',
   'rappel', 'explication', 'explication a', 'explication b', 'explication c', 'explication d', 'explication e',
   'image', 'niveau', 'semestre'
@@ -1062,14 +1063,17 @@ async function getHandler(request: AuthenticatedRequest) {
     // Try in-memory first (fresh buffer). If not present fall back to DB outputUrl (data URL)
     const mem = activeAiSessions.get(aiId);
     if (mem?.resultBuffer) {
+      const original = String(mem.fileName || '').trim();
+      const base = original ? original.replace(/\.[^.]+$/, '') : 'ai_fixed';
+      const outName = `${base}-ai-fixed.xlsx`;
       return new NextResponse(mem.resultBuffer, {
         headers: {
           'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          'Content-Disposition': 'attachment; filename="ai_fixed.xlsx"'
+          'Content-Disposition': `attachment; filename="${outName}"`
         }
       });
     }
-    const job = await prisma.aiValidationJob.findFirst({ where: { id: aiId, userId }, select: { outputUrl: true } });
+    const job = await prisma.aiValidationJob.findFirst({ where: { id: aiId, userId }, select: { outputUrl: true, fileName: true } });
     if (!job?.outputUrl) return NextResponse.json({ error: 'no result available' }, { status: 404 });
     try {
       // outputUrl may be a data URL
@@ -1077,10 +1081,13 @@ async function getHandler(request: AuthenticatedRequest) {
   const buf = Buffer.from(b64, 'base64');
   const u8 = new Uint8Array(buf);
   const blob = new Blob([u8], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const original = String(job.fileName || '').trim();
+      const base = original ? original.replace(/\.[^.]+$/, '') : 'ai_fixed';
+      const outName = `${base}-ai-fixed.xlsx`;
       return new NextResponse(blob, {
         headers: {
           'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          'Content-Disposition': 'attachment; filename="ai_fixed.xlsx"'
+          'Content-Disposition': `attachment; filename="${outName}"`
         }
       });
     } catch {

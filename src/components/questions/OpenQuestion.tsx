@@ -59,6 +59,7 @@ interface OpenQuestionProps {
   showEyeButton?: boolean; // control whether to show the eye button in header
   isRevisionMode?: boolean; // when true, allow free navigation without requiring submission
   customActionButton?: React.ReactNode; // custom button to render between actions and rappel du cours
+
 }
 
 export function OpenQuestion({ 
@@ -93,6 +94,7 @@ export function OpenQuestion({
   showEyeButton = false,
   isRevisionMode = false,
   customActionButton,
+
 }: OpenQuestionProps) {
   const [answer, setAnswer] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -1036,6 +1038,7 @@ export function OpenQuestion({
       {customActionButton}
     </div>
   )}
+
 
   {/* Rappel du cours (après soumission) */}
   {submitted && !suppressReminder && !showSelfAssessment && (() => {
