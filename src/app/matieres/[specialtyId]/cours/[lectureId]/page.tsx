@@ -764,185 +764,190 @@ export default function CoursPageRoute() {
                           {lecture?.specialty?.name ? `${lecture.specialty.name}${lecture?.title ? ' • ' : ''}` : ''}{lecture?.title || ''}
                         </span>
                       )}
+                      {/* Blue line under metadata in mobile view */}
+                      <div className="md:hidden h-1 bg-blue-500 dark:bg-blue-600 rounded w-[200px] mt-2" />
                     </div>
-                    <div className="flex items-center gap-2 flex-wrap justify-end">
-                      {/* Pin button for current question */}
-                      {currentQuestion && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={isPinned ? handleUnpinQuestion : handlePinQuestion}
-                          className="whitespace-nowrap backdrop-blur-sm bg-white/90 dark:bg-gray-800/90 border border-gray-200/60 dark:border-gray-700/60 rounded-xl shadow-md"
-                        >
-                          {isPinned ? (
-                            <PinOff className="h-4 w-4 mr-2" />
-                          ) : (
-                            <Pin className="h-4 w-4 mr-2" />
-                          )}
-                          <span className="hidden sm:inline">{isPinned ? 'Détacher' : 'Épingler'}</span>
-                        </Button>
-                      )}
-                      
-                      {/* Signaler button for current question */}
-                      {currentQuestion && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setIsReportDialogOpen(true)}
-                          className="whitespace-nowrap backdrop-blur-sm bg-white/90 dark:bg-gray-800/90 border border-gray-200/60 dark:border-gray-700/60 rounded-xl shadow-md"
-                        >
-                          <Flag className="h-4 w-4 mr-2" />
-                          <span className="hidden sm:inline">Signaler</span>
-                        </Button>
-                      )}
-                      
-                      {/* Admin Dialog for other actions */}
-                      {(user?.role === 'admin' || user?.role === 'maintainer') && (
-                        <Dialog open={openAdminDialog} onOpenChange={setOpenAdminDialog}>
-                          <DialogTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="whitespace-nowrap"
-                            >
-                              <Settings className="h-4 w-4 mr-2" />
-                              <span className="hidden sm:inline">Admin</span>
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="sm:max-w-md">
-                            <DialogHeader>
-                              <DialogTitle>Actions administrateur</DialogTitle>
-                            </DialogHeader>
-                            <div className="grid gap-3 py-4">
-                              {/* Current Question Actions */}
-                              {currentQuestion && (
-                                <>
-                                  <div className="text-sm text-gray-600 dark:text-gray-400 font-medium border-b pb-2 mb-2">
-                                    Question actuelle
-                                  </div>
-                                  
-                                  <Button
-                                    variant="outline"
-                                    onClick={() => {
-                                      if (currentQuestion && 'questions' in currentQuestion) {
-                                        const cc = currentQuestion as ClinicalCase;
-                                        const isGroupedQrocOnly = cc.questions.every(q => q.type === 'qroc');
-                                        const isGroupedMcqOnly = cc.questions.every(q => q.type === 'mcq');
-                                        if (isGroupedQrocOnly) {
-                                          setOpenGroupedQrocEdit(true);
-                                        } else if (isGroupedMcqOnly) {
-                                          setOpenGroupedMcqEdit(true);
-                                        } else {
-                                          setOpenClinicalCaseEdit(true);
-                                        }
-                                      } else {
-                                        setIsEditDialogOpen(true);
-                                      }
-                                      setOpenAdminDialog(false);
-                                    }}
-                                    className="justify-start"
-                                  >
-                                    <Pencil className="h-4 w-4 mr-2" />
-                                    Modifier la question
-                                  </Button>
-                                  
-                                  <Button
-                                    variant="outline"
-                                    onClick={handleToggleQuestionVisibility}
-                                    disabled={isTogglingVisibility}
-                                    className="justify-start"
-                                  >
-                                    {(() => {
-                                      // Determine if current question is hidden
-                                      let isHidden = false;
-                                      if ('questions' in currentQuestion) {
-                                        // For clinical cases, check first question
-                                        const clinicalCase = currentQuestion as ClinicalCase;
-                                        isHidden = clinicalCase.questions[0]?.hidden || false;
-                                      } else {
-                                        // Regular question
-                                        const question = currentQuestion as Question;
-                                        isHidden = question.hidden || false;
-                                      }
-                                      
-                                      return (
-                                        <>
-                                          {isHidden ? (
-                                            <Eye className="h-4 w-4 mr-2" />
-                                          ) : (
-                                            <EyeOff className="h-4 w-4 mr-2" />
-                                          )}
-                                          {isHidden ? 'Afficher la question' : 'Masquer la question'}
-                                        </>
-                                      );
-                                    })()}
-                                  </Button>
-                                  
-                                  {user?.role === 'admin' && (
-                                    <Button
-                                      variant="outline"
-                                      onClick={handleDeleteCurrentQuestion}
-                                      className="justify-start text-destructive hover:text-destructive"
-                                    >
-                                      <Trash2 className="h-4 w-4 mr-2" />
-                                      Supprimer la question
-                                    </Button>
-                                  )}
-                                  
-                                  <div className="text-sm text-gray-600 dark:text-gray-400 font-medium border-b pb-2 mb-2 mt-4">
-                                    Gestion globale
-                                  </div>
-                                </>
-                              )}
-                              
-                              {/* Global Actions */}
-                              <Button
-                                variant="outline"
-                                onClick={() => {
-                                  setOpenQuestionsDialog(true);
-                                  setOpenAdminDialog(false);
-                                }}
-                                className="justify-start"
-                              >
-                                <PlusCircle className="h-4 w-4 mr-2" />
-                                Créer une question
-                              </Button>
-                              {user?.role === 'admin' && (
-                                <Button
-                                  variant="outline"
-                                  onClick={() => {
-                                    setOpenOrganizer(true);
-                                    setOpenQuestionsDialog(true);
-                                    setOpenAdminDialog(false);
-                                  }}
-                                  className="justify-start"
-                                >
-                                  <ListOrdered className="h-4 w-4 mr-2" />
-                                  Organiser les questions
-                                </Button>
-                              )}
-                            </div>
-                          </DialogContent>
-                        </Dialog>
-                      )}
-                      
-                      {/* Quit button - mobile only, positioned between Admin and Timer */}
+                    <div className="flex items-center gap-2 flex-wrap justify-between">
+                      {/* Quit button - positioned at the far left */}
                       <Button
                         variant="destructive"
                         size="sm"
                         onClick={handleBackToSpecialtyNested}
-                        className="sm:hidden whitespace-nowrap bg-red-600 hover:bg-red-700 text-white border-0 rounded-xl shadow-md"
+                        className="whitespace-nowrap bg-red-600 hover:bg-red-700 text-white border-0 rounded-xl shadow-md"
                       >
                         <ArrowLeft className="h-4 w-4 mr-2" />
                         <span>Quitter</span>
                       </Button>
                       
-                      {/* Timer at the very right */}
-                      <LectureTimer lectureId={lectureId} />
+                      {/* Other buttons grouped at the right */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {/* Pin button for current question */}
+                        {currentQuestion && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={isPinned ? handleUnpinQuestion : handlePinQuestion}
+                            className="whitespace-nowrap backdrop-blur-sm bg-white/90 dark:bg-gray-800/90 border border-gray-200/60 dark:border-gray-700/60 rounded-xl shadow-md"
+                          >
+                            {isPinned ? (
+                              <PinOff className="h-4 w-4 mr-2" />
+                            ) : (
+                              <Pin className="h-4 w-4 mr-2" />
+                            )}
+                            <span className="hidden sm:inline">{isPinned ? 'Détacher' : 'Épingler'}</span>
+                          </Button>
+                        )}
+                        
+                        {/* Signaler button for current question */}
+                        {currentQuestion && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setIsReportDialogOpen(true)}
+                            className="whitespace-nowrap backdrop-blur-sm bg-white/90 dark:bg-gray-800/90 border border-gray-200/60 dark:border-gray-700/60 rounded-xl shadow-md"
+                          >
+                            <Flag className="h-4 w-4 mr-2" />
+                            <span className="hidden sm:inline">Signaler</span>
+                          </Button>
+                        )}
+                        
+                        {/* Admin Dialog for other actions */}
+                        {(user?.role === 'admin' || user?.role === 'maintainer') && (
+                          <Dialog open={openAdminDialog} onOpenChange={setOpenAdminDialog}>
+                            <DialogTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="whitespace-nowrap"
+                              >
+                                <Settings className="h-4 w-4 mr-2" />
+                                <span className="hidden sm:inline">Admin</span>
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-md">
+                              <DialogHeader>
+                                <DialogTitle>Actions administrateur</DialogTitle>
+                              </DialogHeader>
+                              <div className="grid gap-3 py-4">
+                                {/* Current Question Actions */}
+                                {currentQuestion && (
+                                  <>
+                                    <div className="text-sm text-gray-600 dark:text-gray-400 font-medium border-b pb-2 mb-2">
+                                      Question actuelle
+                                    </div>
+                                    
+                                    <Button
+                                      variant="outline"
+                                      onClick={() => {
+                                        if (currentQuestion && 'questions' in currentQuestion) {
+                                          const cc = currentQuestion as ClinicalCase;
+                                          const isGroupedQrocOnly = cc.questions.every(q => q.type === 'qroc');
+                                          const isGroupedMcqOnly = cc.questions.every(q => q.type === 'mcq');
+                                          if (isGroupedQrocOnly) {
+                                            setOpenGroupedQrocEdit(true);
+                                          } else if (isGroupedMcqOnly) {
+                                            setOpenGroupedMcqEdit(true);
+                                          } else {
+                                            setOpenClinicalCaseEdit(true);
+                                          }
+                                        } else {
+                                          setIsEditDialogOpen(true);
+                                        }
+                                        setOpenAdminDialog(false);
+                                      }}
+                                      className="justify-start"
+                                    >
+                                      <Pencil className="h-4 w-4 mr-2" />
+                                      Modifier la question
+                                    </Button>
+                                    
+                                    <Button
+                                      variant="outline"
+                                      onClick={handleToggleQuestionVisibility}
+                                      disabled={isTogglingVisibility}
+                                      className="justify-start"
+                                    >
+                                      {(() => {
+                                        // Determine if current question is hidden
+                                        let isHidden = false;
+                                        if ('questions' in currentQuestion) {
+                                          // For clinical cases, check first question
+                                          const clinicalCase = currentQuestion as ClinicalCase;
+                                          isHidden = clinicalCase.questions[0]?.hidden || false;
+                                        } else {
+                                          // Regular question
+                                          const question = currentQuestion as Question;
+                                          isHidden = question.hidden || false;
+                                        }
+                                        
+                                        return (
+                                          <>
+                                            {isHidden ? (
+                                              <Eye className="h-4 w-4 mr-2" />
+                                            ) : (
+                                              <EyeOff className="h-4 w-4 mr-2" />
+                                            )}
+                                            {isHidden ? 'Afficher la question' : 'Masquer la question'}
+                                          </>
+                                        );
+                                      })()}
+                                    </Button>
+                                    
+                                    {user?.role === 'admin' && (
+                                      <Button
+                                        variant="outline"
+                                        onClick={handleDeleteCurrentQuestion}
+                                        className="justify-start text-destructive hover:text-destructive"
+                                      >
+                                        <Trash2 className="h-4 w-4 mr-2" />
+                                        Supprimer la question
+                                      </Button>
+                                    )}
+                                    
+                                    <div className="text-sm text-gray-600 dark:text-gray-400 font-medium border-b pb-2 mb-2 mt-4">
+                                      Gestion globale
+                                    </div>
+                                  </>
+                                )}
+                                
+                                {/* Global Actions */}
+                                <Button
+                                  variant="outline"
+                                  onClick={() => {
+                                    setOpenQuestionsDialog(true);
+                                    setOpenAdminDialog(false);
+                                  }}
+                                  className="justify-start"
+                                >
+                                  <PlusCircle className="h-4 w-4 mr-2" />
+                                  Créer une question
+                                </Button>
+                                {user?.role === 'admin' && (
+                                  <Button
+                                    variant="outline"
+                                    onClick={() => {
+                                      setOpenOrganizer(true);
+                                      setOpenQuestionsDialog(true);
+                                      setOpenAdminDialog(false);
+                                    }}
+                                    className="justify-start"
+                                  >
+                                    <ListOrdered className="h-4 w-4 mr-2" />
+                                    Organiser les questions
+                                  </Button>
+                                )}
+                              </div>
+                            </DialogContent>
+                          </Dialog>
+                        )}
+                        
+                        {/* Timer at the very right */}
+                        <LectureTimer lectureId={lectureId} />
+                      </div>
                     </div>
                   </div>
-                  {/* Divider under metadata (blue, thicker, indented) */}
-                  <div className="h-1 bg-blue-500 dark:bg-blue-600 rounded w-[250px]" />
+                  {/* Divider under metadata (blue, thicker, indented) - desktop only */}
+                  <div className="hidden md:block h-1 bg-blue-500 dark:bg-blue-600 rounded w-[250px]" />
                 </div>
               )}
 
