@@ -7,12 +7,12 @@ import { validatePassword } from '../../../../lib/password-validation';
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password, name } = await request.json();
-    
+    const { email, password, name, phone } = await request.json();
+
     // Validate input
-    if (!email || !password) {
+    if (!email || !password || !phone) {
       return NextResponse.json(
-        { error: 'Email and password are required' },
+        { error: 'Email, password, and phone are required' },
         { status: 400 }
       );
     }
@@ -25,31 +25,32 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    
+
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
       where: { email }
     });
-    
+
     if (existingUser) {
       return NextResponse.json(
         { error: 'User with this email already exists' },
         { status: 409 }
       );
     }
-    
+
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
-    
+
     // Generate verification token
     const verificationToken = generateToken();
-    
+
     // Create user
     const user = await prisma.user.create({
       data: {
         email,
         password: hashedPassword,
         name: name || null,
+        phone,
         role: 'student', // Default role
         status: 'pending',
         verificationToken,

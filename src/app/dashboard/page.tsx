@@ -1,5 +1,6 @@
 "use client";
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { PhoneDialog } from '@/components/PhoneDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { UniversalHeader } from '@/components/layout/UniversalHeader';
@@ -36,10 +37,40 @@ export default function DashboardPage() {
 
   const shouldShowUpsell = !hasActiveSubscription && !isAdmin && !isUpsellDismissed;
 
+  // PHONE DIALOG STATE AND LOGIC
+  const [showPhoneDialog, setShowPhoneDialog] = useState(false);
+  const [phoneLoading, setPhoneLoading] = useState(false);
+  useEffect(() => {
+    if (user && !user.phone) {
+      setShowPhoneDialog(true);
+    } else {
+      setShowPhoneDialog(false);
+    }
+  }, [user]);
+
+  const handleSavePhone = async (phone: string) => {
+    setPhoneLoading(true);
+    try {
+      const res = await fetch('/api/user/phone', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone }),
+        credentials: 'include',
+      });
+      if (res.ok) {
+        // Optionally, refresh user context
+        if (typeof window !== 'undefined') window.location.reload();
+      }
+    } finally {
+      setPhoneLoading(false);
+    }
+  };
+
   return (
     <ProtectedRoute>
       <ProfileCompletionGuard>
         <AppSidebarProvider>
+          <PhoneDialog open={showPhoneDialog} onSave={handleSavePhone} loading={phoneLoading} />
           <div className="flex min-h-screen w-full max-h-screen overflow-hidden flex-col md:flex-row">
             <AppSidebar />
             <SidebarInset className="flex-1 flex flex-col overflow-hidden">

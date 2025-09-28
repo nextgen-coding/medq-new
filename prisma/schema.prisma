@@ -53,6 +53,7 @@ model User {
   image                 String?
   google_id             String?        @unique(map: "profiles_google_id_idx")
   facebook_id           String?        @unique(map: "profiles_facebook_id_idx")
+  phone                 String?
   emailVerified         DateTime?      @map("email_verified")
   passwordResetExpires  DateTime?      @map("password_reset_expires")
   passwordResetToken    String?        @map("password_reset_token")

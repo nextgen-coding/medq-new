@@ -24,6 +24,7 @@ async function handler(request: AuthenticatedRequest) {
         profileCompleted: true,
         highlightColor: true,
         showSelfAssessment: true,
+        phone: true,
         // Subscription fields
         hasActiveSubscription: true,
         subscriptionExpiresAt: true,
