@@ -495,35 +495,35 @@ export default function SpecialtyPageRoute() {
       <AppSidebarProvider>
         <div className="flex w-full h-screen bg-gray-50 dark:bg-gray-900 overflow-hidden">
           <AppSidebar />
-          <SidebarInset className="flex flex-col h-full bg-gray-50 dark:bg-gray-900">
+          <SidebarInset className="flex flex-col h-full bg-gray-50 dark:bg-gray-900 overflow-hidden">
             <UniversalHeader title={specialty ? specialty.name : 'Matière'} />
             <main className="flex-1 min-h-0 overflow-y-auto">
-              <div className="bg-gray-50 dark:bg-gray-900 p-4 sm:p-6 lg:p-8 min-w-0 overflow-x-hidden flex-1">
-                <div className="max-w-7xl mx-auto space-y-6 min-w-0">
+              <div className="bg-gray-50 dark:bg-gray-900 p-2 sm:p-3 lg:p-6 xl:p-8 min-w-0 overflow-x-hidden flex-1">
+                <div className="max-w-7xl mx-auto space-y-3 sm:space-y-4 lg:space-y-6 min-w-0">
                   {/* Breadcrumb */}
-                  <div className="flex items-center gap-4 min-w-0">
-                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 min-w-0 flex-1">
+                  <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+                    <div className="flex items-center gap-1 sm:gap-2 text-sm text-gray-600 dark:text-gray-400 min-w-0 flex-1">
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => router.push('/matieres')}
-                        className="flex items-center gap-1 px-2 py-1 h-auto hover:bg-gray-100 dark:hover:bg-gray-700 flex-shrink-0"
+                        className="flex items-center gap-1 px-2 py-1 h-auto hover:bg-gray-100 dark:hover:bg-gray-700 flex-shrink-0 text-xs sm:text-sm"
                       >
-                        <ArrowLeft className="h-3 w-3" />
-                        Matières
+                        <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+                        <span className="hidden xs:inline">Matières</span>
                       </Button>
                       <span className="flex-shrink-0">/</span>
-                      <span className="text-gray-900 dark:text-gray-100 font-medium truncate">{specialty.name}</span>
+                      <span className="text-gray-900 dark:text-gray-100 font-medium truncate text-sm sm:text-base">{specialty.name}</span>
                     </div>
                     {isAdmin && (
                       <Button 
                         variant="outline" 
                         size="sm" 
                         onClick={handleEdit} 
-                        className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-100 transition-colors flex-shrink-0"
+                        className="flex items-center gap-1 sm:gap-2 bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-100 transition-colors flex-shrink-0 text-xs sm:text-sm px-2 sm:px-3"
                       >
-                        <Edit className="w-4 h-4" />
-                        Modifier
+                        <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
+                        <span className="hidden xs:inline">Modifier</span>
                       </Button>
                     )}
                   </div>
@@ -538,17 +538,17 @@ export default function SpecialtyPageRoute() {
                           )}
 
                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 min-w-0">
-                            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 min-w-0">
+                            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 min-w-0 border border-blue-100 dark:border-blue-800">
                               <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{specialty.progress?.totalLectures || 0}</div>
-                              <div className="text-sm text-blue-600 dark:text-blue-400">Cours totaux</div>
+                              <div className="text-sm text-blue-600 dark:text-blue-400 font-medium">Cours totaux</div>
                             </div>
-                            <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 min-w-0">
+                            <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 min-w-0 border border-green-100 dark:border-green-800">
                               <div className="text-2xl font-bold text-green-700 dark:text-green-300">{specialty.progress?.completedLectures || 0}</div>
-                              <div className="text-sm text-green-600 dark:text-green-400">Terminés</div>
+                              <div className="text-sm text-green-600 dark:text-green-400 font-medium">Terminés</div>
                             </div>
-                            <div className="bg-medblue-50 dark:bg-medblue-900/20 rounded-lg p-4 min-w-0">
+                            <div className="bg-medblue-50 dark:bg-medblue-900/20 rounded-lg p-4 min-w-0 border border-medblue-100 dark:border-medblue-800">
                               <div className="text-2xl font-bold text-medblue-700 dark:text-medblue-300">{Math.round(specialty.progress?.questionProgress || 0)}%</div>
-                              <div className="text-sm text-medblue-600 dark:text-medblue-400">Progression</div>
+                              <div className="text-sm text-medblue-600 dark:text-medblue-400 font-medium">Progression</div>
                             </div>
                           </div>
                         </div>
@@ -590,29 +590,35 @@ export default function SpecialtyPageRoute() {
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 min-w-0">
                               {Object.keys(courseGroups).map((groupName) => (
-                                <div key={groupName} className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg space-y-2">
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                      <Folder className="w-4 h-4 text-blue-600" />
-                                      <span className="font-medium">{groupName}</span>
-                                      <Badge variant="secondary" className="text-xs">{courseGroups[groupName].ids.length}</Badge>
-                                      <Badge variant="outline" className="text-xs">Coeff: {courseGroups[groupName].coefficient}</Badge>
+                                <div key={groupName} className="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg space-y-3 border border-gray-200 dark:border-gray-600">
+                                  <div className="flex items-start justify-between min-w-0">
+                                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                                      <Folder className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                                      <span className="font-medium truncate">{groupName}</span>
                                     </div>
-                                    <Button variant="ghost" size="sm" onClick={() => deleteGroup(groupName)} className="h-8 w-8 p-0 text-red-600 hover:bg-red-50">
+                                    <Button variant="ghost" size="sm" onClick={() => deleteGroup(groupName)} className="h-8 w-8 p-0 text-red-600 hover:bg-red-50 flex-shrink-0 ml-2">
                                       <Trash className="w-3 h-3" />
                                     </Button>
                                   </div>
-                                  <div className="flex items-center gap-2">
-                                    <Input
-                                      className="h-8 w-24"
-                                      type="number"
-                                      step="0.1"
-                                      value={editingCoeff[groupName] ?? String(courseGroups[groupName].coefficient)}
-                                      onChange={(e)=> setEditingCoeff(prev=> ({...prev, [groupName]: e.target.value}))}
-                                    />
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <Badge variant="secondary" className="text-xs">{courseGroups[groupName].ids.length} cours</Badge>
+                                    <Badge variant="outline" className="text-xs">Coeff: {courseGroups[groupName].coefficient}</Badge>
+                                  </div>
+                                  <div className="flex flex-col sm:flex-row gap-2">
+                                    <div className="flex items-center gap-2 flex-1">
+                                      <label className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">Coeff:</label>
+                                      <Input
+                                        className="h-8 flex-1"
+                                        type="number"
+                                        step="0.1"
+                                        value={editingCoeff[groupName] ?? String(courseGroups[groupName].coefficient)}
+                                        onChange={(e)=> setEditingCoeff(prev=> ({...prev, [groupName]: e.target.value}))}
+                                      />
+                                    </div>
                                     <Button
                                       size="sm"
                                       variant="outline"
+                                      className="whitespace-nowrap"
                                       onClick={async ()=>{
                                         const coeff = parseFloat(editingCoeff[groupName] ?? String(courseGroups[groupName].coefficient))
                                         if (isNaN(coeff)) return
@@ -636,10 +642,9 @@ export default function SpecialtyPageRoute() {
                                 </div>
                               ))}
                             </div>
-                            <div className="flex items-center gap-2 mt-3">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-3">
                               <span className="text-xs text-muted-foreground">Coeff. par défaut du nouveau groupe</span>
-                              <Input className="h-8 w-24" type="number" step="0.1" value={newGroupCoeff} onChange={(e)=> setNewGroupCoeff(e.target.value)} />
-
+                              <Input className="h-8 w-20 sm:w-24" type="number" step="0.1" value={newGroupCoeff} onChange={(e)=> setNewGroupCoeff(e.target.value)} />
                             </div>
                           </div>
                         )}
@@ -648,17 +653,17 @@ export default function SpecialtyPageRoute() {
                   )}
 
                   {/* Search and Filter */}
-                  <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center min-w-0">
-                    <div className="relative flex-1 w-full min-w-0">
+                  <div className="flex flex-col gap-4 min-w-0">
+                    <div className="relative w-full min-w-0">
                       <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4 flex-shrink-0" />
                       <Input placeholder="Rechercher des cours..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 bg-white dark:bg-gray-800 min-w-0" />
                     </div>
-                    <div className="flex gap-2 w-full sm:w-auto min-w-0">
+                    <div className="flex flex-col sm:flex-row gap-2 min-w-0">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="outline" className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-100 transition-colors flex-1 sm:flex-none min-w-0">
+                          <Button variant="outline" className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-100 transition-colors w-full sm:w-auto min-w-0 justify-start">
                             <Filter className="w-4 h-4 flex-shrink-0" />
-                            <span className="truncate">Filtrer</span>
+                            <span className="truncate">Filtrer: {selectedFilter === 'all' ? 'Tous' : selectedFilter === 'completed' ? 'Terminés' : selectedFilter === 'in-progress' ? 'En cours' : 'Non commencés'}</span>
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
@@ -670,7 +675,7 @@ export default function SpecialtyPageRoute() {
                       </DropdownMenu>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="outline" className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-100 transition-colors flex-1 sm:flex-none min-w-0">
+                          <Button variant="outline" className="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-100 transition-colors w-full sm:w-auto min-w-0 justify-start">
                             <ArrowUpDown className="w-4 h-4 flex-shrink-0" />
                             <span className="truncate">
                               {(() => {
@@ -703,8 +708,257 @@ export default function SpecialtyPageRoute() {
                   {/* Lectures table */}
                   <Card className="bg-white dark:bg-gray-800 shadow-sm min-w-0">
                     <CardContent className="p-0 min-w-0">
-                      <div className="overflow-x-auto w-full min-w-0 -mx-2 px-2 sm:mx-0 sm:px-0">
-                        <Table className="min-w-full w-full">
+                      {/* Mobile Card View */}
+                      <div className="block md:hidden p-4 space-y-4">
+                        {ungroupedLectures.map((lecture) => (
+                          <div key={`mobile-lecture-ungrouped-${lecture.id}`} className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
+                            <div className="flex items-start gap-3">
+                              {isAdmin && (
+                                <Checkbox
+                                  checked={!!selectedCourseIds[lecture.id]}
+                                  onCheckedChange={(checked) => setSelectedCourseIds(prev => ({ ...prev, [lecture.id]: !!checked }))}
+                                  className="mt-1"
+                                />
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <div 
+                                  className="flex items-start gap-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg p-2 -m-2 transition-colors"
+                                  onClick={() => goToLectureMode(lecture.id)}
+                                >
+                                  <File className="w-5 h-5 text-gray-500 flex-shrink-0 mt-0.5" />
+                                  <div className="min-w-0 flex-1">
+                                    <div className="font-medium text-gray-900 dark:text-gray-100 truncate">
+                                      {lecture.title}
+                                    </div>
+                                    {lecture.description && (
+                                      <div className="text-sm text-gray-500 truncate mt-1">
+                                        {lecture.description}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                
+                                <div className="mt-3 space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-sm font-medium">Progression</span>
+                                    <span className="text-sm font-semibold">{Math.round(lecture.progress?.percentage || 0)}%</span>
+                                  </div>
+                                  <div className="relative h-2 w-full overflow-hidden rounded-full bg-gray-200">
+                                    {(() => {
+                                      const total = lecture.progress?.totalQuestions || 1;
+                                      const correct = lecture.progress?.correctAnswers || 0;
+                                      const incorrect = lecture.progress?.incorrectAnswers || 0;
+                                      const partial = lecture.progress?.partialAnswers || 0;
+                                      
+                                      const correctPercent = (correct / total) * 100;
+                                      const incorrectPercent = (incorrect / total) * 100;
+                                      const partialPercent = (partial / total) * 100;
+                                      
+                                      return (
+                                        <>
+                                          <div className="absolute top-0 left-0 h-full bg-green-500" style={{ width: `${correctPercent}%` }} />
+                                          <div className="absolute top-0 h-full bg-red-500" style={{ left: `${correctPercent}%`, width: `${incorrectPercent}%` }} />
+                                          <div className="absolute top-0 h-full bg-yellow-500" style={{ left: `${correctPercent + incorrectPercent}%`, width: `${partialPercent}%` }} />
+                                        </>
+                                      );
+                                    })()}
+                                  </div>
+                                  <div className="text-xs text-gray-500">
+                                    {lecture.progress?.completedQuestions || 0} / {lecture.progress?.totalQuestions || 0} questions
+                                  </div>
+                                </div>
+
+                                <div className="mt-3 flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    {isAdmin && (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => router.push(`/admin/reports?lectureId=${lecture.id}`)}
+                                        className="flex items-center gap-1 hover:bg-orange-50 dark:hover:bg-orange-900/20 text-orange-600"
+                                      >
+                                        <AlertTriangle className="w-4 h-4" />
+                                        <span className="font-medium">{lecture.reportsCount || 0}</span>
+                                      </Button>
+                                    )}
+                                    {(() => {
+                                      const note = (lecture as any).culmonNote;
+                                      if (note == null || isNaN(note)) return null;
+                                      const isGood = note > 10;
+                                      const cls = isGood ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400';
+                                      return (
+                                        <span className={`text-sm font-semibold ${cls}`}>
+                                          Note: {note.toFixed(2)}/20
+                                        </span>
+                                      );
+                                    })()}
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      size="sm"
+                                      onClick={() => goToLectureMode(lecture.id)}
+                                      className="h-9 bg-sky-500 hover:bg-sky-600 text-white text-sm px-3"
+                                    >
+                                      <Play className="w-4 h-4 mr-1" />
+                                      {getModeLabel(getLectureMode(lecture.id))}
+                                    </Button>
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <Button
+                                          aria-label="Changer le mode"
+                                          variant="outline"
+                                          size="icon"
+                                          className="h-9 w-9 rounded-md bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-100 transition-colors"
+                                        >
+                                          <ChevronDown className="w-4 h-4" />
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end">
+                                        <DropdownMenuItem onClick={() => setLectureMode(lecture.id, 'study')}>Étude</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => setLectureMode(lecture.id, 'revision')}>Révision</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => setLectureMode(lecture.id, 'pinned')}>Épinglé</DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                        
+                        {/* Grouped lectures for mobile */}
+                        {Object.keys(courseGroups).map((groupName) => (
+                          <div key={`mobile-group-${groupName}`}>
+                            <div className="flex items-center gap-2 mb-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                              <Folder className="w-4 h-4 text-blue-600" />
+                              <span className="font-semibold text-blue-900 dark:text-blue-100">{groupName}</span>
+                              <Badge variant="secondary" className="ml-auto">{groupedLectures[groupName]?.length || 0} cours</Badge>
+                            </div>
+                            <div className="ml-4 space-y-3">
+                              {groupedLectures[groupName]?.map((lecture) => (
+                                <div key={`mobile-grouped-lecture-${lecture.id}`} className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600 border-l-4 border-l-blue-400">
+                                  <div className="flex items-start gap-3">
+                                    {isAdmin && (
+                                      <Checkbox
+                                        checked={!!selectedCourseIds[lecture.id]}
+                                        onCheckedChange={(checked) => setSelectedCourseIds(prev => ({ ...prev, [lecture.id]: !!checked }))}
+                                        className="mt-1"
+                                      />
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                      <div 
+                                        className="flex items-start gap-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg p-2 -m-2 transition-colors"
+                                        onClick={() => goToLectureMode(lecture.id)}
+                                      >
+                                        <File className="w-5 h-5 text-gray-500 flex-shrink-0 mt-0.5" />
+                                        <div className="min-w-0 flex-1">
+                                          <div className="font-medium text-gray-900 dark:text-gray-100 truncate">
+                                            {lecture.title}
+                                          </div>
+                                          {lecture.description && (
+                                            <div className="text-sm text-gray-500 truncate mt-1">
+                                              {lecture.description}
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                      
+                                      <div className="mt-3 space-y-2">
+                                        <div className="flex items-center justify-between">
+                                          <span className="text-sm font-medium">Progression</span>
+                                          <span className="text-sm font-semibold">{Math.round(lecture.progress?.percentage || 0)}%</span>
+                                        </div>
+                                        <div className="relative h-2 w-full overflow-hidden rounded-full bg-gray-200">
+                                          {(() => {
+                                            const total = lecture.progress?.totalQuestions || 1;
+                                            const correct = lecture.progress?.correctAnswers || 0;
+                                            const incorrect = lecture.progress?.incorrectAnswers || 0;
+                                            const partial = lecture.progress?.partialAnswers || 0;
+                                            
+                                            const correctPercent = (correct / total) * 100;
+                                            const incorrectPercent = (incorrect / total) * 100;
+                                            const partialPercent = (partial / total) * 100;
+                                            
+                                            return (
+                                              <>
+                                                <div className="absolute top-0 left-0 h-full bg-green-500" style={{ width: `${correctPercent}%` }} />
+                                                <div className="absolute top-0 h-full bg-red-500" style={{ left: `${correctPercent}%`, width: `${incorrectPercent}%` }} />
+                                                <div className="absolute top-0 h-full bg-yellow-500" style={{ left: `${correctPercent + incorrectPercent}%`, width: `${partialPercent}%` }} />
+                                              </>
+                                            );
+                                          })()}
+                                        </div>
+                                        <div className="text-xs text-gray-500">
+                                          {lecture.progress?.completedQuestions || 0} / {lecture.progress?.totalQuestions || 0} questions
+                                        </div>
+                                      </div>
+
+                                      <div className="mt-3 flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                          {isAdmin && (
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              onClick={() => router.push(`/admin/reports?lectureId=${lecture.id}`)}
+                                              className="flex items-center gap-1 hover:bg-orange-50 dark:hover:bg-orange-900/20 text-orange-600"
+                                            >
+                                              <AlertTriangle className="w-4 h-4" />
+                                              <span className="font-medium">{lecture.reportsCount || 0}</span>
+                                            </Button>
+                                          )}
+                                          {(() => {
+                                            const note = (lecture as any).culmonNote;
+                                            if (note == null || isNaN(note)) return null;
+                                            const isGood = note > 10;
+                                            const cls = isGood ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400';
+                                            return (
+                                              <span className={`text-sm font-semibold ${cls}`}>
+                                                Note: {note.toFixed(2)}/20
+                                              </span>
+                                            );
+                                          })()}
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          <Button
+                                            size="sm"
+                                            onClick={() => goToLectureMode(lecture.id)}
+                                            className="h-9 bg-sky-500 hover:bg-sky-600 text-white text-sm px-3"
+                                          >
+                                            <Play className="w-4 h-4 mr-1" />
+                                            {getModeLabel(getLectureMode(lecture.id))}
+                                          </Button>
+                                          <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                              <Button
+                                                aria-label="Changer le mode"
+                                                variant="outline"
+                                                size="icon"
+                                                className="h-9 w-9 rounded-md bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-100 transition-colors"
+                                              >
+                                                <ChevronDown className="w-4 h-4" />
+                                              </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end">
+                                              <DropdownMenuItem onClick={() => setLectureMode(lecture.id, 'study')}>Étude</DropdownMenuItem>
+                                              <DropdownMenuItem onClick={() => setLectureMode(lecture.id, 'revision')}>Révision</DropdownMenuItem>
+                                              <DropdownMenuItem onClick={() => setLectureMode(lecture.id, 'pinned')}>Épinglé</DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                          </DropdownMenu>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Desktop Table View */}
+                      <div className="hidden md:block">
+                        <div className="overflow-x-auto w-full">
+                          <Table className="min-w-full w-full">
                           <TableHeader>
                             <TableRow>
                                 {isAdmin && (
@@ -1061,6 +1315,7 @@ export default function SpecialtyPageRoute() {
                           ].flat())}
                         </TableBody>
                       </Table>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
