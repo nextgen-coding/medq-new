@@ -139,27 +139,39 @@ export default function SessionViewerPage() {
   // Store last scroll position for correction PDF
   const correctionScrollPos = useRef<number>(0);
 
-  // Save scroll position when hiding correction PDF
+  // Save scroll position when hiding correction PDF or collapsing panel
   const prevShowCorrectionPdf = useRef(showCorrectionPdf);
+  const prevPanelCollapsed = useRef(panelCollapsed);
   useEffect(() => {
-    const ref = correctionViewerRef.current;
-    if (prevShowCorrectionPdf.current && !showCorrectionPdf && ref) {
-      correctionScrollPos.current = ref.scrollTop;
-    }
-    prevShowCorrectionPdf.current = showCorrectionPdf;
-  }, [showCorrectionPdf]);
-
-  // Restore scroll position only after PDF is loaded and visible
-  useEffect(() => {
-    if (!showCorrectionPdf || correctionLoading) return;
     const ref = correctionViewerRef.current;
     if (ref) {
+      // Save when hiding correction PDF
+      if (prevShowCorrectionPdf.current && !showCorrectionPdf) {
+        correctionScrollPos.current = ref.scrollTop;
+      }
+      // Save when collapsing panel
+      if (!prevPanelCollapsed.current && panelCollapsed) {
+        correctionScrollPos.current = ref.scrollTop;
+      }
+    }
+    prevShowCorrectionPdf.current = showCorrectionPdf;
+    prevPanelCollapsed.current = panelCollapsed;
+  }, [showCorrectionPdf, panelCollapsed]);
+
+  // Restore scroll position immediately when PDF should be visible
+  useEffect(() => {
+    const shouldShowPdf = showCorrectionPdf || !correctionModeEnabled;
+    if (!shouldShowPdf || panelCollapsed) return;
+    const ref = correctionViewerRef.current;
+    if (ref && correctionScrollPos.current > 0) {
+      // Set scroll position immediately
       ref.scrollTop = correctionScrollPos.current;
+      // And again after a short delay to ensure PDF has rendered
       setTimeout(() => {
         if (ref) ref.scrollTop = correctionScrollPos.current;
-      }, 400);
+      }, 100);
     }
-  }, [showCorrectionPdf, correctionLoading]);
+  }, [showCorrectionPdf, panelCollapsed, correctionModeEnabled]);
   const fitExamPage = useCallback(() => {
     // Disabled: always maintain 133% zoom
     setScale(1.33);
@@ -189,6 +201,7 @@ export default function SessionViewerPage() {
   const canShowCorrectionPdf = !!(session && correctionUrlRaw);
   const canShowCorrectionZone = !!session && (isAdminOrMaintainer || hasDbCorrection === true);
   const canShowCorrectionButton = isAdminOrMaintainer && (canShowCorrectionPdf || canShowCorrectionZone);
+  const canToggleCorrectionPanel = canShowCorrectionPdf || canShowCorrectionZone;
   // auto open PDF view (in-panel) if ?type=correction
   useEffect(() => { if (viewType === 'correction' && canShowCorrectionPdf) { setPanelCollapsed(false); setShowCorrectionPdf(true); } }, [viewType, canShowCorrectionPdf]);
 
@@ -360,6 +373,10 @@ export default function SessionViewerPage() {
 
   // Handle question linking from CorrectionZone
   const handleQuestionLink = useCallback((questionId: string, questionNumber?: number) => {
+    // Save scroll position when switching to zone view
+    if (correctionViewerRef.current) {
+      correctionScrollPos.current = correctionViewerRef.current.scrollTop;
+    }
     // First, focus the PDF viewer by making sure correction PDF is not shown
     setShowCorrectionPdf(false);
     setPanelCollapsed(false); // Show correction panel but not PDF mode
@@ -515,6 +532,10 @@ export default function SessionViewerPage() {
       // Panel is open: if currently showing PDF, close; otherwise switch to PDF
       const currentlyShowingPdf = (!correctionModeEnabled) || (correctionModeEnabled && showCorrectionPdf);
       if (currentlyShowingPdf) {
+        // Save scroll position before collapsing
+        if (correctionViewerRef.current) {
+          correctionScrollPos.current = correctionViewerRef.current.scrollTop;
+        }
         setPanelCollapsed(true);
       } else {
         setShowCorrectionPdf(true);
@@ -647,6 +668,10 @@ export default function SessionViewerPage() {
                                   variant={correctionModeEnabled ? "default" : "outline"}
                                   size="sm"
                                   onClick={() => {
+                                    // Save scroll position when switching views
+                                    if (correctionViewerRef.current) {
+                                      correctionScrollPos.current = correctionViewerRef.current.scrollTop;
+                                    }
                                     const newCorrectionMode = !correctionModeEnabled;
                                     setCorrectionModeEnabled(newCorrectionMode);
                                     if (newCorrectionMode) {
@@ -671,16 +696,18 @@ export default function SessionViewerPage() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => {
+                                  // Save scroll position before collapsing panel
+                                  if (!panelCollapsed && correctionViewerRef.current) {
+                                    correctionScrollPos.current = correctionViewerRef.current.scrollTop;
+                                  }
                                   setPanelCollapsed(c => !c);
                                   if (panelCollapsed) {
                                     if (correctionModeEnabled) {
-                                      setShowCorrectionPdf(false);
-                                    } else {
                                       setShowCorrectionPdf(true);
                                     }
                                   }
                                 }}
-                                disabled={!canShowCorrectionButton}
+                                disabled={!canToggleCorrectionPanel}
                                 className="bg-white/70 dark:bg-muted/40 hover:bg-blue-50 dark:hover:bg-blue-900/30 border-blue-200 dark:border-blue-800 gap-1"
                                 title={canShowCorrectionPdf ? "Afficher/Masquer la correction (C)" : "Afficher/Masquer la correction"}
                               >
@@ -931,7 +958,12 @@ export default function SessionViewerPage() {
                                 <Button 
                                   size="sm" 
                                   variant="outline" 
-                                  onClick={() => setShowCorrectionPdf(!showCorrectionPdf)} 
+                                  onClick={() => {
+                                    if (correctionViewerRef.current) {
+                                      correctionScrollPos.current = correctionViewerRef.current.scrollTop;
+                                    }
+                                    setShowCorrectionPdf(!showCorrectionPdf);
+                                  }} 
                                   className="ml-auto gap-2 bg-white/70 dark:bg-muted/40 hover:bg-blue-50 dark:hover:bg-blue-900/30 border-blue-200 dark:border-blue-800"
                                 >
                                   {showCorrectionPdf ? "Voir Zone de Correction" : "Voir PDF"}
@@ -939,7 +971,12 @@ export default function SessionViewerPage() {
                               )}
                               {/* Close panel button - always available */}
                               {!correctionModeEnabled && (
-                                <Button size="sm" variant="outline" onClick={() => setPanelCollapsed(true)} className="ml-auto gap-2 bg-white/70 dark:bg-muted/40 hover:bg-blue-50 dark:hover:bg-blue-900/30 border-blue-200 dark:border-blue-800">
+                                <Button size="sm" variant="outline" onClick={() => {
+                                  if (correctionViewerRef.current) {
+                                    correctionScrollPos.current = correctionViewerRef.current.scrollTop;
+                                  }
+                                  setPanelCollapsed(true);
+                                }} className="ml-auto gap-2 bg-white/70 dark:bg-muted/40 hover:bg-blue-50 dark:hover:bg-blue-900/30 border-blue-200 dark:border-blue-800">
                                   Fermer
                                 </Button>
                               )}
@@ -956,7 +993,12 @@ export default function SessionViewerPage() {
                                   <Button 
                                     size="sm" 
                                     variant="outline" 
-                                    onClick={() => setPanelCollapsed(true)} 
+                                    onClick={() => {
+                                      if (correctionViewerRef.current) {
+                                        correctionScrollPos.current = correctionViewerRef.current.scrollTop;
+                                      }
+                                      setPanelCollapsed(true);
+                                    }} 
                                     className="gap-2 bg-white/70 dark:bg-muted/40 hover:bg-blue-50 dark:hover:bg-blue-900/30 border-blue-200 dark:border-blue-800"
                                   >
                                     Fermer
