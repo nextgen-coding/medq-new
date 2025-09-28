@@ -25,7 +25,7 @@ export function PhoneDialog({ open, onSave, loading }: PhoneDialogProps) {
 
   return (
     <Dialog open={open}>
-      <DialogContent hideCloseButton>
+      <DialogContent>
         <DialogHeader>
           <DialogTitle>Numéro de téléphone requis</DialogTitle>
           <DialogDescription>

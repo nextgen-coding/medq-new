@@ -1018,13 +1018,13 @@ export default function SessionViewerPage() {
                                     className="px-2 text-[11px] bg-white/70 dark:bg-muted/40 hover:bg-blue-50 dark:hover:bg-blue-900/30 border-blue-200 dark:border-blue-800">Ajuster</Button>
                                 </div>
                                 <div className="flex-1 relative min-h-0">
-                                  <div ref={correctionViewerRef} className="absolute inset-0 overflow-y-auto overflow-x-auto px-4 py-4">
+                                  <div ref={correctionViewerRef} className="absolute inset-0 overflow-y-auto overflow-x-scroll px-4 py-4">
                                     <PDFDoc
                                       file={correctionUrl}
                                       onLoadSuccess={({ numPages }) => { setCorrectionNumPages(numPages); setCorrectionLoading(false); setCorrectionError(null); }}
                                       onLoadError={(err) => { console.error(err); setCorrectionLoading(false); setCorrectionError('Erreur PDF.'); }}
                                       loading=""
-                                      className="w-fit min-w-full flex flex-col items-center"
+                                      className="w-fit min-w-full flex flex-col items-center gap-8"
                                     >
                                       {correctionLoading && (
                                         <div className="flex items-center gap-2 py-4">
@@ -1036,7 +1036,7 @@ export default function SessionViewerPage() {
                                         <div className="text-sm text-blue-700 dark:text-blue-300 py-6">{correctionError}</div>
                                       )}
                                       {!correctionError && (correctionNumPages ? Array.from({ length: correctionNumPages }, (_, i) => (
-                                        <div key={i} className="mb-6 last:mb-0">
+                                        <div key={i} className="mb-6 last:mb-0 min-w-[2000px] w-fit">
                                           <PDFPage
                                             pageNumber={i + 1}
                                             scale={correctionScale}
@@ -1047,14 +1047,16 @@ export default function SessionViewerPage() {
                                           />
                                         </div>
                                       )) : (
-                                        <PDFPage
-                                          pageNumber={1}
-                                          scale={correctionScale}
-                                          rotate={correctionRotation}
-                                          className="shadow-xl bg-white rounded-lg border-2 border-blue-100 dark:border-blue-800"
-                                          renderTextLayer={false}
-                                          renderAnnotationLayer={false}
-                                        />
+                                        <div className="min-w-[2000px] w-fit">
+                                          <PDFPage
+                                            pageNumber={1}
+                                            scale={correctionScale}
+                                            rotate={correctionRotation}
+                                            className="shadow-xl bg-white rounded-lg border-2 border-blue-100 dark:border-blue-800"
+                                            renderTextLayer={false}
+                                            renderAnnotationLayer={false}
+                                          />
+                                        </div>
                                       ))}
                                     </PDFDoc>
                                   </div>
@@ -1092,13 +1094,13 @@ export default function SessionViewerPage() {
                                     className="px-2 text-[11px] bg-white/70 dark:bg-muted/40 hover:bg-blue-50 dark:hover:bg-blue-900/30 border-blue-200 dark:border-blue-800">Ajuster</Button>
                                 </div>
                                 <div className="flex-1 relative min-h-0">
-                                  <div ref={correctionViewerRef} className="absolute inset-0 overflow-y-auto overflow-x-auto px-4 py-4">
+                                  <div ref={correctionViewerRef} className="absolute inset-0 overflow-y-auto overflow-x-scroll px-4 py-4">
                                     <PDFDoc
                                       file={correctionUrl}
                                       onLoadSuccess={({ numPages }) => { setCorrectionNumPages(numPages); setCorrectionLoading(false); setCorrectionError(null); }}
                                       onLoadError={(err) => { console.error(err); setCorrectionLoading(false); setCorrectionError('Erreur PDF.'); }}
                                       loading=""
-                                      className="w-fit min-w-full flex flex-col items-center"
+                                      className="w-fit min-w-full flex flex-col items-center gap-8"
                                     >
                                       {correctionLoading && (
                                         <div className="flex items-center gap-2 py-4">
@@ -1110,7 +1112,7 @@ export default function SessionViewerPage() {
                                         <div className="text-sm text-blue-700 dark:text-blue-300 py-6">{correctionError}</div>
                                       )}
                                       {!correctionError && (correctionNumPages ? Array.from({ length: correctionNumPages }, (_, i) => (
-                                        <div key={i} className="mb-6 last:mb-0">
+                                        <div key={i} className="mb-6 last:mb-0 min-w-[2000px] w-fit">
                                           <PDFPage
                                             pageNumber={i + 1}
                                             scale={correctionScale}
@@ -1121,14 +1123,16 @@ export default function SessionViewerPage() {
                                           />
                                         </div>
                                       )) : (
-                                        <PDFPage
-                                          pageNumber={1}
-                                          scale={correctionScale}
-                                          rotate={correctionRotation}
-                                          className="shadow-xl bg-white rounded-lg border-2 border-blue-100 dark:border-blue-800"
-                                          renderTextLayer={false}
-                                          renderAnnotationLayer={false}
-                                        />
+                                        <div className="min-w-[2000px] w-fit">
+                                          <PDFPage
+                                            pageNumber={1}
+                                            scale={correctionScale}
+                                            rotate={correctionRotation}
+                                            className="shadow-xl bg-white rounded-lg border-2 border-blue-100 dark:border-blue-800"
+                                            renderTextLayer={false}
+                                            renderAnnotationLayer={false}
+                                          />
+                                        </div>
                                       ))}
                                     </PDFDoc>
                                   </div>

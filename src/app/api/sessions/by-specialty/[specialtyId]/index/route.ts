@@ -4,10 +4,10 @@ import { requireAdmin, AuthenticatedRequest } from '@/lib/auth-middleware';
 
 export const GET = requireAdmin(async (
   request: AuthenticatedRequest,
-  context: any
+  { params }: { params: Promise<{ specialtyId: string }> }
 ) => {
   try {
-    const specialtyId = context?.params?.specialtyId as string | undefined;
+    const { specialtyId } = await params;
 
     if (!specialtyId) {
       return NextResponse.json({ error: 'ID de spécialité requis' }, { status: 400 });
