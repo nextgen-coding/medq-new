@@ -58,6 +58,7 @@ interface OpenQuestionProps {
   autoFocus?: boolean; // control initial autofocus of textarea when active
   showEyeButton?: boolean; // control whether to show the eye button in header
   isRevisionMode?: boolean; // when true, allow free navigation without requiring submission
+  customActionButton?: React.ReactNode; // custom button to render between actions and rappel du cours
 }
 
 export function OpenQuestion({ 
@@ -91,6 +92,7 @@ export function OpenQuestion({
   autoFocus = true,
   showEyeButton = false,
   isRevisionMode = false,
+  customActionButton,
 }: OpenQuestionProps) {
   const [answer, setAnswer] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -1026,6 +1028,13 @@ export function OpenQuestion({
         }, 30);
       }}
     />
+  )}
+
+  {/* Custom action button (e.g. for revision mode) */}
+  {customActionButton && (
+    <div className="mt-4">
+      {customActionButton}
+    </div>
   )}
 
   {/* Rappel du cours (après soumission) */}
