@@ -79,19 +79,14 @@ export function OpenQuestionInput({ answer, setAnswer, isSubmitted, onSubmit, on
       }
       e.preventDefault();
       
-      // If answer is empty and onSkip is available, skip instead of submitting
-      if (!answer.trim() && onSkip) {
-        if (textareaRef.current) {
-          textareaRef.current.blur();
-        }
-        // Small delay to ensure blur happens before navigation
-        setTimeout(() => {
-          onSkip();
-        }, 10);
-      } else {
-        // Call onSubmit for actual submission with answer
-        onSubmit?.();
+      // Always call onSubmit, let the parent handle empty vs non-empty answers
+      if (textareaRef.current) {
+        textareaRef.current.blur();
       }
+      // Small delay to ensure blur happens before submission
+      setTimeout(() => {
+        onSubmit?.();
+      }, 10);
     }
   };
   

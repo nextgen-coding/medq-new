@@ -57,6 +57,7 @@ interface OpenQuestionProps {
   onFocus?: () => void; // callback when any part of the question receives focus
   autoFocus?: boolean; // control initial autofocus of textarea when active
   showEyeButton?: boolean; // control whether to show the eye button in header
+  isRevisionMode?: boolean; // when true, allow free navigation without requiring submission
 }
 
 export function OpenQuestion({ 
@@ -89,6 +90,7 @@ export function OpenQuestion({
   onFocus,
   autoFocus = true,
   showEyeButton = false,
+  isRevisionMode = false,
 }: OpenQuestionProps) {
   const [answer, setAnswer] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -362,32 +364,36 @@ export function OpenQuestion({
       hasSubmittedRef.current = true;
       if (showDeferredSelfAssessment) {
         if (answerResult === undefined) {
-          // Pending self-evaluation
-            setAssessmentCompleted(false);
-            setShowSelfAssessment(true);
+          // Pending self-evaluation for clinical case questions only
+          setAssessmentCompleted(false);
+          setShowSelfAssessment(true);
         } else {
-          // Evaluation done – hide buttons
+          // Evaluation done – show results
           setAssessmentCompleted(true);
           setShowSelfAssessment(false);
           setShouldShowUserAnswer(true); // Show user's answer when evaluation is completed
         }
       } else {
-        // Immediate mode or clinical case after refresh
+        // Immediate mode - question is answered, show the results not self-assessment
         setAssessmentCompleted(answerResult !== undefined);
         setShowSelfAssessment(false);
+        setShouldShowUserAnswer(answerResult !== undefined); // Show user answer if there's a result
         // In clinical cases (identified by hideActions + hideMeta), always show user answer if evaluation is complete
         if (hideActions && hideMeta && answerResult !== undefined) {
           setShouldShowUserAnswer(true);
         }
       }
     } else {
-      if (!userAnswer) setAnswer('');
-      setSubmitted(false);
-      setShowSelfAssessment(false);
-      setAssessmentCompleted(false);
-      setHasSubmitted(false);
-      hasSubmittedRef.current = false;
-      setShouldShowUserAnswer(false); // Reset flag when not answered
+      // Only reset states if question hasn't been submitted locally
+      if (!hasSubmitted) {
+        if (!userAnswer) setAnswer('');
+        setSubmitted(false);
+        setShowSelfAssessment(false);
+        setAssessmentCompleted(false);
+        setHasSubmitted(false);
+        hasSubmittedRef.current = false;
+        setShouldShowUserAnswer(false); // Reset flag when not answered
+      }
     }
   }, [question.id, isAnswered, answerResult, showDeferredSelfAssessment, userAnswer, hideActions, hideMeta]);
 
@@ -412,8 +418,25 @@ export function OpenQuestion({
       // The actual result will be determined when "Show Results" is clicked
       onSubmit(answer, 'partial'); // Use 'partial' as default for clinic questions
     } else {
-      // For regular questions, show self-assessment; do not auto-scroll away from the question
-      setShowSelfAssessment(true);
+      // For regular questions, check if answer is empty
+      const isEmpty = !answer || answer.trim() === '';
+      
+      // Check user's self-assessment preference
+      const shouldShowSelfAssessment = (user as any)?.showSelfAssessment ?? true;
+      
+      if (isEmpty) {
+        // If answer is empty, skip self-assessment and go directly to results
+        setAssessmentCompleted(true);
+        onSubmit(answer, false); // false indicates incorrect/no answer (empty submission)
+      } else if (shouldShowSelfAssessment) {
+        // For non-empty answers, show self-assessment if user prefers it
+        setAssessmentCompleted(false); // Reset assessment state for new evaluation
+        setShowSelfAssessment(true);
+      } else {
+        // Skip self-assessment if user disabled it, auto-submit with partial result
+        setAssessmentCompleted(true);
+        onSubmit(answer, 'partial'); // Default to partial when self-assessment is disabled
+      }
       // Intentionally no scroll to "Rappel du cours"; keep the question and its answer visible in place
     }
 
@@ -622,12 +645,8 @@ export function OpenQuestion({
       if (!submitted && !isTyping && event.key === 'Enter' && !event.shiftKey) {
         if (disableIndividualSubmit && hideImmediateResults) return; // blocked in grouped mode
         event.preventDefault();
-        if (answer.trim()) {
-          handleSubmit();
-        } else {
-          // Allow skipping to next question even if no answer provided
-          onNext();
-        }
+        // Always call handleSubmit, it now properly handles empty answers
+        handleSubmit();
         return;
       }
 
@@ -671,9 +690,23 @@ export function OpenQuestion({
         const expected = expectedFromArray || (question as any).course_reminder || (question as any).courseReminder || question.explanation || (question as any).correctAnswer || '';
         expectedReferenceInline = expected || '';
         
-        const canShowReferenceInline = submitted && expectedReferenceInline && (!hideImmediateResults || (showSelfAssessment && showDeferredSelfAssessment) || assessmentCompleted) && !showSelfAssessment;
+        // Show reference inline only for new submissions, not for already answered questions
+        const canShowReferenceInline = submitted && expectedReferenceInline && (!hideImmediateResults || (showSelfAssessment && showDeferredSelfAssessment) || assessmentCompleted) && !showSelfAssessment && !isAnswered;
 
-        if (!(submitted && isSimpleQroc)) return null;
+        // Don't show the card wrapper for already answered questions - let OpenQuestionSelfAssessment handle results
+        // Only show for new simple QROC submissions
+        const shouldShowInline = (submitted && isSimpleQroc && !showSelfAssessment && !assessmentCompleted && !isAnswered);
+        
+        console.log('shouldShowInline debug:', {
+          submitted,
+          isSimpleQroc,
+          showSelfAssessment,
+          assessmentCompleted,
+          isAnswered,
+          shouldShowInline
+        });
+        
+        if (!shouldShowInline) return null;
 
         return (
           <div className="rounded-xl border border-gray-200/80 dark:border-gray-700/60 bg-white dark:bg-neutral-900 p-4 sm:p-5 shadow-sm space-y-3">
@@ -702,30 +735,15 @@ export function OpenQuestion({
               </div>
             )}
 
-            {/* Self assessment within the card (flat variant) */}
-            {showSelfAssessment && (!hideImmediateResults || showDeferredSelfAssessment) && (
-              <div ref={selfAssessmentRef}>
-                <OpenQuestionSelfAssessment
-                  onAssessment={handleSelfAssessment}
-                  userAnswerText={submittedAnswer || (submitted ? answer : undefined)}
-                  questionId={question.id}
-                  enableHighlighting={enableAnswerHighlighting}
-                  highlightConfirm={highlightConfirm}
-                  variant="flat"
-                  selectedRating={deferredAssessmentResult}
-                  correctAnswer={(question.correct_answers || question.correctAnswers || []).join(', ') || question.explanation || ''}
-                />
-              </div>
-            )}
+            {/* Self assessment is now shown in place of the input area */}
           </div>
         );
       })()}
       
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
-        <div className="flex-1 min-w-0 max-w-5xl">
+        <div className="flex-1 min-w-0 w-full">
           {/* Always ensure question text is visible - either in header or inline */}
-          {!hideMeta && 
-           !(submitted && !hideImmediateResults && !disableIndividualSubmit) && (
+          {!hideMeta && (
             <OpenQuestionHeader 
               questionText={question.text} 
               questionNumber={question.number}
@@ -737,18 +755,20 @@ export function OpenQuestion({
               hideMeta={hideMeta}
               correctAnswers={question.correct_answers || question.correctAnswers}
               showEyeButton={showEyeButton}
+              hideQuestionText={true}
             />
           )}
           {/* Show inline question text when hideMeta is true - with optional eye button */}
-          {hideMeta && 
-           !(submitted && !hideImmediateResults && !disableIndividualSubmit) && (
+          {/* But NOT for simple QROC questions during evaluation (when they use card wrapper) */}
+          {/* Still show for simple QROC when user is entering answer */}
+          {(() => {
+            const isSimpleQroc = !hideImmediateResults && !disableIndividualSubmit;
+            const isInEvaluationPhase = submitted && isSimpleQroc;
+            console.log('hideMeta inline check:', { hideMeta, isSimpleQroc, submitted, isInEvaluationPhase, shouldShow: hideMeta && !isInEvaluationPhase });
+            return hideMeta && !isInEvaluationPhase;
+          })() && (
             <>
               <div className="flex items-start gap-3 mb-2">
-                {question.number && (
-                  <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold tracking-wide flex-shrink-0 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-                    Question {question.number}
-                  </span>
-                )}
                 <div className="flex-1 min-w-0">
                   <HighlightableQuestionText
                     questionId={question.id}
@@ -829,8 +849,8 @@ export function OpenQuestion({
       </div>
     )}
 
-    {/* Show user answer in clinical/grouped mode after self-assessment */}
-    {hideActions && isAnswered && userAnswer && disableIndividualSubmit && hideImmediateResults && (assessmentCompleted || shouldShowUserAnswer) && (
+    {/* Show user answer in clinical/grouped mode after self-assessment - but not when showing self-assessment inline */}
+    {hideActions && isAnswered && userAnswer && disableIndividualSubmit && hideImmediateResults && (assessmentCompleted || shouldShowUserAnswer) && !showSelfAssessment && (
       <div className="mt-4">
         <div className={`rounded-xl border ${shouldShowUserAnswer ? getEvaluationColors(deferredAssessmentResult || answerResult).border : 'border-emerald-300/60 dark:border-emerald-600/70'} ${shouldShowUserAnswer ? getEvaluationColors(deferredAssessmentResult || answerResult).background : 'bg-emerald-50/80 dark:bg-emerald-900/50'} px-6 py-3 shadow-sm`}>
           <div className="mb-2">
@@ -845,101 +865,171 @@ export function OpenQuestion({
       </div>
     )}
 
-    {/* Show input field: even when actions are hidden in grouped clinical cases (disableIndividualSubmit),
-        we still need the input visible so users can type their answer. */}
+    {/* Show input field OR self-assessment */}
     {(() => {
       const showInput = (!submitted || keepInputAfterSubmit) && (!hideActions || disableIndividualSubmit);
-      return showInput;
-    })() && (
+      const showSelfAssessmentInPlace = showSelfAssessment && (!hideImmediateResults || showDeferredSelfAssessment);
+      // Show self-assessment results for active evaluation OR for pre-answered questions with results
+      const showSelfAssessmentResults = assessmentCompleted && submitted;
+      
+      // Debug: Always show self-assessment if submitted and not already answered (for new submissions)
+      const shouldShowSelfAssessment = showSelfAssessmentInPlace || showSelfAssessmentResults || (submitted && !isAnswered && hasSubmitted);
+      
+      if (shouldShowSelfAssessment) {
+        return (
+          <div ref={selfAssessmentRef} className="pt-2">
+            <OpenQuestionSelfAssessment
+              onAssessment={handleSelfAssessment}
+              userAnswerText={submittedAnswer || (submitted ? answer : undefined)}
+              questionId={question.id}
+              enableHighlighting={enableAnswerHighlighting}
+              highlightConfirm={highlightConfirm}
+              selectedRating={(() => {
+                // For QROC questions with self-assessment, only use deferredAssessmentResult
+                // Ignore answerResult since these questions need manual evaluation
+                const useOnlyDeferredResult = showDeferredSelfAssessment || (!hideImmediateResults && showSelfAssessment);
+                const rating = isAnswered ? 
+                  (useOnlyDeferredResult ? deferredAssessmentResult : (deferredAssessmentResult || answerResult)) : 
+                  (assessmentCompleted ? (deferredAssessmentResult || null) : null);
+                console.log('selectedRating calculation:', {
+                  isAnswered,
+                  assessmentCompleted,
+                  answerResult,
+                  deferredAssessmentResult,
+                  useOnlyDeferredResult,
+                  finalRating: rating
+                });
+                return rating;
+              })()}
+              correctAnswer={(question.correct_answers || question.correctAnswers || []).join(', ') || question.explanation || ''}
+              questionText={question.text}
+            />
+          </div>
+        );
+      }
+      
+      return showInput ? (
         <OpenQuestionInput
           answer={answer}
           setAnswer={setAnswer}
           isSubmitted={submitted && !keepInputAfterSubmit}
           onSubmit={handleSubmit}
-          onSkip={onNext}
           onBlur={handleBlur}
           isActive={autoFocus}
           disableEnterKey={disableEnterHandlers}
         />
-      )}
+      ) : null;
+    })()}
 
   {/* Reference answer now shown inside self-assessment panel */}
 
   {/* Persistent reference + user answer block (including during self-assessment) */}
   {(() => {
     // Avoid duplicate reference/self-assessment when wrapped in simple QROC container
-    const usingWrapper = submitted && !hideImmediateResults && !disableIndividualSubmit;
+    // But always show results for already answered questions with results
+    const usingWrapper = submitted && !hideImmediateResults && !disableIndividualSubmit && !isAnswered;
     if (usingWrapper) return null;
-    const canShowReference = submitted && expectedReference && (!hideImmediateResults || (showSelfAssessment && showDeferredSelfAssessment) || assessmentCompleted) && !showSelfAssessment;
+    // Show results only for new submissions, not for already answered questions  
+    // Already answered questions use the OpenQuestionSelfAssessment component for results
+    const canShowReference = submitted && expectedReference && (!hideImmediateResults || (showSelfAssessment && showDeferredSelfAssessment) || assessmentCompleted) && !showSelfAssessment && !isAnswered;
+    
     if (!canShowReference) return null;
     
     // After self-assessment completion, show user's answer instead of correct answer
-    const displayText = shouldShowUserAnswer ? (submittedAnswer || answer || "Aucune réponse saisie") : expectedReference;
-    const titleText = shouldShowUserAnswer ? "Votre réponse" : "Réponse";
+    const showUserAnswerForResults = shouldShowUserAnswer;
+    const displayText = showUserAnswerForResults ? (submittedAnswer || userAnswer || answer || "Aucune réponse saisie") : expectedReference;
+    const titleText = showUserAnswerForResults ? "Votre réponse" : "Réponse de référence";
     
     return (
       <div className="mt-0.5">
-        <div className={`rounded-xl border ${shouldShowUserAnswer ? getEvaluationColors(deferredAssessmentResult || answerResult).border : 'border-emerald-300/60 dark:border-emerald-600/70'} ${shouldShowUserAnswer ? getEvaluationColors(deferredAssessmentResult || answerResult).background : 'bg-emerald-50/80 dark:bg-emerald-900/50'} px-6 py-2 shadow-sm`}>
+        <div className={`rounded-xl border ${showUserAnswerForResults ? getEvaluationColors(deferredAssessmentResult || answerResult).border : 'border-emerald-300/60 dark:border-emerald-600/70'} ${showUserAnswerForResults ? getEvaluationColors(deferredAssessmentResult || answerResult).background : 'bg-emerald-50/80 dark:bg-emerald-900/50'} px-6 py-2 shadow-sm`}>
           <div className="mb-2">
-            <h3 className={`text-base md:text-lg font-bold tracking-tight ${shouldShowUserAnswer ? getEvaluationColors(deferredAssessmentResult || answerResult).text : 'text-emerald-800 dark:text-emerald-50'}`}>{titleText}</h3>
+            <h3 className={`text-base md:text-lg font-bold tracking-tight ${showUserAnswerForResults ? getEvaluationColors(deferredAssessmentResult || answerResult).text : 'text-emerald-800 dark:text-emerald-50'}`}>{titleText}</h3>
           </div>
-          <div className={`prose prose-sm md:prose-base dark:prose-invert max-w-none leading-relaxed ${shouldShowUserAnswer ? getEvaluationColors(deferredAssessmentResult || answerResult).text : 'text-emerald-800 dark:text-emerald-50'}`}>
+          <div className={`prose prose-sm md:prose-base dark:prose-invert max-w-none leading-relaxed ${showUserAnswerForResults ? getEvaluationColors(deferredAssessmentResult || answerResult).text : 'text-emerald-800 dark:text-emerald-50'}`}>
             <RichTextDisplay text={displayText} enableImageZoom={true} />
           </div>
         </div>
+        
+        {/* Show reference answer when displaying user results and reference exists */}
+        {showUserAnswerForResults && expectedReference && (
+          <div className="mt-3">
+            <div className="rounded-xl border border-emerald-300/60 dark:border-emerald-600/70 bg-emerald-50/80 dark:bg-emerald-900/50 px-6 py-2 shadow-sm">
+              <div className="mb-2">
+                <h3 className="text-base md:text-lg font-bold tracking-tight text-emerald-800 dark:text-emerald-50">Réponse de référence</h3>
+              </div>
+              <div className="prose prose-sm md:prose-base dark:prose-invert max-w-none leading-relaxed text-emerald-800 dark:text-emerald-50">
+                <RichTextDisplay text={expectedReference} enableImageZoom={true} />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   })()}
 
-  {(() => {
-    const usingWrapper = submitted && !hideImmediateResults && !disableIndividualSubmit;
-    if (usingWrapper) return null;
-    if (!(showSelfAssessment && (!hideImmediateResults || showDeferredSelfAssessment))) return null;
-    return (
-      <div ref={selfAssessmentRef} className="pt-4 -mx-3 px-3">
-        <OpenQuestionSelfAssessment
-          onAssessment={handleSelfAssessment}
-          userAnswerText={submittedAnswer || (submitted ? answer : undefined)}
-          questionId={question.id}
-          enableHighlighting={enableAnswerHighlighting}
-          highlightConfirm={highlightConfirm}
-          selectedRating={deferredAssessmentResult}
-          correctAnswer={(question.correct_answers || question.correctAnswers || []).join(', ') || question.explanation || ''}
-        />
-      </div>
-    );
-  })()}
+    {/* Self-assessment panel is now rendered inline above, replacing the input */}
 
-      {!hideActions && (
-        <OpenQuestionActions
-          isSubmitted={submitted}
-          canSubmit={!hasSubmitted}
-          onSubmit={handleSubmit}
-          onNext={onNext}
-          showNext={submitted} // Show "Suivant" immediately after submission
-          hasSubmitted={hasSubmitted}
-          assessmentCompleted={assessmentCompleted}
-          assessmentResult={deferredAssessmentResult || (showDeferredSelfAssessment ? null : (answerResult !== undefined ? answerResult : null))}
-          onResubmit={handleResubmit}
-          userAnswerText={userAnswer || answer}
-          correctAnswer={question.correctAnswers?.[0]}
-          currentAnswer={answer}
-          showNotesArea={showNotesArea}
-          hideNotesButton={false} // Always show notes button so users can hide/show notes
-          onToggleNotes={() => {
-            setShowNotesArea(prev => !prev);
-            setNotesManuallyControlled(true);
-            setTimeout(() => {
-              if (!showNotesArea && notesRef.current) {
-                notesRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              }
-            }, 30);
-          }}
-        />
-      )}
+    {/* Show actions right after question content in revision mode */}
+    {!hideActions && isRevisionMode && (
+      <OpenQuestionActions
+        isSubmitted={submitted}
+        canSubmit={!hasSubmitted}
+        onSubmit={handleSubmit}
+        onNext={onNext}
+        showNext={submitted || isRevisionMode} // Show "Suivant" immediately after submission, or always in revision mode
+        hasSubmitted={hasSubmitted}
+        assessmentCompleted={assessmentCompleted}
+        assessmentResult={deferredAssessmentResult || (showDeferredSelfAssessment ? null : (answerResult !== undefined ? answerResult : null))}
+        onResubmit={handleResubmit}
+        userAnswerText={userAnswer || answer}
+        correctAnswer={question.correctAnswers?.[0]}
+        currentAnswer={answer}
+        showNotesArea={showNotesArea}
+        hideNotesButton={false} // Always show notes button so users can hide/show notes
+        onToggleNotes={() => {
+          setShowNotesArea(prev => !prev);
+          setNotesManuallyControlled(true);
+          setTimeout(() => {
+            if (!showNotesArea && notesRef.current) {
+              notesRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+          }, 30);
+        }}
+      />
+    )}
+
+  {/* Actions positioned above "Rappel du cours" in normal mode only */}
+  {!hideActions && !isRevisionMode && (
+    <OpenQuestionActions
+      isSubmitted={submitted}
+      canSubmit={!hasSubmitted}
+      onSubmit={handleSubmit}
+      onNext={onNext}
+      showNext={submitted || isRevisionMode} // Show "Suivant" immediately after submission, or always in revision mode
+      hasSubmitted={hasSubmitted}
+      assessmentCompleted={assessmentCompleted}
+      assessmentResult={deferredAssessmentResult || (showDeferredSelfAssessment ? null : (answerResult !== undefined ? answerResult : null))}
+      onResubmit={handleResubmit}
+      userAnswerText={userAnswer || answer}
+      correctAnswer={question.correctAnswers?.[0]}
+      currentAnswer={answer}
+      showNotesArea={showNotesArea}
+      hideNotesButton={false} // Always show notes button so users can hide/show notes
+      onToggleNotes={() => {
+        setShowNotesArea(prev => !prev);
+        setNotesManuallyControlled(true);
+        setTimeout(() => {
+          if (!showNotesArea && notesRef.current) {
+            notesRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 30);
+      }}
+    />
+  )}
 
   {/* Rappel du cours (après soumission) */}
-  {submitted && !suppressReminder && (() => {
+  {submitted && !suppressReminder && !showSelfAssessment && (() => {
     const text = (question as any).course_reminder || (question as any).courseReminder || question.explanation;
     const reminderMediaUrl = (question as any).course_reminder_media_url || (question as any).courseReminderMediaUrl;
     const reminderMediaType = (question as any).course_reminder_media_type || (question as any).courseReminderMediaType;

@@ -23,6 +23,8 @@ async function handler(request: AuthenticatedRequest) {
         faculty: true,
         profileCompleted: true,
         highlightColor: true,
+        showSelfAssessment: true,
+        phone: true,
         // Subscription fields
         hasActiveSubscription: true,
         subscriptionExpiresAt: true,

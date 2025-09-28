@@ -51,6 +51,8 @@ interface MCQQuestionProps {
   isActive?: boolean; // when true, this instance accepts keyboard shortcuts
   showNotesAfterSubmit?: boolean; // show notes area after submit (for task page)
   onFocus?: () => void; // callback when any part of the question receives focus
+  customActionButton?: React.ReactNode; // custom button to render between actions and rappel du cours
+  isRevisionMode?: boolean; // when true, allow free navigation without requiring submission
 }
 
 export function MCQQuestion({ 
@@ -76,7 +78,9 @@ export function MCQQuestion({
   disableKeyboardHandlers = false,
   allowEnterSubmit = true,
   isActive = false,
-  onFocus
+  onFocus,
+  customActionButton,
+  isRevisionMode = false
 }: MCQQuestionProps) {
   const [selectedOptionIds, setSelectedOptionIds] = useState<string[]>([]);
   const [submitted, setSubmitted] = useState(false);
@@ -663,7 +667,7 @@ export function MCQQuestion({
     >
       
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
-        <div className="flex-1 min-w-0 max-w-3xl">
+        <div className="flex-1 min-w-0 w-full">
           {!hideMeta && (
             <MCQHeader
               questionText={question.text}
@@ -744,6 +748,7 @@ export function MCQQuestion({
             showNotesArea={showNotesArea}
             hideNotesButton={false} // Always show notes button so users can hide/show notes
             onResubmit={handleResubmit}
+            showNext={submitted || isRevisionMode} // Show "Suivant" after submission or always in revision mode
             onToggleNotes={() => {
               setShowNotesArea(prev => !prev);
               setNotesManuallyControlled(true);
@@ -754,6 +759,13 @@ export function MCQQuestion({
               }, 30);
             }}
           />
+        </div>
+      )}
+
+      {/* Custom action button (e.g. for revision mode) */}
+      {customActionButton && (
+        <div className="mt-4">
+          {customActionButton}
         </div>
       )}
       

@@ -5,7 +5,7 @@ import { Question, ClinicalCase } from '@/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ChevronLeft, ChevronRight, CheckCircle, Circle, XCircle, MinusCircle, Stethoscope, EyeOff, StickyNote, Pin, Flag, Pencil, LogOut } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CheckCircle, Circle, XCircle, MinusCircle, EyeOff, StickyNote, Pin, Flag, Pencil, LogOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 // Replaced Vaul Drawer (infinite update loop on some setups) with a simple custom sheet
 import { useTranslation } from 'react-i18next';
@@ -419,7 +419,7 @@ export function QuestionControlPanel({
 
     const getColumnIcon = (key: ColumnKey) => {
       switch (key) {
-        case 'clinical': return <Stethoscope className="h-4 w-4 text-blue-600 dark:text-blue-400" />;
+        case 'clinical': return <div className="w-2 h-2 bg-blue-500 rounded-full"></div>;
         default: return <div className="w-2 h-2 bg-blue-500 rounded-full"></div>;
       }
     };
@@ -932,7 +932,6 @@ export function QuestionControlPanel({
   {clinicalCases.length > 0 && (
           <div className="space-y-3">
             <div className="flex items-center gap-2 px-3 py-2 bg-blue-50/50 dark:bg-blue-900/20 border border-blue-200/50 dark:border-blue-700/50 rounded-xl">
-              <Stethoscope className="h-4 w-4 text-blue-600 dark:text-blue-400" />
               <span className="text-sm font-semibold text-blue-700 dark:text-blue-300">
     Cas Cliniques ({clinicalCases.length})
               </span>

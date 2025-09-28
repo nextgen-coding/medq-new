@@ -53,6 +53,7 @@ model User {
   image                 String?
   google_id             String?        @unique(map: "profiles_google_id_idx")
   facebook_id           String?        @unique(map: "profiles_facebook_id_idx")
+  phone                 String?
   emailVerified         DateTime?      @map("email_verified")
   passwordResetExpires  DateTime?      @map("password_reset_expires")
   passwordResetToken    String?        @map("password_reset_token")
@@ -81,6 +82,7 @@ model User {
   commentLikes          CommentLike[]
   activities            UserActivity[]
   highlightColor        String?         @map("highlight_color")
+  showSelfAssessment    Boolean         @default(true) @map("show_self_assessment")
   // Added reverse relations for session corrections
   sessionCorrections            SessionCorrection[]
   sessionCorrectionSubmissions  SessionCorrectionSubmission[]
@@ -95,7 +97,12 @@ model User {
   usedVoucherCodes             VoucherCodeUsage[]
   verifiedPayments             Payment[]        @relation("PaymentVerifier")
   createdVoucherCodes          VoucherCode[]    @relation("VoucherCreator")
+  createdReductionCoupons      ReductionCoupon[] @relation("ReductionCouponCreator")
+  usedReductionCoupons         ReductionCoupon[] @relation("ReductionCouponUser")
   updatedPricingSettings       PricingSettings[]
+  // Level change requests relation
+  levelChangeRequests          LevelChangeRequest[]
+  reviewedLevelChangeRequests  LevelChangeRequest[] @relation("ReviewedBy")
 
   @@map("profiles")
 }
@@ -457,6 +464,9 @@ model Niveau {
   Specialty Specialty[]
   semesters Semester[]
   sessions  Session[]
+  // Level change request relations
+  currentLevelRequests    LevelChangeRequest[] @relation("CurrentLevel")
+  requestedLevelRequests  LevelChangeRequest[] @relation("RequestedLevel")
 
   @@map("niveaux")
 }
@@ -617,6 +627,9 @@ model Payment {
   // Voucher code fields
   voucherCodeId         String?        @map("voucher_code_id") @db.Uuid
   
+  // Metadata for audit and additional data
+  metadata              Json?          @map("metadata")
+  
   // Custom payment fields
   customPaymentDetails  String?        @map("custom_payment_details") // Phone number, bank details, etc.
   proofImageUrl         String?        @map("proof_image_url")
@@ -671,6 +684,32 @@ model VoucherCodeUsage {
   @@map("voucher_code_usage")
 }
 
+enum DiscountType {
+  percentage
+  fixed
+}
+
+model ReductionCoupon {
+  id            String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code          String       @unique
+  discountType  DiscountType @map("discount_type")
+  discountValue Float        @map("discount_value") // Percentage (0-100) or fixed amount
+  isUsed        Boolean      @default(false) @map("is_used")
+  usedAt        DateTime?    @map("used_at") @db.Timestamptz(6)
+  expiresAt     DateTime?    @map("expires_at") @db.Timestamptz(6)
+  createdBy     String       @map("created_by") @db.Uuid
+  createdAt     DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  
+  // Relations
+  creator       User         @relation("ReductionCouponCreator", fields: [createdBy], references: [id])
+  usedBy        User?        @relation("ReductionCouponUser", fields: [usedById], references: [id])
+  usedById      String?      @map("used_by_id") @db.Uuid
+
+  @@index([code], map: "idx_reduction_coupon_code")
+  @@index([isUsed], map: "idx_reduction_coupon_used")
+  @@map("reduction_coupons")
+}
+
 model PricingSettings {
   id                    String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   
@@ -700,5 +739,33 @@ model PricingSettings {
   updater               User           @relation(fields: [updatedBy], references: [id])
 
   @@map("pricing_settings")
+}
+
+enum LevelChangeRequestStatus {
+  pending
+  approved
+  rejected
+}
+
+model LevelChangeRequest {
+  id              String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String                  @map("user_id") @db.Uuid
+  currentLevelId  String                  @map("current_level_id") @db.Uuid
+  requestedLevelId String                 @map("requested_level_id") @db.Uuid
+  status          LevelChangeRequestStatus @default(pending)
+  reason          String?                 // Optional reason from user
+  adminNote       String?                 @map("admin_note") // Optional note from admin
+  reviewedBy      String?                 @map("reviewed_by") @db.Uuid
+  reviewedAt      DateTime?               @map("reviewed_at") @db.Timestamptz(6)
+  createdAt       DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime                @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Relations
+  user            User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currentLevel    Niveau                  @relation("CurrentLevel", fields: [currentLevelId], references: [id])
+  requestedLevel  Niveau                  @relation("RequestedLevel", fields: [requestedLevelId], references: [id])
+  reviewedByUser  User?                   @relation("ReviewedBy", fields: [reviewedBy], references: [id])
+
+  @@map("level_change_requests")
 }
 

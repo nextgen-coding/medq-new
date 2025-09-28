@@ -25,6 +25,7 @@ export function RegisterForm({ onToggleForm }: { onToggleForm: () => void }) {
   const router = useRouter();
   const [formData, setFormData] = useState({
     email: '',
+    phone: '',
     password: '',
     confirmPassword: '',
     faculty: '',
@@ -84,6 +85,14 @@ export function RegisterForm({ onToggleForm }: { onToggleForm: () => void }) {
     e.preventDefault();
     setError('');
 
+
+    // Tunisian phone validation: starts with 2, 4, 5, or 9 and is 8 digits
+    const tunisianPhoneRegex = /^[2459][0-9]{7}$/;
+    if (!tunisianPhoneRegex.test(formData.phone)) {
+      setError('Veuillez entrer un numéro de téléphone tunisien valide (8 chiffres, commence par 2, 4, 5 ou 9).');
+      return;
+    }
+
     if (formData.password !== formData.confirmPassword) {
       setError(t('auth.passwordsMustMatch'));
       return;
@@ -105,7 +114,8 @@ export function RegisterForm({ onToggleForm }: { onToggleForm: () => void }) {
     try {
       const result = await register(
         formData.email,
-        formData.password
+        formData.password,
+        formData.phone
       );
       if (result.success) {
         toast({
@@ -216,6 +226,26 @@ export function RegisterForm({ onToggleForm }: { onToggleForm: () => void }) {
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-medblue-500 focus:border-transparent bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 text-sm"
             placeholder="Votre email"
             required
+          />
+        </div>
+
+        {/* Phone Number Field */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-2">
+            Numéro de téléphone (Tunisie)
+          </label>
+          <input
+            type="tel"
+            name="phone"
+            value={formData.phone}
+            onChange={handleInputChange}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-medblue-500 focus:border-transparent bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 text-sm"
+            placeholder="ex: 20 123 456"
+            pattern="[2459][0-9]{7}"
+            maxLength={8}
+            minLength={8}
+            required
+            inputMode="numeric"
           />
         </div>
 

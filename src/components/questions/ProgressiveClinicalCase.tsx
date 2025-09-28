@@ -308,7 +308,7 @@ export const ProgressiveClinicalCase: React.FC<ProgressiveClinicalCaseProps> = (
                 }
               })}
             </div>
-            <div className="mt-8 flex justify-end"><Button onClick={onNextCase}>Question suivante <ChevronRight className="h-4 w-4 ml-1" /></Button></div>
+            <div className="mt-8 flex justify-end"><Button onClick={onNextCase}>Suivant <ChevronRight className="h-4 w-4 ml-1" /></Button></div>
           </div>
           <div className="text-center text-xs text-muted-foreground">Entrée pour continuer</div>
         </div>

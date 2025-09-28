@@ -5,10 +5,9 @@ import type { Prisma } from '@prisma/client';
 
 async function getHandler(
   request: AuthenticatedRequest,
-  context: any
+  { params }: { params: Promise<{ lectureId: string }> }
 ) {
   try {
-    const { params } = context as { params: Promise<{ lectureId: string }> };
     const userId = request.user?.userId;
     
     if (!userId) {
@@ -167,10 +166,9 @@ async function getHandler(
 
 async function putHandler(
   request: AuthenticatedRequest,
-  context: any
+  { params }: { params: Promise<{ lectureId: string }> }
 ) {
   try {
-    const { params } = context as { params: Promise<{ lectureId: string }> };
     const { lectureId } = await params;
     const { title, description, specialtyId, isFree } = await request.json();
 
@@ -208,10 +206,9 @@ async function putHandler(
 
 async function deleteHandler(
   request: AuthenticatedRequest,
-  context: any
+  { params }: { params: Promise<{ lectureId: string }> }
 ) {
   try {
-    const { params } = context as { params: Promise<{ lectureId: string }> };
     const { lectureId } = await params;
 
     // First delete all questions in this lecture

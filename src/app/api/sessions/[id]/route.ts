@@ -3,13 +3,12 @@ import { prisma } from '@/lib/prisma'
 import { requireAdmin, AuthenticatedRequest } from '@/lib/auth-middleware'
 
 // GET /api/sessions/[id] - Get a single session by ID
-// Note: Using a generic context param (instead of destructured typed params) to satisfy Next.js 15 route handler validation.
 export async function GET(
   request: NextRequest,
-  context: any
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const sessionId = context?.params?.id as string | undefined
+    const { id: sessionId } = await params
 
     if (!sessionId) {
       return NextResponse.json({ error: 'ID de session requis' }, { status: 400 })
@@ -59,10 +58,10 @@ export async function GET(
 // DELETE /api/sessions/[id] - Delete a single session (admin only)
 export const DELETE = requireAdmin(async (
   request: AuthenticatedRequest,
-  context: any
+  { params }: { params: Promise<{ id: string }> }
 ) => {
   try {
-    const sessionId = context?.params?.id as string | undefined
+    const { id: sessionId } = await params
 
     if (!sessionId) {
       return NextResponse.json({ error: 'ID de session requis' }, { status: 400 })
@@ -99,10 +98,10 @@ export const DELETE = requireAdmin(async (
 // PUT /api/sessions/[id] - Update a session (admin only)
 export const PUT = requireAdmin(async (
   request: AuthenticatedRequest,
-  context: any
+  { params }: { params: Promise<{ id: string }> }
 ) => {
   try {
-    const sessionId = context?.params?.id as string | undefined
+    const { id: sessionId } = await params
 
     if (!sessionId) {
       return NextResponse.json({ error: 'ID de session requis' }, { status: 400 })

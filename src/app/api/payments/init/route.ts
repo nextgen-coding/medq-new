@@ -113,7 +113,7 @@ async function verifyPaymentAmount(
 async function handler(request: AuthenticatedRequest) {
   try {
     const body = await request.json()
-    const { method, subscriptionType, customPaymentDetails, voucherCode, proofFileUrl } = body
+    const { method, subscriptionType, customPaymentDetails, voucherCode, proofFileUrl, couponCode } = body
 
     // Validate input
     if (!method || !subscriptionType) {
@@ -134,10 +134,52 @@ async function handler(request: AuthenticatedRequest) {
     // 🔒 SECURITY: Always fetch and calculate pricing server-side
     // Never trust client-provided amounts
     const securePricing = await getSecurePricing()
-    const { finalAmount, originalAmount, discountAmount, currency } = calculateSecureAmount(
+    let { finalAmount, originalAmount, discountAmount, currency } = calculateSecureAmount(
       subscriptionType, 
       securePricing
     )
+
+    // Handle coupon discount for konnect_gateway method
+    let couponDiscount = 0
+    let couponId = null
+    if (method === PaymentMethod.konnect_gateway && couponCode) {
+      // Validate coupon
+      const coupon = await prisma.reductionCoupon.findUnique({
+        where: { code: couponCode }
+      })
+
+      if (!coupon) {
+        return NextResponse.json({ error: 'Code de réduction invalide' }, { status: 400 })
+      }
+
+      if (coupon.isUsed) {
+        return NextResponse.json({ error: 'Ce code de réduction a déjà été utilisé' }, { status: 400 })
+      }
+
+      if (coupon.expiresAt && new Date(coupon.expiresAt) < new Date()) {
+        return NextResponse.json({ error: 'Ce code de réduction a expiré' }, { status: 400 })
+      }
+
+      // Calculate coupon discount
+      if (coupon.discountType === 'percentage') {
+        couponDiscount = Math.round(finalAmount * (coupon.discountValue / 100) * 100) / 100
+      } else {
+        couponDiscount = Math.min(coupon.discountValue, finalAmount)
+      }
+
+      finalAmount = Math.max(0, finalAmount - couponDiscount)
+      couponId = coupon.id
+
+      // Mark coupon as used immediately for Konnect payments to prevent reuse
+      await prisma.reductionCoupon.update({
+        where: { id: coupon.id },
+        data: {
+          isUsed: true,
+          usedAt: new Date(),
+          usedById: request.user!.userId
+        }
+      })
+    }
 
     // 🔒 SECURITY: Create payment record with server-calculated amount FIRST
     // This ensures we have a secure audit trail before any external API calls
@@ -150,6 +192,8 @@ async function handler(request: AuthenticatedRequest) {
       metadata: {
         originalAmount,
         discountAmount,
+        couponDiscount,
+        couponId,
         currency,
         pricingTimestamp: new Date().toISOString()
       }

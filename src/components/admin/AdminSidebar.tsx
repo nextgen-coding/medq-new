@@ -518,7 +518,7 @@ export function AdminSidebar() {
                     <SidebarMenuItem>
                       <SidebarMenuButton 
                         className={`group transition-all duration-200 font-medium rounded-xl ${
-                          state === 'expanded' 
+                          state === 'expanded' || isMobile
                             ? 'px-3 py-3 min-h-[44px] flex items-center justify-between' 
                             : 'p-0 min-h-[44px] w-full flex items-center justify-center'
                         } ${

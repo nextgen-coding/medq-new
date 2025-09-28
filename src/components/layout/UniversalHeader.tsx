@@ -287,12 +287,12 @@ export function UniversalHeader({
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => router.push('/profile')}>
                   <User className="mr-2 h-4 w-4" />
-                  <span>Profile</span>
+                  <span>{t('profile.title', { defaultValue: 'Profil' })}</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleSignOut}>
                   <LogOut className="mr-2 h-4 w-4" />
-                  <span>Log out</span>
+                  <span>{t('auth.signOut', { defaultValue: 'Se déconnecter' })}</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

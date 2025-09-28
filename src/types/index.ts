@@ -15,6 +15,7 @@ export type User = {
   niveauId?: string;
   semesterId?: string;
   profileCompleted?: boolean;
+  phone?: string;
   // Subscription fields
   hasActiveSubscription?: boolean;
   subscriptionExpiresAt?: string;

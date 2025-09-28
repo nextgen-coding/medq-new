@@ -4,12 +4,13 @@ import { prisma } from '@/lib/prisma';
 // GET /api/specialties/[specialtyId]/sessions
 export async function GET(
   request: Request,
-  context: any
+  { params }: { params: Promise<{ specialtyId: string }> }
 ) {
   try {
     const url = new URL(request.url);
     const nameFallback = url.searchParams.get('name') || undefined;
-    let id = (context?.params?.specialtyId || '').trim().replace(/[\u200B-\u200D\uFEFF]/g, '');
+    const { specialtyId } = await params;
+    let id = (specialtyId || '').trim().replace(/[\u200B-\u200D\uFEFF]/g, '');
     const uuidLike = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
     if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });

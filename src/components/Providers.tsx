@@ -9,6 +9,7 @@ import { Toaster } from '@/components/ui/toaster'
 import { Toaster as Sonner } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { Suspense } from 'react'
+import { PhoneGuard } from '@/components/PhoneGuard'
 
 const queryClient = new QueryClient()
 
@@ -29,17 +30,19 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <QueryClientProvider client={queryClient}>
       <Suspense fallback={<LoadingFallback />}>
         <AuthProvider>
-          <SubscriptionProvider>
-            <ThemeProvider>
-              <I18nProvider>
-                <TooltipProvider>
-                  {children}
-                  <Toaster />
-                  <Sonner />
-                </TooltipProvider>
-              </I18nProvider>
-            </ThemeProvider>
-          </SubscriptionProvider>
+          <PhoneGuard>
+            <SubscriptionProvider>
+              <ThemeProvider>
+                <I18nProvider>
+                  <TooltipProvider>
+                    {children}
+                    <Toaster />
+                    <Sonner />
+                  </TooltipProvider>
+                </I18nProvider>
+              </ThemeProvider>
+            </SubscriptionProvider>
+          </PhoneGuard>
         </AuthProvider>
       </Suspense>
     </QueryClientProvider>

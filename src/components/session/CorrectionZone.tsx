@@ -2327,64 +2327,92 @@ export function CorrectionZone({ sessionId, mode, onQuestionLink, pdfLinks = [],
                     </div>
 
                     {/* QROC Self-Assessment in validation section */}
-                    <div className="mt-4 p-3 sm:p-4 rounded-lg bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
-                      <div className="flex items-start gap-3 mb-3">
-                        <h4 className="font-medium text-blue-900 dark:text-blue-200 text-sm sm:text-base flex-shrink-0">
-                          Évaluez votre réponse:
-                        </h4>
-                        <div className="flex-1 font-medium text-blue-900 dark:text-blue-200 text-sm sm:text-base break-words">
+                    <div className="mt-4 space-y-4">
+                      {/* Reference Answer Section - Green background */}
+                      <div className="bg-green-100 dark:bg-green-900/30 rounded-lg p-4 border-l-4 border-green-500">
+                        <h5 className="text-sm font-semibold text-green-800 dark:text-green-200 mb-2 uppercase tracking-wide">
+                          Réponse de référence
+                        </h5>
+                        <div className="text-green-700 dark:text-green-300 leading-relaxed">
+                          {(question.correctAnswers || [''])[0] || 'Aucune réponse définie'}
+                        </div>
+                      </div>
+
+                      {/* User Answer Section - Color based on evaluation */}
+                      <div className={`rounded-lg p-4 border-l-4 ${
+                        getQrocEvaluation(question.id)
+                          ? getQrocEvaluation(question.id)?.status === 'correct'
+                            ? 'bg-green-100 dark:bg-green-900/30 border-green-500'
+                            : getQrocEvaluation(question.id)?.status === 'partial'
+                            ? 'bg-orange-100 dark:bg-orange-900/30 border-orange-500'
+                            : 'bg-red-100 dark:bg-red-900/30 border-red-500'
+                          : 'bg-blue-100 dark:bg-blue-900/30 border-blue-500'
+                      }`}>
+                        <h5 className={`text-sm font-semibold mb-2 uppercase tracking-wide ${
+                          getQrocEvaluation(question.id)
+                            ? getQrocEvaluation(question.id)?.status === 'correct'
+                              ? 'text-green-800 dark:text-green-200'
+                              : getQrocEvaluation(question.id)?.status === 'partial'
+                              ? 'text-orange-800 dark:text-orange-200'
+                              : 'text-red-800 dark:text-red-200'
+                            : 'text-blue-800 dark:text-blue-200'
+                        }`}>
+                          Votre réponse
+                        </h5>
+                        <div className={`leading-relaxed ${
+                          getQrocEvaluation(question.id)
+                            ? getQrocEvaluation(question.id)?.status === 'correct'
+                              ? 'text-green-700 dark:text-green-300'
+                              : getQrocEvaluation(question.id)?.status === 'partial'
+                              ? 'text-orange-700 dark:text-orange-300'
+                              : 'text-red-700 dark:text-red-300'
+                            : 'text-blue-700 dark:text-blue-300'
+                        }`}>
                           {userAnswers.texts.find(t => t.id === question.id)?.answer?.trim() || (
                             <span className="italic opacity-70">(vide)</span>
                           )}
                         </div>
                       </div>
-                      
-                      {/* Separator */}
-                      <div className="border-t border-blue-200/60 dark:border-blue-700/60 my-3"></div>
-                      
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full max-w-full">
-                        <Button
-                          size="sm"
-                          className="w-full gap-1 bg-green-600/90 hover:bg-green-600 text-white shadow-md hover:shadow-lg transition-all duration-200 text-xs py-2 px-2 min-h-[32px] max-w-full"
-                          onClick={() => setQrocEvaluation(question.id, 'correct')}
-                        >
-                          <CheckCircle className="h-3 w-3 flex-shrink-0" />
-                          <span className="truncate text-xs">Correcte</span>
-                        </Button>
-                        
-                        <Button
-                          size="sm"
-                          className="w-full gap-1 bg-amber-500/90 hover:bg-amber-500 text-white shadow-md hover:shadow-lg transition-all duration-200 text-xs py-2 px-2 min-h-[32px] max-w-full"
-                          onClick={() => setQrocEvaluation(question.id, 'partial')}
-                        >
-                          <MinusCircle className="h-3 w-3 flex-shrink-0" />
-                          <span className="truncate text-xs">Partiellement</span>
-                        </Button>
-                        
-                        <Button
-                          size="sm"
-                          className="w-full gap-1 bg-red-600/90 hover:bg-red-600 text-white shadow-md hover:shadow-lg transition-all duration-200 text-xs py-2 px-2 min-h-[32px] max-w-full"
-                          onClick={() => setQrocEvaluation(question.id, 'incorrect')}
-                        >
-                          <XCircle className="h-3 w-3 flex-shrink-0" />
-                          <span className="truncate text-xs">Incorrecte</span>
-                        </Button>
-                      </div>
+
+                      {/* Evaluation Section - Only show if not evaluated yet */}
+                      {!getQrocEvaluation(question.id) && (
+                        <div className="mt-4">
+                          <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                            Évaluez votre réponse:
+                          </h5>
+                          <div className="flex flex-col xs:flex-row gap-3 w-full">
+                            <Button
+                              size="lg"
+                              className="flex items-center justify-center gap-2 px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-medium rounded-full transition-all duration-200 flex-1"
+                              onClick={() => setQrocEvaluation(question.id, 'correct')}
+                            >
+                              <CheckCircle className="h-4 w-4" />
+                              Correct!
+                            </Button>
+
+                            <Button
+                              size="lg" 
+                              className="flex items-center justify-center gap-2 px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-full transition-all duration-200 flex-1"
+                              onClick={() => setQrocEvaluation(question.id, 'partial')}
+                            >
+                              <MinusCircle className="h-4 w-4" />
+                              Partiellement correcte
+                            </Button>
+
+                            <Button
+                              size="lg"
+                              className="flex items-center justify-center gap-2 px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-medium rounded-full transition-all duration-200 flex-1"
+                              onClick={() => setQrocEvaluation(question.id, 'incorrect')}
+                            >
+                              <XCircle className="h-4 w-4" />
+                              Incorrect
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
-                    {/* Show validation result after evaluation */}
-                    {getQrocEvaluation(question.id) && (
-                      <div className="mt-3 p-3 rounded-md bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
-                        <div className="flex items-center gap-2 text-green-800 dark:text-green-200">
-                          <CheckCircle className="h-4 w-4" />
-                          <span className="text-sm font-medium">Validé votre réponse comme: {
-                            getQrocEvaluation(question.id)?.status === 'correct' ? 'Correcte' :
-                            getQrocEvaluation(question.id)?.status === 'partial' ? 'Partiellement' :
-                            'Incorrecte'
-                          }</span>
-                        </div>
-                      </div>
-                    )}
+
                   </div>
                 ) : (
                   <div className="space-y-2">
@@ -2914,62 +2942,92 @@ export function CorrectionZone({ sessionId, mode, onQuestionLink, pdfLinks = [],
                           </div>
 
                           {/* QROC Self-Assessment for Clinical Cases in validation section */}
-                          <div className="mt-4 p-3 sm:p-4 rounded-lg bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
-                            <h4 className="font-medium mb-3 text-blue-900 dark:text-blue-200 text-sm sm:text-base">
-                              Évaluez votre réponse:
-                            </h4>
-                            <div className="mb-3 p-2 bg-blue-100/50 dark:bg-blue-900/50 rounded border text-blue-800 dark:text-blue-100 text-xs sm:text-sm break-words">
-                              {userAnswers.clinicalCaseAnswers?.find(c => c.caseId === clinicalCase.id)?.questionAnswers?.find(q => q.questionId === question.id)?.textAnswer?.trim() || (
-                                <span className="italic opacity-70">(vide)</span>
-                              )}
-                            </div>
-                            
-                            {/* Separator */}
-                            <div className="border-t border-blue-200/60 dark:border-blue-700/60 my-3"></div>
-                            
-                            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full">
-                              <Button
-                                size="sm"
-                                className="flex-1 gap-2 bg-green-600/90 hover:bg-green-600 text-white shadow-md hover:shadow-lg transition-all duration-200 text-xs sm:text-sm py-2 px-3 min-h-[36px]"
-                                onClick={() => setQrocEvaluation(question.id, 'correct')}
-                              >
-                                <CheckCircle className="h-4 w-4 flex-shrink-0" />
-                                <span className="truncate">Correcte</span>
-                              </Button>
-                              
-                              <Button
-                                size="sm"
-                                className="flex-1 gap-2 bg-amber-500/90 hover:bg-amber-500 text-white shadow-md hover:shadow-lg transition-all duration-200 text-xs sm:text-sm py-2 px-3 min-h-[36px]"
-                                onClick={() => setQrocEvaluation(question.id, 'partial')}
-                              >
-                                <MinusCircle className="h-4 w-4 flex-shrink-0" />
-                                <span className="truncate">Partiellement</span>
-                              </Button>
-                              
-                              <Button
-                                size="sm"
-                                className="flex-1 gap-2 bg-red-600/90 hover:bg-red-600 text-white shadow-md hover:shadow-lg transition-all duration-200 text-xs sm:text-sm py-2 px-3 min-h-[36px]"
-                                onClick={() => setQrocEvaluation(question.id, 'incorrect')}
-                              >
-                                <XCircle className="h-4 w-4 flex-shrink-0" />
-                                <span className="truncate">Incorrecte</span>
-                              </Button>
-                            </div>
-                          </div>
-
-                          {/* Show validation result after evaluation for Clinical Cases */}
-                          {getQrocEvaluation(question.id) && (
-                            <div className="mt-3 p-3 rounded-md bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
-                              <div className="flex items-center gap-2 text-green-800 dark:text-green-200">
-                                <CheckCircle className="h-4 w-4" />
-                                <span className="text-sm font-medium">Validé votre réponse comme: {
-                                  getQrocEvaluation(question.id)?.status === 'correct' ? 'Correcte' :
-                                  getQrocEvaluation(question.id)?.status === 'partial' ? 'Partiellement' :
-                                  'Incorrecte'
-                                }</span>
+                          <div className="mt-4 space-y-4">
+                            {/* Reference Answer Section - Green background */}
+                            <div className="bg-green-100 dark:bg-green-900/30 rounded-lg p-4 border-l-4 border-green-500">
+                              <h5 className="text-sm font-semibold text-green-800 dark:text-green-200 mb-2 uppercase tracking-wide">
+                                Réponse de référence
+                              </h5>
+                              <div className="text-green-700 dark:text-green-300 leading-relaxed">
+                                {(question.correctAnswers || [''])[0] || 'Aucune réponse définie'}
                               </div>
                             </div>
-                          )}
+
+                            {/* User Answer Section - Color based on evaluation */}
+                            <div className={`rounded-lg p-4 border-l-4 ${
+                              getQrocEvaluation(question.id)
+                                ? getQrocEvaluation(question.id)?.status === 'correct'
+                                  ? 'bg-green-100 dark:bg-green-900/30 border-green-500'
+                                  : getQrocEvaluation(question.id)?.status === 'partial'
+                                  ? 'bg-orange-100 dark:bg-orange-900/30 border-orange-500'
+                                  : 'bg-red-100 dark:bg-red-900/30 border-red-500'
+                                : 'bg-blue-100 dark:bg-blue-900/30 border-blue-500'
+                            }`}>
+                              <h5 className={`text-sm font-semibold mb-2 uppercase tracking-wide ${
+                                getQrocEvaluation(question.id)
+                                  ? getQrocEvaluation(question.id)?.status === 'correct'
+                                    ? 'text-green-800 dark:text-green-200'
+                                    : getQrocEvaluation(question.id)?.status === 'partial'
+                                    ? 'text-orange-800 dark:text-orange-200'
+                                    : 'text-red-800 dark:text-red-200'
+                                  : 'text-blue-800 dark:text-blue-200'
+                              }`}>
+                                Votre réponse
+                              </h5>
+                              <div className={`leading-relaxed ${
+                                getQrocEvaluation(question.id)
+                                  ? getQrocEvaluation(question.id)?.status === 'correct'
+                                    ? 'text-green-700 dark:text-green-300'
+                                    : getQrocEvaluation(question.id)?.status === 'partial'
+                                    ? 'text-orange-700 dark:text-orange-300'
+                                    : 'text-red-700 dark:text-red-300'
+                                  : 'text-blue-700 dark:text-blue-300'
+                              }`}>
+                                {userAnswers.clinicalCaseAnswers?.find(c => c.caseId === clinicalCase.id)?.questionAnswers?.find(q => q.questionId === question.id)?.textAnswer?.trim() || (
+                                  <span className="italic opacity-70">(vide)</span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Evaluation Section - Only show if not evaluated yet */}
+                            {!getQrocEvaluation(question.id) && (
+                              <div className="mt-4">
+                                <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+                                  Évaluez votre réponse:
+                                </h5>
+                                <div className="flex flex-col xs:flex-row gap-3 w-full">
+                                  <Button
+                                    size="lg"
+                                    className="flex items-center justify-center gap-2 px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-medium rounded-full transition-all duration-200 flex-1"
+                                    onClick={() => setQrocEvaluation(question.id, 'correct')}
+                                  >
+                                    <CheckCircle className="h-4 w-4" />
+                                    Correct!
+                                  </Button>
+
+                                  <Button
+                                    size="lg" 
+                                    className="flex items-center justify-center gap-2 px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-full transition-all duration-200 flex-1"
+                                    onClick={() => setQrocEvaluation(question.id, 'partial')}
+                                  >
+                                    <MinusCircle className="h-4 w-4" />
+                                    Partiellement correcte
+                                  </Button>
+
+                                  <Button
+                                    size="lg"
+                                    className="flex items-center justify-center gap-2 px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-medium rounded-full transition-all duration-200 flex-1"
+                                    onClick={() => setQrocEvaluation(question.id, 'incorrect')}
+                                  >
+                                    <XCircle className="h-4 w-4" />
+                                    Incorrect
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+
                         </div>
                       ) : (
                         <div className="space-y-2">

@@ -2,11 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth, AuthenticatedRequest } from '@/lib/auth-middleware'
 import { prisma } from '@/lib/prisma'
 
-async function handler(request: AuthenticatedRequest, context: { params: Promise<{ id: string }> }) {
+async function handler(request: AuthenticatedRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { proofImageUrl } = await request.json()
-    const params = await context.params
-    const paymentId = params.id
+    const { id: paymentId } = await params
 
     if (!proofImageUrl) {
       return NextResponse.json(
