@@ -195,7 +195,22 @@ export default function CourseManagementPage() {
     if (group.type==='clinical_case') {
       setCreationMode('clinical_case');
       setCaseText(group.caseText || '');
-      const mapped = group.questions.sort((a,b)=> (a.caseQuestionNumber||0)-(b.caseQuestionNumber||0)).map(q=>({ id:q.id, type: q.type as any, text:q.text, options: (q.type==='clinic_mcq'? (q.options||[]):[]), correctAnswers: q.correctAnswers||[], referenceAnswer: (q.type==='clinic_croq'?(q.correctAnswers?.[0]||''):'') }));
+      const mapped = group.questions.sort((a,b)=> (a.caseQuestionNumber||0)-(b.caseQuestionNumber||0)).map(q=>{
+        if (q.type==='clinic_mcq') {
+          const options = (q.options||[]).map(o=> (typeof o==='string'? o : (o as any).text || ''));
+          // Convert correctAnswers from IDs to letters if needed
+          let correctAnswers = q.correctAnswers || [];
+          if (correctAnswers.length > 0 && typeof q.options?.[0] === 'object') {
+            // If options are objects, correctAnswers should be IDs, convert to letters
+            const optionMap = new Map((q.options as any[]).map((o, idx) => [o.id, String.fromCharCode(65 + idx)]));
+            correctAnswers = correctAnswers.map(id => optionMap.get(id) || id).filter(Boolean);
+          }
+          // If correctAnswers are already letters, keep them as is
+          return { id:q.id, type: q.type as any, text:q.text, options, correctAnswers, referenceAnswer: '' };
+        } else {
+          return { id:q.id, type: q.type as any, text:q.text, options: [], correctAnswers: q.correctAnswers||[], referenceAnswer: (q.correctAnswers?.[0]||'') };
+        }
+      });
       setCaseQuestions(mapped as any);
       setOriginalGroupQuestionIds(group.questions.map(q=>q.id));
     } else if (group.type==='grouped_qroc') {
@@ -206,7 +221,17 @@ export default function CourseManagementPage() {
       setOriginalGroupQuestionIds(group.questions.map(q=>q.id));
     } else if (group.type==='grouped_qcm') {
       setCreationMode('grouped_qcm');
-      const mapped = group.questions.sort((a,b)=> (a.caseQuestionNumber||0)-(b.caseQuestionNumber||0)).map(q=>({ id:q.id, text:q.text, options: (q.options||[]).map(o=> (typeof o==='string'? o : (o as any).text || '')), correctAnswers: q.correctAnswers||[] }));
+      const mapped = group.questions.sort((a,b)=> (a.caseQuestionNumber||0)-(b.caseQuestionNumber||0)).map(q=>{
+        const options = (q.options||[]).map(o=> (typeof o==='string'? o : (o as any).text || ''));
+        // Convert correctAnswers from IDs to letters if needed
+        let correctAnswers = q.correctAnswers || [];
+        if (correctAnswers.length > 0 && typeof q.options?.[0] === 'object') {
+          // If options are objects, correctAnswers should be IDs, convert to letters
+          const optionMap = new Map((q.options as any[]).map((o, idx) => [o.id, String.fromCharCode(65 + idx)]));
+          correctAnswers = correctAnswers.map(id => optionMap.get(id) || id).filter(Boolean);
+        }
+        return { id:q.id, text:q.text, options, correctAnswers };
+      });
       setGroupQcmSubs(mapped);
       setGroupQcmCaseText(group.caseText || '');
       setOriginalGroupQuestionIds(group.questions.map(q=>q.id));
@@ -541,16 +566,29 @@ export default function CourseManagementPage() {
                       const items: Array<{kind:'clinical'; group:{caseNumber:number; caseText?:string; questions:Question[]}} | {kind:'grouped_qroc'; group:{caseNumber:number; caseText?:string; questions:Question[]}} | {kind:'grouped_qcm'; group:{caseNumber:number; caseText?:string; questions:Question[]}} | {kind:'single'; question:Question}> = [];
                       // Clinical groups
                       clinicGroups.forEach((qs, num)=>{
-                        items.push({ kind:'clinical', group:{ caseNumber:num, caseText: (qs[0] as any).caseText, questions: qs.sort((a,b)=> (a.caseQuestionNumber||0)-(b.caseQuestionNumber||0)) }});
+                        // Get caseText from the first question that has it, or find the most common one
+                        const caseTexts = qs.map(q => (q as any).caseText).filter(Boolean);
+                        const caseText = caseTexts.length > 0 ? caseTexts[0] : undefined;
+                        items.push({ kind:'clinical', group:{ caseNumber:num, caseText, questions: qs.sort((a,b)=> (a.caseQuestionNumber||0)-(b.caseQuestionNumber||0)) }});
                         groupedKeys.add('clinic-'+num);
                       });
                       // QROC groups (only if more than 1)
                       qrocGroups.forEach((qs, num)=>{
-                        if (qs.length>1) { const ctext = (qs.find(q=> (q as any).caseText) as any)?.caseText; items.push({ kind:'grouped_qroc', group:{ caseNumber:num, caseText: ctext, questions: qs.sort((a,b)=> (a.caseQuestionNumber||0)-(b.caseQuestionNumber||0)) }}); groupedKeys.add('gqroc-'+num); }
+                        if (qs.length>1) { 
+                          const caseTexts = qs.map(q=> (q as any).caseText).filter(Boolean);
+                          const ctext = caseTexts.length > 0 ? caseTexts[0] : undefined;
+                          items.push({ kind:'grouped_qroc', group:{ caseNumber:num, caseText: ctext, questions: qs.sort((a,b)=> (a.caseQuestionNumber||0)-(b.caseQuestionNumber||0)) }}); 
+                          groupedKeys.add('gqroc-'+num); 
+                        }
                       });
                       // QCM groups (only if more than 1)
                       qcmGroups.forEach((qs, num)=>{
-                        if (qs.length>1) { const ctext = (qs.find(q=> (q as any).caseText) as any)?.caseText; items.push({ kind:'grouped_qcm', group:{ caseNumber:num, caseText: ctext, questions: qs.sort((a,b)=> (a.caseQuestionNumber||0)-(b.caseQuestionNumber||0)) }}); groupedKeys.add('gqcm-'+num); }
+                        if (qs.length>1) { 
+                          const caseTexts = qs.map(q=> (q as any).caseText).filter(Boolean);
+                          const ctext = caseTexts.length > 0 ? caseTexts[0] : undefined;
+                          items.push({ kind:'grouped_qcm', group:{ caseNumber:num, caseText: ctext, questions: qs.sort((a,b)=> (a.caseQuestionNumber||0)-(b.caseQuestionNumber||0)) }}); 
+                          groupedKeys.add('gqcm-'+num); 
+                        }
                       });
                       // Singles
                       for (const q of filtered) {

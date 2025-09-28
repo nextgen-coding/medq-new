@@ -323,20 +323,20 @@ export default function ProfilePageRoute() {
               />
 
               {/* Main Content */}
-              <main className="flex-1 min-h-0 overflow-y-auto">
-                <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-16">
+              <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
+                <div className="max-w-full sm:max-w-6xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-6 sm:py-8 pb-12 sm:pb-16">
                   {/* Header Section */}
                   <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Mon Profil</h1>
+                    <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">Mon Profil</h1>
                     <p className="text-gray-600 dark:text-gray-400">Gérez vos informations personnelles et vos préférences</p>
                   </div>
 
-                  <div className="grid gap-8 lg:grid-cols-3 pb-8">
+                  <div className="grid gap-3 sm:gap-4 md:gap-6 lg:gap-8 lg:grid-cols-3 pb-6 sm:pb-8">
                     {/* Left Column: Profile Overview + Subscription */}
-                    <div className="lg:col-span-1 flex flex-col gap-8">
+                    <div className="lg:col-span-1 flex flex-col gap-4 sm:gap-6 lg:gap-8">
                       {/* Profile Overview Card */}
-                      <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-xl hover:shadow-2xl transition-all duration-300">
-                        <CardContent className="p-6">
+                      <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-xl hover:shadow-2xl transition-all duration-300 overflow-hidden">
+                        <CardContent className="p-4 sm:p-6">
                           <div className="text-center">
                             {/* Enhanced Avatar Section */}
                             <div className="relative mb-6">
@@ -403,8 +403,8 @@ export default function ProfilePageRoute() {
                       </Card>
 
                       {/* Subscription Card */}
-                      <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-xl hover:shadow-2xl transition-all duration-300">
-                        <CardContent className="p-6">
+                      <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-xl hover:shadow-2xl transition-all duration-300 overflow-hidden">
+                        <CardContent className="p-4 sm:p-6">
                           <div className="flex items-start justify-between mb-4">
                             <div className="flex items-center gap-3">
                               <div className="p-2 rounded-xl bg-yellow-100 dark:bg-yellow-900/40">
@@ -468,11 +468,11 @@ export default function ProfilePageRoute() {
                     </div>
 
                     {/* Main Content Cards */}
-                    <div className="lg:col-span-2 space-y-6">
+                    <div className="lg:col-span-2 space-y-4 sm:space-y-6">
                       {/* Personal Information */}
-                      <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-xl hover:shadow-2xl transition-all duration-300">
+                      <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-xl hover:shadow-2xl transition-all duration-300 overflow-hidden">
                         <CardHeader className="pb-4">
-                          <CardTitle className="text-xl font-semibold text-gray-900 dark:text-white flex items-center">
+                          <CardTitle className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white flex items-center">
                             <User className="h-5 w-5 mr-2 text-blue-600 dark:text-blue-400" />
                             Informations Personnelles
                           </CardTitle>
@@ -641,17 +641,17 @@ export default function ProfilePageRoute() {
                       </Card>
 
                       {/* Account Security */}
-                      <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-xl hover:shadow-2xl transition-all duration-300">
+                      <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-xl hover:shadow-2xl transition-all duration-300 overflow-hidden">
                         <CardHeader className="pb-4">
-                          <CardTitle className="text-xl font-semibold text-gray-900 dark:text-white flex items-center">
+                          <CardTitle className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white flex items-center">
                             <Shield className="h-5 w-5 mr-2 text-green-600 dark:text-green-400" />
                             Sécurité du Compte
                           </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-6">
                           {/* Password Change */}
-                          <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                            <div>
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg gap-3">
+                            <div className="flex-1">
                               <h4 className="font-medium text-gray-900 dark:text-white">Mot de passe</h4>
                               <p className="text-sm text-gray-600 dark:text-gray-400">
                                 Dernière modification: {user?.passwordUpdatedAt ?
@@ -662,7 +662,7 @@ export default function ProfilePageRoute() {
                             <Button
                               variant="outline"
                               size="sm"
-                              className="border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-400 dark:hover:bg-blue-900/20 transition-all duration-200"
+                              className="border-blue-200 text-blue-600 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-400 dark:hover:bg-blue-900/20 transition-all duration-200 self-start sm:self-auto"
                               onClick={() => setShowChangePassword(!showChangePassword)}
                             >
                               <Lock className="h-4 w-4 mr-2" />
@@ -677,7 +677,7 @@ export default function ProfilePageRoute() {
                                 <>
                                   <h4 className="font-semibold text-gray-900 dark:text-white mb-4">{user?.password ? 'Changer le mot de passe' : 'Définir le mot de passe'}</h4>
 
-                                  <div className="grid gap-4 md:grid-cols-1">
+                                  <div className="grid gap-4">
                                     {/* Only show current password if user has a password set */}
                                     {user?.password && (
                                       <div className="space-y-2">
@@ -754,11 +754,11 @@ export default function ProfilePageRoute() {
                                     </div>
                                   </div>
 
-                                  <div className="flex space-x-3 pt-4">
+                                  <div className="flex flex-col sm:flex-row gap-3 pt-4">
                                     <Button
                                       onClick={handleRequestVerificationCode}
                                       disabled={isRequestingCode || (user?.password ? (!passwordData.currentPassword || !passwordData.newPassword || passwordData.newPassword !== passwordData.confirmPassword) : (!passwordData.newPassword || passwordData.newPassword !== passwordData.confirmPassword))}
-                                      className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+                                      className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 w-full sm:w-auto"
                                     >
                                       {isRequestingCode ? 'Envoi en cours...' : 'Envoyer le code de vérification'}
                                     </Button>
@@ -769,7 +769,7 @@ export default function ProfilePageRoute() {
                                         setPasswordChangeStep('form')
                                         setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '', verificationCode: '' })
                                       }}
-                                      className="border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 transition-all duration-200"
+                                      className="border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 transition-all duration-200 w-full sm:w-auto"
                                     >
                                       Annuler
                                     </Button>
@@ -798,18 +798,18 @@ export default function ProfilePageRoute() {
                                     </div>
                                   </div>
 
-                                  <div className="flex space-x-3 pt-4">
+                                  <div className="flex flex-col sm:flex-row gap-3 pt-4">
                                     <Button
                                       onClick={handleVerifyAndChangePassword}
                                       disabled={!passwordData.verificationCode || passwordData.verificationCode.length !== 6}
-                                      className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+                                      className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 w-full sm:w-auto"
                                     >
                                       Changer le mot de passe
                                     </Button>
                                     <Button
                                       variant="outline"
                                       onClick={() => setPasswordChangeStep('form')}
-                                      className="border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 transition-all duration-200"
+                                      className="border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 transition-all duration-200 w-full sm:w-auto"
                                     >
                                       Retour
                                     </Button>
@@ -820,7 +820,7 @@ export default function ProfilePageRoute() {
                                         setPasswordChangeStep('form')
                                         setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '', verificationCode: '' })
                                       }}
-                                      className="border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 transition-all duration-200"
+                                      className="border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 transition-all duration-200 w-full sm:w-auto"
                                     >
                                       Annuler
                                     </Button>
@@ -833,9 +833,9 @@ export default function ProfilePageRoute() {
                       </Card>
 
                       {/* Preferences */}
-                      <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-xl hover:shadow-2xl transition-all duration-300">
+                      <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-xl hover:shadow-2xl transition-all duration-300 overflow-hidden">
                         <CardHeader className="pb-4">
-                          <CardTitle className="text-xl font-semibold text-gray-900 dark:text-white flex items-center">
+                          <CardTitle className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white flex items-center">
                             <Settings className="h-5 w-5 mr-2 text-purple-600 dark:text-purple-400" />
                             Préférences
                           </CardTitle>

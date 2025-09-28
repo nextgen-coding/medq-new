@@ -108,7 +108,7 @@ export const PUT = requireAdmin(async (
     }
 
     const body = await request.json()
-    const { name, pdfUrl, correctionUrl, specialtyId, niveauId, semesterId } = body
+    const { name, pdfUrl, correctionUrl, specialtyId, niveauId, semesterId, isFree } = body
 
     // Validate required fields
     if (!name?.trim()) {
@@ -164,6 +164,7 @@ export const PUT = requireAdmin(async (
         specialtyId: specialtyId || existingSession.specialtyId,
         niveauId: niveauId || existingSession.niveauId,
         semesterId: semesterId || existingSession.semesterId,
+        isFree: isFree ?? existingSession.isFree,
       },
       include: {
         specialty: {

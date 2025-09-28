@@ -19,6 +19,7 @@ interface SessionItem {
   name: string;
   pdfUrl?: string | null;
   correctionUrl?: string | null;
+  isFree?: boolean;
   niveau?: { id: string; name: string } | null;
   semester?: { id: string; name: string; order: number } | null;
   specialty?: { id: string; name: string } | null;
@@ -46,7 +47,7 @@ export default function SessionsAdminPage() {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState<{ name: string; pdfUrl: string; correctionUrl: string; niveauId: string; semester: string; specialtyName: string }>({ name: '', pdfUrl: '', correctionUrl: '', niveauId: '', semester: '', specialtyName: '' });
+  const [form, setForm] = useState<{ name: string; pdfUrl: string; correctionUrl: string; niveauId: string; semester: string; specialtyName: string; isFree: boolean }>({ name: '', pdfUrl: '', correctionUrl: '', niveauId: '', semester: '', specialtyName: '', isFree: false });
   const [niveaux, setNiveaux] = useState<{ id: string; name: string }[]>([]);
   const [semesters, setSemesters] = useState<{ id: string; name: string; order: number; niveauId: string }[]>([]);
   const [confirmDelete, setConfirmDelete] = useState<{ id: string; name: string } | null>(null);
@@ -86,13 +87,13 @@ export default function SessionsAdminPage() {
 
   useEffect(() => { load(); }, []);
 
-  const resetForm = () => setForm({ name: '', pdfUrl: '', correctionUrl: '', niveauId: '', semester: '', specialtyName: selectedSpecialty?.name || '' });
+  const resetForm = () => setForm({ name: '', pdfUrl: '', correctionUrl: '', niveauId: '', semester: '', specialtyName: selectedSpecialty?.name || '', isFree: false });
 
   const handleCreate = async () => {
     if (!form.name) return;
     setCreating(true);
     try {
-      const res = await fetch('/api/sessions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.name, pdfUrl: form.pdfUrl || undefined, correctionUrl: form.correctionUrl || undefined, niveauId: form.niveauId || undefined, semester: form.semester || undefined, specialtyName: form.specialtyName || undefined }) });
+      const res = await fetch('/api/sessions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.name, pdfUrl: form.pdfUrl || undefined, correctionUrl: form.correctionUrl || undefined, niveauId: form.niveauId || undefined, semester: form.semester || undefined, specialtyName: form.specialtyName || undefined, isFree: form.isFree }) });
       if (!res.ok) {
         const txt = await res.text();
         toast({ title: 'Échec création', description: txt, variant: 'destructive' });
@@ -108,12 +109,12 @@ export default function SessionsAdminPage() {
   const startEdit = (s: SessionItem) => {
     setEditingId(s.id);
     setShowForm(true);
-    setForm({ name: s.name, pdfUrl: s.pdfUrl || '', correctionUrl: s.correctionUrl || '', niveauId: s.niveau?.id || '', semester: s.semester ? String(s.semester.order) : '', specialtyName: s.specialty?.name || '' });
+    setForm({ name: s.name, pdfUrl: s.pdfUrl || '', correctionUrl: s.correctionUrl || '', niveauId: s.niveau?.id || '', semester: s.semester ? String(s.semester.order) : '', specialtyName: s.specialty?.name || '', isFree: s.isFree || false });
   };
 
   const handleUpdate = async () => {
     if (!editingId) return;
-    const res = await fetch(`/api/sessions/${editingId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.name, pdfUrl: form.pdfUrl || undefined, correctionUrl: form.correctionUrl || undefined, niveauId: form.niveauId || undefined, semesterId: undefined, semester: form.semester || undefined, specialtyName: form.specialtyName || undefined }) });
+    const res = await fetch(`/api/sessions/${editingId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: form.name, pdfUrl: form.pdfUrl || undefined, correctionUrl: form.correctionUrl || undefined, niveauId: form.niveauId || undefined, semesterId: undefined, semester: form.semester || undefined, specialtyName: form.specialtyName || undefined, isFree: form.isFree }) });
     if (!res.ok) {
       const txt = await res.text();
       toast({ title: 'Échec modification', description: txt, variant: 'destructive' });
@@ -264,6 +265,10 @@ export default function SessionsAdminPage() {
                     <Label>Spécialité</Label>
                     <Input value={form.specialtyName} disabled placeholder="Spécialité sélectionnée" className="border-blue-200 bg-muted/40" />
                   </div>
+                  <div className="sm:col-span-2 flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200">
+                    <input id="isFree" type="checkbox" checked={form.isFree} onChange={e => setForm(f => ({ ...f, isFree: e.target.checked }))} className="h-4 w-4 rounded border-blue-300 text-blue-600 focus:ring-blue-500" />
+                    <label htmlFor="isFree" className="text-sm font-medium text-blue-700 dark:text-blue-300">Session gratuite pour tous les utilisateurs</label>
+                  </div>
                   <div className="sm:col-span-2 flex flex-col xs:flex-row gap-2 justify-end pt-2 border-t border-blue-100">
                     {editingId && <Button variant="outline" size="sm" onClick={() => { setEditingId(null); resetForm(); }} className="border-blue-200 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 order-2 xs:order-1">Annuler</Button>}
                     {!editingId && <Button size="sm" onClick={handleCreate} disabled={!form.name || creating} className="bg-blue-600 hover:bg-blue-700 text-white gap-1 order-1 xs:order-2"><Plus className="h-4 w-4" /> Créer</Button>}
@@ -289,6 +294,7 @@ export default function SessionsAdminPage() {
                         <TableHead>Nom</TableHead>
                         <TableHead className="hidden sm:table-cell">Niveau</TableHead>
                         <TableHead className="hidden sm:table-cell">Semestre</TableHead>
+                        <TableHead className="hidden md:table-cell">Gratuit</TableHead>
                         <TableHead className="hidden md:table-cell">PDF</TableHead>
                         <TableHead className="hidden md:table-cell">Correction</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
@@ -308,6 +314,17 @@ export default function SessionsAdminPage() {
                           </TableCell>
                           <TableCell className="hidden sm:table-cell">{s.niveau?.name || '-'}</TableCell>
                           <TableCell className="hidden sm:table-cell">{s.semester ? `S${s.semester.order}` : '-'}</TableCell>
+                          <TableCell className="hidden md:table-cell">
+                            {s.isFree ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs font-medium rounded-full">
+                                ✓ Gratuit
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 text-xs font-medium rounded-full">
+                                Payant
+                              </span>
+                            )}
+                          </TableCell>
                           <TableCell className="hidden md:table-cell">{s.pdfUrl ? 'Oui' : '-'}</TableCell>
                           <TableCell className="hidden md:table-cell">{s.correctionUrl ? 'Oui' : '-'}</TableCell>
                           <TableCell className="text-right">

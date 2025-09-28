@@ -5,26 +5,64 @@ import { requireAdmin, AuthenticatedRequest } from '@/lib/auth-middleware';
 // GET /api/admin/notifications - Get all admin notifications
 async function getHandler(request: AuthenticatedRequest) {
   try {
-    const notifications = await prisma.notification.findMany({
-      where: {
-        isAdminNotification: true,
-      },
-      select: {
-        id: true,
-        userId: true,
-        title: true,
-        message: true,
-        type: true,
-        isRead: true,
-        createdAt: true,
-        user: {
-          select: { id: true, email: true, name: true, role: true }
-        }
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 100
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = Math.min(parseInt(searchParams.get('limit') || '10'), 50); // Max 50 per page
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
+
+    const where: any = {
+      isAdminNotification: true,
+    };
+
+    // Add date filtering
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) {
+        where.createdAt.gte = new Date(startDate);
+      }
+      if (endDate) {
+        where.createdAt.lte = new Date(endDate);
+      }
+    }
+
+    const [notifications, totalCount] = await Promise.all([
+      prisma.notification.findMany({
+        where,
+        select: {
+          id: true,
+          userId: true,
+          title: true,
+          message: true,
+          type: true,
+          isRead: true,
+          createdAt: true,
+          user: {
+            select: { id: true, email: true, name: true, role: true }
+          }
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit
+      }),
+      prisma.notification.count({
+        where
+      })
+    ]);
+
+    const totalPages = Math.ceil(totalCount / limit);
+
+    return NextResponse.json({
+      notifications,
+      pagination: {
+        page,
+        limit,
+        totalCount,
+        totalPages,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1
+      }
     });
-    return NextResponse.json({ notifications });
   } catch (error) {
     console.error('Error fetching admin notifications:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

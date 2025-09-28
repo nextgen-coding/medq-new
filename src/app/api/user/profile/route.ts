@@ -92,6 +92,7 @@ export async function PUT(request: NextRequest) {
         highlightColor: true,
         showSelfAssessment: true,
         profileCompleted: true,
+        phone: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -135,6 +136,7 @@ export async function PUT(request: NextRequest) {
       highlightColor: updatedUser.highlightColor ?? null,
       showSelfAssessment: updatedUser.showSelfAssessment ?? true,
       profileCompleted: updatedUser.profileCompleted,
+      phone: updatedUser.phone ?? null,
       createdAt: updatedUser.createdAt,
       updatedAt: updatedUser.updatedAt
     };

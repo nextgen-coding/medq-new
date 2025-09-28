@@ -1101,6 +1101,7 @@ export default function UpgradePage() {
                                     <UploadDropzone
                                       endpoint="imageUploader"
                                       onClientUploadComplete={(res) => {
+                                        console.log('Upload complete:', res);
                                         if (res?.[0]) {
                                           setState(prev => ({
                                             ...prev,
@@ -1115,20 +1116,15 @@ export default function UpgradePage() {
                                         }
                                       }}
                                       onUploadError={(error) => {
+                                        console.error('Upload error:', error);
                                         toast({
                                           title: 'Erreur',
-                                          description: 'Erreur lors du téléversement',
+                                          description: `Erreur lors du téléversement: ${error.message}`,
                                           variant: 'destructive'
                                         })
                                       }}
-                                      content={{
-                                        label: "Glissez et déposez vos fichiers ici ou cliquez pour sélectionner",
-                                        allowedContent: "Images (PNG, JPG, JPEG) jusqu'à 4MB",
-                                        button: "Choisir des fichiers"
-                                      }}
-                                      appearance={{
-                                        button: "ut-ready:bg-medblue-500 ut-ready:bg-opacity-100 ut-uploading:cursor-not-allowed ut-uploading:bg-medblue-500/50 ut-ready:px-4 ut-ready:py-2 ut-ready:rounded-lg ut-ready:text-white ut-ready:font-medium ut-ready:cursor-pointer",
-                                        container: "border-medblue-300 dark:border-medblue-700"
+                                      onUploadBegin={() => {
+                                        console.log('Upload started');
                                       }}
                                     />
                                   </div>

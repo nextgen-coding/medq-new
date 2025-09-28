@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '../../../../lib/prisma';
-import { sendPasswordResetEmail } from '../../../../lib/email';
-import { generateToken, generateExpiryDate } from '../../../../lib/tokens';
+import { prisma } from '@/lib/prisma';
+import { sendPasswordResetEmail } from '@/lib/email';
+import { generateToken, generateExpiryDate } from '@/lib/tokens';
 
 export async function POST(request: NextRequest) {
   try {

@@ -44,6 +44,7 @@ async function getHandler(request: AuthenticatedRequest) {
       name: true,
       pdfUrl: true,
       correctionUrl: true,
+      isFree: true,
       niveauId: true,
       semesterId: true,
       createdAt: true,
@@ -66,7 +67,8 @@ async function postHandler(request: AuthenticatedRequest) {
     semesterId: bodySemesterId,
     semester,
     specialtyId: bodySpecialtyId,
-    specialtyName
+    specialtyName,
+    isFree
   } = body as {
     name: string;
     pdfUrl?: string;
@@ -77,6 +79,7 @@ async function postHandler(request: AuthenticatedRequest) {
     semester?: string | number; // e.g., 'S1', '1', 1
     specialtyId?: string;
     specialtyName?: string;
+    isFree?: boolean;
   };
 
   if (!name) return NextResponse.json({ error: 'name required' }, { status: 400 });
@@ -134,7 +137,8 @@ async function postHandler(request: AuthenticatedRequest) {
       correctionUrl: normalizeDriveLink(correctionUrl),
       niveauId,
       semesterId,
-      specialtyId
+      specialtyId,
+      isFree: isFree ?? false
     }
   });
   return NextResponse.json(created, { status: 201 });

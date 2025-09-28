@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { Inbox, Check, Trash2, Clock, CheckCircle2, AlertTriangle, Info, X, Shield, Users, Settings, Activity, Bell, GraduationCap } from 'lucide-react';
+import { Inbox, Check, Trash2, Clock, CheckCircle2, AlertTriangle, Info, X, Shield, Users, Settings, Activity, Bell, GraduationCap, ChevronLeft, ChevronRight, Calendar, Filter, X as XIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 interface Notification {
@@ -28,6 +28,14 @@ export default function AdminInboxPage() {
   const [loadingRequests, setLoadingRequests] = useState(true);
   const [showLevelRequestsDialog, setShowLevelRequestsDialog] = useState(false);
   const { t } = useTranslation();
+
+  // Pagination and filtering state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [isFiltering, setIsFiltering] = useState(false);
 
   const formatTime = (d: string | Date) => {
     const date = typeof d === 'string' ? new Date(d) : d;
@@ -52,11 +60,19 @@ export default function AdminInboxPage() {
     }
   }, []);
 
-  const loadNotifications = useCallback(async () => {
+  const loadNotifications = useCallback(async (page = 1, startDateFilter = '', endDateFilter = '') => {
     try {
       setLoading(true);
       // Use admin API to get all admin notifications (all admins see all admin notifications)
-      const res = await fetch('/api/admin/notifications', { credentials: 'include' });
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: '10'
+      });
+
+      if (startDateFilter) params.append('startDate', startDateFilter);
+      if (endDateFilter) params.append('endDate', endDateFilter);
+
+      const res = await fetch(`/api/admin/notifications?${params}`, { credentials: 'include' });
       if (!res.ok) return;
       const json = await res.json();
       const stripAdmin = (s: string) => s?.replace(/^\[ADMIN\]\s*/i, '') ?? s;
@@ -69,17 +85,39 @@ export default function AdminInboxPage() {
         time: n.createdAt ? formatTime(n.createdAt) : undefined,
       } as Notification));
       setNotifications(list);
+      setTotalPages(json.pagination?.totalPages || 1);
+      setTotalCount(json.pagination?.totalCount || 0);
+      setCurrentPage(page);
     } catch (e) {
       console.error('Error loading notifications:', e);
     } finally {
       setLoading(false);
+      setIsFiltering(false);
     }
   }, []);
 
   useEffect(() => {
-    loadNotifications();
+    loadNotifications(currentPage, startDate, endDate);
     loadLevelChangeRequests();
-  }, [loadNotifications, loadLevelChangeRequests]);
+  }, [loadNotifications, loadLevelChangeRequests, currentPage, startDate, endDate]);
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handleDateFilter = () => {
+    setIsFiltering(true);
+    setCurrentPage(1); // Reset to first page when filtering
+    loadNotifications(1, startDate, endDate);
+  };
+
+  const clearFilters = () => {
+    setStartDate('');
+    setEndDate('');
+    setCurrentPage(1);
+    setIsFiltering(true);
+    loadNotifications(1, '', '');
+  };
 
   const markAsRead = async (id: string) => {
     try {
@@ -533,7 +571,7 @@ export default function AdminInboxPage() {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-blue-900 dark:text-blue-100">Total</p>
-                  <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">{notifications.length}</p>
+                  <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">{totalCount}</p>
                 </div>
               </div>
             </CardContent>
@@ -561,7 +599,7 @@ export default function AdminInboxPage() {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-green-900 dark:text-green-100">Lues</p>
-                  <p className="text-2xl font-bold text-green-700 dark:text-green-300">{notifications.length - unreadCount}</p>
+                  <p className="text-2xl font-bold text-green-700 dark:text-green-300">{notifications.filter(n => n.read).length}</p>
                 </div>
               </div>
             </CardContent>
@@ -583,6 +621,136 @@ export default function AdminInboxPage() {
             </CardContent>
           </Card>
         </div>
+
+
+
+        {/* Filters and Pagination */}
+        <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-gray-50 dark:from-gray-900 dark:to-gray-800/50">
+          <CardContent className="p-6">
+            <div className="flex flex-col xl:flex-row gap-6 items-start xl:items-center justify-between">
+              {/* Date Filters */}
+              <div className="flex flex-col xl:flex-row gap-4 items-start xl:items-center w-full xl:w-auto">
+                <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center w-full sm:w-auto">
+                  <div className="flex items-center gap-2 min-w-fit">
+                    <Calendar className="h-4 w-4 text-gray-500" />
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Filtrer par date:</span>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                    <div className="flex flex-col">
+                      <label className="text-xs text-gray-500 mb-1.5 font-medium">Date début</label>
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 min-w-[140px]"
+                      />
+                    </div>
+
+                    <div className="flex flex-col">
+                      <label className="text-xs text-gray-500 mb-1.5 font-medium">Date fin</label>
+                      <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="px-3 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 min-w-[140px]"
+                      />
+                    </div>
+
+                    <div className="flex gap-2 sm:mt-6">
+                      <Button
+                        onClick={handleDateFilter}
+                        disabled={isFiltering}
+                        size="sm"
+                        className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-all duration-200"
+                      >
+                        <Filter className="h-4 w-4 mr-2" />
+                        Filtrer
+                      </Button>
+                      {(startDate || endDate) && (
+                        <Button
+                          onClick={clearFilters}
+                          variant="outline"
+                          size="sm"
+                          className="border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800 shadow-sm transition-all duration-200"
+                        >
+                          <XIcon className="h-4 w-4 mr-2" />
+                          Effacer
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Pagination Info and Controls */}
+              <div className="flex flex-col sm:flex-row gap-4 items-center justify-between w-full xl:w-auto xl:justify-end">
+                {/* Pagination Info */}
+                <div className="text-sm text-gray-600 dark:text-gray-400 text-center sm:text-left xl:text-right">
+                  {totalCount > 0 ? (
+                    <>
+                      <span className="font-medium">{totalCount} notification{totalCount > 1 ? 's' : ''}</span>
+                      <span className="mx-2 text-gray-400">•</span>
+                      <span>Page {currentPage} sur {totalPages}</span>
+                    </>
+                  ) : (
+                    <span className="font-medium">Aucune notification</span>
+                  )}
+                </div>
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="flex items-center gap-1">
+                    <Button
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage <= 1 || isFiltering}
+                      variant="outline"
+                      size="sm"
+                      className="flex items-center gap-2 px-3 py-2 h-9 border-gray-300 hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800 transition-all duration-200"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                      <span className="hidden sm:inline ml-1">Précédent</span>
+                    </Button>
+
+                    <div className="flex items-center gap-1 mx-2">
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        const pageNum = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
+                        if (pageNum > totalPages) return null;
+                        return (
+                          <Button
+                            key={pageNum}
+                            onClick={() => handlePageChange(pageNum)}
+                            disabled={isFiltering}
+                            variant={pageNum === currentPage ? "default" : "outline"}
+                            size="sm"
+                            className={`w-9 h-9 p-0 border-gray-300 hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800 transition-all duration-200 ${
+                              pageNum === currentPage
+                                ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600 shadow-sm'
+                                : ''
+                            }`}
+                          >
+                            {pageNum}
+                          </Button>
+                        );
+                      })}
+                    </div>
+
+                    <Button
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage >= totalPages || isFiltering}
+                      variant="outline"
+                      size="sm"
+                      className="flex items-center gap-2 px-3 py-2 h-9 border-gray-300 hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-800 transition-all duration-200"
+                    >
+                      <span className="hidden sm:inline mr-1">Suivant</span>
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
 
 

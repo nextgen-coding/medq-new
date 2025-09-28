@@ -1,8 +1,8 @@
-"use client";
-
+'use client';
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { PlusCircle, FileText } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSubscription } from '@/contexts/SubscriptionContext';
 import { UniversalHeader } from '@/components/layout/UniversalHeader';
 import { AppSidebar, AppSidebarProvider } from '@/components/layout/AppSidebar';
 import { SidebarInset } from '@/components/ui/sidebar';
@@ -12,6 +12,8 @@ import { ManageSessionsDialog } from '@/components/session/ManageSessionsDialog'
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
+import { UpsellBanner } from '@/components/subscription/UpsellBanner';
+import { UpgradeDialog } from '@/components/subscription/UpgradeDialog';
 import { Semester, Niveau } from '@/types';
 
 type Specialty = {
@@ -31,6 +33,7 @@ type Specialty = {
 
 export default function SessionsPage() {
   const { user, isAdmin } = useAuth();
+  const { hasActiveSubscription } = useSubscription();
   const [specialties, setSpecialties] = useState<Specialty[]>([]);
   const [filteredSpecialties, setFilteredSpecialties] = useState<Specialty[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -42,6 +45,10 @@ export default function SessionsPage() {
   const [isManageDialogOpen, setIsManageDialogOpen] = useState(false);
   const [selectedSpecialty, setSelectedSpecialty] = useState<Specialty | null>(null);
   const [updatingSpecialtyId, setUpdatingSpecialtyId] = useState<string | null>(null);
+  const [isUpgradeDialogOpen, setIsUpgradeDialogOpen] = useState(false);
+  const [isUpsellDismissed, setIsUpsellDismissed] = useState(false);
+
+  const shouldShowUpsell = !hasActiveSubscription && !isAdmin && !isUpsellDismissed;
 
   // Filter and sort specialties when data changes
   useEffect(() => {
@@ -278,6 +285,16 @@ export default function SessionsPage() {
                   </div>
                 )}
 
+                {/* Upsell Banner for non-subscribed users */}
+                {shouldShowUpsell && (
+                  <div className="mb-8">
+                    <UpsellBanner
+                      onDismiss={() => setIsUpsellDismissed(true)}
+                      onUpgrade={() => setIsUpgradeDialogOpen(true)}
+                    />
+                  </div>
+                )}
+
                 {/* Sessions Grid */}
                 {isLoading ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -340,6 +357,15 @@ export default function SessionsPage() {
         onOpenChange={setIsManageDialogOpen}
         specialty={selectedSpecialty}
         onSessionsChanged={handleSessionsChanged}
+      />
+
+      <UpgradeDialog
+        isOpen={isUpgradeDialogOpen}
+        onOpenChange={setIsUpgradeDialogOpen}
+        onUpgrade={() => {
+          setIsUpgradeDialogOpen(false);
+          // The dialog handles navigation internally
+        }}
       />
     </ProtectedRoute>
   );

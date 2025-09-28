@@ -496,6 +496,7 @@ model Session {
   specialtyId    String?  @map("specialty_id") @db.Uuid
   pdfUrl         String?  @map("pdf_url")
   correctionUrl  String?  @map("correction_url")
+  isFree         Boolean  @default(false) @map("is_free")
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   niveau         Niveau?  @relation(fields: [niveauId], references: [id])
   semester       Semester? @relation(fields: [semesterId], references: [id])
