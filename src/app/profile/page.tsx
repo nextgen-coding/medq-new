@@ -104,15 +104,65 @@ export default function ProfilePageRoute() {
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
     newPassword: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    verificationCode: ''
   })
   const [showPasswords, setShowPasswords] = useState({
     current: false,
     new: false,
     confirm: false
   })
+  const [passwordChangeStep, setPasswordChangeStep] = useState<'form' | 'verify'>('form')
+  const [isRequestingCode, setIsRequestingCode] = useState(false)
 
   if (!isClient) return null;
+
+  const handleRequestVerificationCode = async () => {
+    try {
+      setIsRequestingCode(true)
+      const res = await fetch('/api/user/password/send-verification-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+      if (!res.ok) {
+        const errorData = await res.json();
+        toast({ title: 'Erreur', description: errorData.error || 'Impossible d\'envoyer le code de vérification', variant: 'destructive' });
+        return;
+      }
+      toast({ title: 'Code envoyé', description: 'Un code de vérification a été envoyé à votre adresse e-mail', variant: 'default' })
+      setPasswordChangeStep('verify')
+    } catch (e) {
+      toast({ title: 'Erreur', description: 'Impossible d\'envoyer le code de vérification', variant: 'destructive' })
+    } finally {
+      setIsRequestingCode(false)
+    }
+  }
+
+  const handleVerifyAndChangePassword = async () => {
+    try {
+      const res = await fetch('/api/user/password/verify-and-change', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: passwordData.verificationCode,
+          newPassword: passwordData.newPassword
+        }),
+      })
+      if (!res.ok) {
+        const errorData = await res.json();
+        toast({ title: 'Erreur', description: errorData.error || 'Code de vérification invalide', variant: 'destructive' });
+        return;
+      }
+      toast({ title: 'Succès', description: 'Mot de passe mis à jour avec succès', variant: 'default' })
+      setShowChangePassword(false)
+      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '', verificationCode: '' })
+      setPasswordChangeStep('form')
+      // Refresh user context so UI updates to require current password next time
+      if (refreshUser) await refreshUser();
+    } catch (e) {
+      toast({ title: 'Erreur', description: 'Impossible de changer le mot de passe', variant: 'destructive' })
+    }
+  }
 
   const handlePasswordChange = async () => {
     try {
@@ -145,7 +195,7 @@ export default function ProfilePageRoute() {
       }
       toast({ title: 'Succès', description: user?.password ? 'Mot de passe mis à jour' : 'Mot de passe défini', variant: 'default' })
       setShowChangePassword(false)
-      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' })
+      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '', verificationCode: '' })
       // Refresh user context so UI updates to require current password next time
       if (refreshUser) await refreshUser();
     } catch (e) {
@@ -623,105 +673,160 @@ export default function ProfilePageRoute() {
                           {/* Change/Set Password Form */}
                           {showChangePassword && (
                             <div className="space-y-4 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg border border-blue-200 dark:border-blue-800 animate-in slide-in-from-top-2 duration-300">
-                              <h4 className="font-semibold text-gray-900 dark:text-white mb-4">{user?.password ? 'Changer le mot de passe' : 'Définir le mot de passe'}</h4>
+                              {passwordChangeStep === 'form' ? (
+                                <>
+                                  <h4 className="font-semibold text-gray-900 dark:text-white mb-4">{user?.password ? 'Changer le mot de passe' : 'Définir le mot de passe'}</h4>
 
-                              <div className="grid gap-4 md:grid-cols-1">
-                                {/* Only show current password if user has a password set */}
-                                {user?.password && (
-                                  <div className="space-y-2">
-                                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                      Mot de passe actuel
-                                    </Label>
-                                    <div className="relative">
-                                      <Input
-                                        type={showPasswords.current ? "text" : "password"}
-                                        value={passwordData.currentPassword}
-                                        onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
-                                        className="bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 focus:border-blue-500 focus:ring-blue-500/20 pr-10 transition-all duration-200"
-                                        placeholder="Votre mot de passe actuel"
-                                      />
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-600"
-                                        onClick={() => setShowPasswords(prev => ({ ...prev, current: !prev.current }))}
-                                      >
-                                        {showPasswords.current ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                      </Button>
+                                  <div className="grid gap-4 md:grid-cols-1">
+                                    {/* Only show current password if user has a password set */}
+                                    {user?.password && (
+                                      <div className="space-y-2">
+                                        <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                          Mot de passe actuel
+                                        </Label>
+                                        <div className="relative">
+                                          <Input
+                                            type={showPasswords.current ? "text" : "password"}
+                                            value={passwordData.currentPassword}
+                                            onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
+                                            className="bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 focus:border-blue-500 focus:ring-blue-500/20 pr-10 transition-all duration-200"
+                                            placeholder="Votre mot de passe actuel"
+                                          />
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-600"
+                                            onClick={() => setShowPasswords(prev => ({ ...prev, current: !prev.current }))}
+                                          >
+                                            {showPasswords.current ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    <div className="space-y-2">
+                                      <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                        Nouveau mot de passe
+                                      </Label>
+                                      <div className="relative">
+                                        <Input
+                                          type={showPasswords.new ? "text" : "password"}
+                                          value={passwordData.newPassword}
+                                          onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+                                          className="bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 focus:border-blue-500 focus:ring-blue-500/20 pr-10 transition-all duration-200"
+                                          placeholder="Votre nouveau mot de passe"
+                                        />
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="sm"
+                                          className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-600"
+                                          onClick={() => setShowPasswords(prev => ({ ...prev, new: !prev.new }))}
+                                        >
+                                          {showPasswords.new ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                        </Button>
+                                      </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                      <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                        Confirmer le mot de passe
+                                      </Label>
+                                      <div className="relative">
+                                        <Input
+                                          type={showPasswords.confirm ? "text" : "password"}
+                                          value={passwordData.confirmPassword}
+                                          onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                                          className="bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 focus:border-blue-500 focus:ring-blue-500/20 pr-10 transition-all duration-200"
+                                          placeholder="Confirmez votre nouveau mot de passe"
+                                        />
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="sm"
+                                          className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-600"
+                                          onClick={() => setShowPasswords(prev => ({ ...prev, confirm: !prev.confirm }))}
+                                        >
+                                          {showPasswords.confirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                        </Button>
+                                      </div>
                                     </div>
                                   </div>
-                                )}
 
-                                <div className="space-y-2">
-                                  <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    Nouveau mot de passe
-                                  </Label>
-                                  <div className="relative">
-                                    <Input
-                                      type={showPasswords.new ? "text" : "password"}
-                                      value={passwordData.newPassword}
-                                      onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
-                                      className="bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 focus:border-blue-500 focus:ring-blue-500/20 pr-10 transition-all duration-200"
-                                      placeholder="Votre nouveau mot de passe"
-                                    />
+                                  <div className="flex space-x-3 pt-4">
                                     <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="sm"
-                                      className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-600"
-                                      onClick={() => setShowPasswords(prev => ({ ...prev, new: !prev.new }))}
+                                      onClick={handleRequestVerificationCode}
+                                      disabled={isRequestingCode || (user?.password ? (!passwordData.currentPassword || !passwordData.newPassword || passwordData.newPassword !== passwordData.confirmPassword) : (!passwordData.newPassword || passwordData.newPassword !== passwordData.confirmPassword))}
+                                      className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
                                     >
-                                      {showPasswords.new ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                      {isRequestingCode ? 'Envoi en cours...' : 'Envoyer le code de vérification'}
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      onClick={() => {
+                                        setShowChangePassword(false)
+                                        setPasswordChangeStep('form')
+                                        setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '', verificationCode: '' })
+                                      }}
+                                      className="border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 transition-all duration-200"
+                                    >
+                                      Annuler
                                     </Button>
                                   </div>
-                                </div>
+                                </>
+                              ) : (
+                                <>
+                                  <h4 className="font-semibold text-gray-900 dark:text-white mb-4">Vérification du code</h4>
+                                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                                    Un code de vérification a été envoyé à votre adresse e-mail. Veuillez l'entrer ci-dessous pour confirmer le changement de mot de passe.
+                                  </p>
 
-                                <div className="space-y-2">
-                                  <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                    Confirmer le mot de passe
-                                  </Label>
-                                  <div className="relative">
-                                    <Input
-                                      type={showPasswords.confirm ? "text" : "password"}
-                                      value={passwordData.confirmPassword}
-                                      onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                                      className="bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 focus:border-blue-500 focus:ring-blue-500/20 pr-10 transition-all duration-200"
-                                      placeholder="Confirmez votre nouveau mot de passe"
-                                    />
+                                  <div className="space-y-4">
+                                    <div className="space-y-2">
+                                      <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                        Code de vérification
+                                      </Label>
+                                      <Input
+                                        type="text"
+                                        value={passwordData.verificationCode}
+                                        onChange={(e) => setPasswordData(prev => ({ ...prev, verificationCode: e.target.value }))}
+                                        className="bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 focus:border-blue-500 focus:ring-blue-500/20 transition-all duration-200 text-center text-lg font-mono tracking-widest"
+                                        placeholder="000000"
+                                        maxLength={6}
+                                      />
+                                    </div>
+                                  </div>
+
+                                  <div className="flex space-x-3 pt-4">
                                     <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="sm"
-                                      className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 p-0 hover:bg-gray-100 dark:hover:bg-gray-600"
-                                      onClick={() => setShowPasswords(prev => ({ ...prev, confirm: !prev.confirm }))}
+                                      onClick={handleVerifyAndChangePassword}
+                                      disabled={!passwordData.verificationCode || passwordData.verificationCode.length !== 6}
+                                      className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
                                     >
-                                      {showPasswords.confirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                      Changer le mot de passe
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      onClick={() => setPasswordChangeStep('form')}
+                                      className="border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 transition-all duration-200"
+                                    >
+                                      Retour
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      onClick={() => {
+                                        setShowChangePassword(false)
+                                        setPasswordChangeStep('form')
+                                        setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '', verificationCode: '' })
+                                      }}
+                                      className="border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 transition-all duration-200"
+                                    >
+                                      Annuler
                                     </Button>
                                   </div>
-                                </div>
-                              </div>
-
-                              <div className="flex space-x-3 pt-4">
-                                <Button
-                                  onClick={handlePasswordChange}
-                                  className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
-                                  disabled={
-                                    user?.google_id
-                                      ? (!passwordData.newPassword || passwordData.newPassword !== passwordData.confirmPassword)
-                                      : (!passwordData.currentPassword || !passwordData.newPassword || passwordData.newPassword !== passwordData.confirmPassword)
-                                  }
-                                >
-                                  {user?.google_id ? 'Définir' : 'Mettre à jour'}
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  onClick={() => setShowChangePassword(false)}
-                                  className="border-gray-200 text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700 transition-all duration-200"
-                                >
-                                  Annuler
-                                </Button>
-                              </div>
+                                </>
+                              )}
                             </div>
                           )}
                         </CardContent>

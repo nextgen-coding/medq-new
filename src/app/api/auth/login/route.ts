@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     
     if (!user) {
       return NextResponse.json(
-        { error: 'Invalid credentials' },
+        { error: 'Identifiants invalides' },
         { status: 401 }
       );
     }
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     if (user.password && user.status !== 'verified') {
       return NextResponse.json(
         { 
-          error: 'Please verify your email address before logging in. Check your inbox for a verification link.',
+          error: 'Veuillez vérifier votre adresse e-mail avant de vous connecter. Vérifiez votre boîte de réception pour le lien de vérification.',
           needsVerification: true
         },
         { status: 401 }
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     
     if (!isValidPassword) {
       return NextResponse.json(
-        { error: 'Invalid credentials' },
+        { error: 'Identifiants invalides' },
         { status: 401 }
       );
     }
@@ -71,6 +71,7 @@ export async function POST(request: NextRequest) {
       faculty: user.faculty,
       profileCompleted: user.profileCompleted,
       highlightColor: user.highlightColor,
+      phone: user.phone,
       emailVerified: user.emailVerified,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt

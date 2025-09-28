@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
 
     if (existingUser) {
       return NextResponse.json(
-        { error: 'User with this email already exists' },
+        { error: 'Un utilisateur avec cet e-mail existe déjà' },
         { status: 409 }
       );
     }

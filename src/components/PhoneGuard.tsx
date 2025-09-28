@@ -8,17 +8,26 @@ interface PhoneGuardProps {
 }
 
 export function PhoneGuard({ children }: PhoneGuardProps) {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
   const [showPhoneDialog, setShowPhoneDialog] = useState(false);
   const [phoneLoading, setPhoneLoading] = useState(false);
 
   useEffect(() => {
-    if (user && !user.phone) {
-      setShowPhoneDialog(true);
-    } else {
+    // Don't show dialog while auth is loading
+    if (isLoading) {
       setShowPhoneDialog(false);
+      return;
     }
-  }, [user]);
+
+    // Only check phone when we have user data and auth is not loading
+    if (user !== null) {
+      if (!user.phone || user.phone.trim() === '') {
+        setShowPhoneDialog(true);
+      } else {
+        setShowPhoneDialog(false);
+      }
+    }
+  }, [user, isLoading]);
 
   const handleSavePhone = async (phone: string) => {
     setPhoneLoading(true);

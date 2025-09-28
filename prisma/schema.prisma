@@ -103,6 +103,8 @@ model User {
   // Level change requests relation
   levelChangeRequests          LevelChangeRequest[]
   reviewedLevelChangeRequests  LevelChangeRequest[] @relation("ReviewedBy")
+  // Password change verification codes
+  passwordChangeVerifications  PasswordChangeVerification[]
 
   @@map("profiles")
 }
@@ -767,5 +769,18 @@ model LevelChangeRequest {
   reviewedByUser  User?                   @relation("ReviewedBy", fields: [reviewedBy], references: [id])
 
   @@map("level_change_requests")
+}
+
+model PasswordChangeVerification {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  code      String   // 6-digit verification code
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("password_change_verifications")
 }
 

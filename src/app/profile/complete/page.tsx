@@ -18,9 +18,10 @@ import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import Image from 'next/image';
 
 const profileSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters'),
-  sexe: z.enum(['M', 'F'], { required_error: 'Please select your gender' }),
-  niveauId: z.string().min(1, 'Please select your level'),
+  name: z.string().min(2, 'Le nom doit contenir au moins 2 caractères'),
+  sexe: z.enum(['M', 'F'], { required_error: 'Veuillez sélectionner votre sexe' }),
+  niveauId: z.string().min(1, 'Veuillez sélectionner votre niveau'),
+  faculty: z.enum(['FMT', 'FMS', 'FMM', 'FMSf'], { required_error: 'Veuillez sélectionner votre faculté' }),
   semesterId: z.string().optional().nullable(),
 });
 
@@ -60,6 +61,7 @@ export default function CompleteProfilePage() {
   mode: 'onChange',
     defaultValues: {
       name: user?.name || '',
+      faculty: (user?.faculty as 'FMT' | 'FMS' | 'FMM' | 'FMSf') || 'FMSF',
     },
   });
 
@@ -110,10 +112,12 @@ export default function CompleteProfilePage() {
   const selectedSemesterId = watch('semesterId');
   const nameVal = watch('name');
   const sexeVal = watch('sexe');
+  const facultyVal = watch('faculty');
   const requireSemester = semesters.length > 0;
   const isFormReady = Boolean(
     (nameVal || '').trim().length >= 2 &&
     !!sexeVal &&
+    !!facultyVal &&
     !!selectedNiveauId &&
     (!requireSemester || !!selectedSemesterId)
   );
@@ -154,6 +158,7 @@ export default function CompleteProfilePage() {
           name: data.name,
           sexe: data.sexe,
           niveauId: data.niveauId,
+          faculty: data.faculty,
           // Only send semesterId if we actually have semesters for this niveau
           semesterId: semesters.length ? (data.semesterId || null) : null,
         }),
@@ -349,6 +354,25 @@ export default function CompleteProfilePage() {
                     </RadioGroup>
                     {errors.sexe && (
                       <p className="text-sm text-red-500">{errors.sexe.message}</p>
+                    )}
+                  </div>
+
+                  {/* Faculty Field */}
+                  <div className="space-y-2">
+                    <Label htmlFor="faculty">Faculté</Label>
+                    <Select value={facultyVal || ''} onValueChange={(value) => setValue('faculty', value as 'FMT' | 'FMS' | 'FMM' | 'FMSf')}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sélectionnez votre faculté" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="FMT">Faculté de Médecine de Tunis F.M.T.</SelectItem>
+                        <SelectItem value="FMS">Faculté de Médecine de Sfax F.M.S.</SelectItem>
+                        <SelectItem value="FMM">Faculté de Médecine de Monastir F.M.M.</SelectItem>
+                        <SelectItem value="FMSf">Faculté de Médecine de Sousse F.M.So.</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {errors.faculty && (
+                      <p className="text-sm text-red-500">{errors.faculty.message}</p>
                     )}
                   </div>
 
