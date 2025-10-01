@@ -71,7 +71,7 @@ export function LectureComplete({
           
           if (allCorrect) {
             correctTasks++;
-          } else if (hasCorrect || hasPartial) {
+          } else if (hasCorrect) {
             partiallyCorrectTasks++;
           } else {
             incorrectTasks++;

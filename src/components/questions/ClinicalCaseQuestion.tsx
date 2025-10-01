@@ -1438,7 +1438,7 @@ export function ClinicalCaseQuestion({
                                 const hasPartial = subResults.some(r => r === 'partial');
                                 
                                 if (allCorrect) return true;
-                                else if (hasCorrect || hasPartial) return 'partial';
+                                else if (hasCorrect) return 'partial';
                                 else return false;
                               }
                               return null;

@@ -605,7 +605,7 @@ export default function CoursPageRoute() {
             const resVals = clinicalCase.questions.map((q: any) => answerResults[q.id]).filter((r: any) => r !== undefined);
             if (!resVals.length) return undefined;
             if (resVals.every((r: any) => r === true)) return true;
-            if (resVals.some((r: any) => r === true || r === 'partial')) return 'partial';
+            if (resVals.some((r: any) => r === true)) return 'partial';
             return false;
           })() as any}
           userAnswers={revisionUserAnswers}
