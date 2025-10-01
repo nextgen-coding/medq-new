@@ -159,6 +159,7 @@ export function OpenQuestion({
   }, [showNotesAfterSubmit, isAnswered, notesManuallyControlled, notesHasContent]);
   const notesRef = useRef<HTMLDivElement | null>(null);
   const hasSubmittedRef = useRef(false); // Immediate synchronous access to submission state
+  const selfAssessmentCompletedRef = useRef(false); // Track if self-assessment has been completed
   const selfAssessmentRef = useRef<HTMLDivElement | null>(null);
   const questionRef = useRef<HTMLDivElement | null>(null); // Ref for question top
   const { t } = useTranslation();
@@ -350,7 +351,7 @@ export function OpenQuestion({
 
   // Handle userAnswer changes separately to avoid reinitialization loops
   useEffect(() => {
-    if (userAnswer && userAnswer !== answer) {
+    if (userAnswer !== undefined && userAnswer !== answer) {
       setAnswer(userAnswer);
     }
   }, [userAnswer]); // Remove answer dependency to prevent loops
@@ -370,16 +371,19 @@ export function OpenQuestion({
         if (answerResult === undefined) {
           // Pending self-evaluation for clinical case questions only
           setAssessmentCompleted(false);
+          selfAssessmentCompletedRef.current = false;
           setShowSelfAssessment(true);
         } else {
           // Evaluation done – show results
           setAssessmentCompleted(true);
+          selfAssessmentCompletedRef.current = true;
           setShowSelfAssessment(false);
           setShouldShowUserAnswer(true); // Show user's answer when evaluation is completed
         }
       } else {
         // Immediate mode - question is answered, show the results not self-assessment
         setAssessmentCompleted(answerResult !== undefined);
+        selfAssessmentCompletedRef.current = answerResult !== undefined;
         setShowSelfAssessment(false);
         setShouldShowUserAnswer(answerResult !== undefined); // Show user answer if there's a result
         // In clinical cases (identified by hideActions + hideMeta), always show user answer if evaluation is complete
@@ -396,6 +400,7 @@ export function OpenQuestion({
         setAssessmentCompleted(false);
         setHasSubmitted(false);
         hasSubmittedRef.current = false;
+        selfAssessmentCompletedRef.current = false; // Reset self-assessment completion
         setShouldShowUserAnswer(false); // Reset flag when not answered
       }
     }
@@ -420,6 +425,7 @@ export function OpenQuestion({
     const isQrocInClinicalCase = hideImmediateResults && (question.type === 'qroc' || question.type === 'clinic_croq');
     if (hideImmediateResults && !isQrocInClinicalCase) {
       setAssessmentCompleted(true);
+      selfAssessmentCompletedRef.current = true;
       // Call onSubmit immediately with answer and a placeholder result
       // The actual result will be determined when "Show Results" is clicked
       onSubmit(answer, 'partial'); // Use 'partial' as default for clinic questions
@@ -427,6 +433,7 @@ export function OpenQuestion({
       // For QROC in clinical cases, always defer self-assessment to evaluation phase
       // The ClinicalCaseQuestion component will control when to show self-assessment
       setAssessmentCompleted(false);
+      selfAssessmentCompletedRef.current = false;
       
       // Call onSubmit with answer but no result - result will be set during self-assessment
       onSubmit(answer, undefined);
@@ -440,10 +447,12 @@ export function OpenQuestion({
       if (isEmpty) {
         // For empty answers, show self-assessment to encourage evaluation
         setAssessmentCompleted(false);
+        selfAssessmentCompletedRef.current = false;
         setShowSelfAssessment(true);
       } else if (shouldShowSelfAssessment) {
         // For non-empty answers, show self-assessment if user prefers it
         setAssessmentCompleted(false); // Reset assessment state for new evaluation
+        selfAssessmentCompletedRef.current = false;
         setShowSelfAssessment(true);
       } else {
         // Skip self-assessment if user disabled it, auto-submit with partial result
@@ -471,6 +480,7 @@ export function OpenQuestion({
   };
 
   const handleSelfAssessment = async (rating: 'correct' | 'wrong' | 'partial') => {
+    selfAssessmentCompletedRef.current = true; // Mark as completed immediately
     setAssessmentCompleted(true);
     setShowSelfAssessment(false);
     setShouldShowUserAnswer(true); // Flag to show user answer instead of correct answer
@@ -524,6 +534,7 @@ export function OpenQuestion({
     setAssessmentCompleted(false);
     setHasSubmitted(false);
     hasSubmittedRef.current = false;
+    selfAssessmentCompletedRef.current = false; // Reset self-assessment completion
     setDeferredAssessmentResult(null);
     setSubmittedAnswer(''); // Reset preserved answer
     setShouldShowUserAnswer(false); // Reset flag
@@ -544,13 +555,13 @@ export function OpenQuestion({
   };
 
   const wrappedOnNext = useCallback(() => {
-    // If self-assessment is active, skip it instead of going to next
-    if (showSelfAssessment && !assessmentCompleted) {
+    // If self-assessment is active and not completed, skip it instead of going to next
+    if (showSelfAssessment && !selfAssessmentCompletedRef.current) {
       handleSelfAssessment('partial');
     } else {
       onNext();
     }
-  }, [showSelfAssessment, assessmentCompleted, onNext]);
+  }, [showSelfAssessment, onNext]);
 
   const handleQuestionUpdated = async () => {
     try {
@@ -660,20 +671,11 @@ export function OpenQuestion({
           };
           handleSelfAssessment(map[event.key]);
         }
-        return; // don’t fall through to Enter handling while assessing
-      }
-
-      // Submit with Enter (only when not typing in inputs, textarea handles its own Enter)
-      if (!submitted && !isTyping && event.key === 'Enter' && !event.shiftKey) {
-        if (disableIndividualSubmit && hideImmediateResults) return; // blocked in grouped mode
-        event.preventDefault();
-        // Always call handleSubmit, it now properly handles empty answers
-        handleSubmit();
-        return;
+        return; // don't fall through to Enter handling while assessing
       }
 
       // Next question with Enter after assessment is complete
-      if (submitted && assessmentCompleted && !isTyping && event.key === 'Enter') {
+      if (submitted && selfAssessmentCompletedRef.current && !isTyping && event.key === 'Enter') {
         event.preventDefault();
         onNext();
         return;
@@ -684,7 +686,7 @@ export function OpenQuestion({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [showSelfAssessment, hideImmediateResults, showDeferredSelfAssessment, submitted, assessmentCompleted, answer, disableEnterHandlers]);
+  }, [showSelfAssessment, hideImmediateResults, showDeferredSelfAssessment, submitted, answer, disableEnterHandlers]);
 
   return (
     <motion.div

@@ -167,7 +167,7 @@ export default function LecturePageRoute() {
     // Don't automatically move to next question - let user see the result first
   };
 
-  const handleOpenSubmit = (answer: string, resultValue: boolean | 'partial') => {
+  const handleOpenSubmit = (answer: string, resultValue?: boolean | 'partial') => {
     // Only handle regular questions here, clinical cases are handled separately
     // Check if this is actually a clinical case (has questions array) vs a regular question
     if (!('questions' in currentQuestion!)) {
@@ -215,7 +215,12 @@ export default function LecturePageRoute() {
         return null;
       }
       
-      const isAnswered = clinicalCase.questions.every(q => answers[q.id] !== undefined);
+      const isAnswered = clinicalCase.questions.every(q => {
+        const answer = answers[q.id];
+        if (answer === undefined) return false;
+        if ((q.type as any) === 'clinic_croq' && typeof answer === 'string' && answer.trim().length === 0) return false;
+        return true;
+      });
       const caseAnswerResult = isAnswered ? 
         (clinicalCase.questions.every(q => answerResults[q.id] === true) ? true : 
          clinicalCase.questions.some(q => answerResults[q.id] === true || answerResults[q.id] === 'partial') ? 'partial' : false) : 
@@ -288,7 +293,8 @@ export default function LecturePageRoute() {
     }
 
     // Regular question handling
-    const isAnswered = answers[currentQuestion.id] !== undefined;
+    const isAnswered = answers[currentQuestion.id] !== undefined && 
+      (currentQuestion.type !== 'qroc' || (typeof answers[currentQuestion.id] === 'string' && answers[currentQuestion.id].trim().length > 0));
     const answerResult = answerResults[currentQuestion.id];
     const userAnswer = answers[currentQuestion.id];
     

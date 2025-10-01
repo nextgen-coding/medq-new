@@ -148,14 +148,10 @@ export function ClinicalCaseQuestion({
   const [revealIndex, setRevealIndex] = useState<number>(clinicalCase.questions.length - 1);
   // Removed per-question submission; single global submit after all questions answered
 
-  // Auto-show notes when content is detected, but don't auto-hide when content is deleted
-  // Only auto-show if user hasn't manually controlled the notes area
+  // Sync local questionResults with prop changes
   useEffect(() => {
-    if (notesHasContent && !showNotesArea && !notesManuallyControlled) {
-      setShowNotesArea(true);
-    }
-    // Don't auto-hide when content becomes empty - let user manually close
-  }, [notesHasContent, showNotesArea, notesManuallyControlled]);
+    setQuestionResults(prev => ({ ...prev, ...answerResults }));
+  }, [answerResults]);
 
   // Auto-show notes area if clinical case has existing notes on mount
   // Only run if user hasn't manually controlled notes
@@ -592,7 +588,7 @@ export function ClinicalCaseQuestion({
     const updatedResults = { ...questionResults };
     
     clinicalCase.questions.forEach(question => {
-      if ((question.type as any) === 'clinic_mcq' && currentAnswers[question.id] === undefined) {
+      if ((question.type as any) === 'clinic_mcq' && (currentAnswers[question.id] === undefined || (Array.isArray(currentAnswers[question.id]) && currentAnswers[question.id].length === 0))) {
         // Auto-submit unanswered QCM as incorrect with empty selection
         updatedAnswers[question.id] = [];
         updatedResults[question.id] = false;

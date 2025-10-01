@@ -55,17 +55,11 @@ export function LectureComplete({
   
   questions.forEach((item: any) => {
     if ('questions' in item && Array.isArray(item.questions)) {
-      // Clinical case - check if ALL sub-questions are answered
+      // Clinical case - check if ALL sub-questions have results (completed case)
       const clinicalCase = item;
-      const allSubQuestionsAnswered = clinicalCase.questions.every((subQ: any) => {
-        const answer = answers[subQ.id];
-        if (answer === undefined || answer === null) return false;
-        if (Array.isArray(answer)) return answer.length > 0;
-        if (typeof answer === 'string') return answer.trim().length > 0;
-        return Boolean(answer);
-      });
+      const allSubQuestionsHaveResults = clinicalCase.questions.every((subQ: any) => answerResults[subQ.id] !== undefined);
       
-      if (allSubQuestionsAnswered) {
+      if (allSubQuestionsHaveResults) {
         answeredTasks++;
         
         // Determine clinical case result based on sub-question results
@@ -88,9 +82,10 @@ export function LectureComplete({
       // Regular question
       const question = item;
       const answer = answers[question.id];
+      const isQrocQuestion = (question.type as any) === 'qroc' || (question.type as any) === 'open';
       const hasAnswer = answer !== undefined && answer !== null && 
         (Array.isArray(answer) ? answer.length > 0 : 
-         typeof answer === 'string' ? answer.trim().length > 0 : 
+         typeof answer === 'string' ? (isQrocQuestion ? true : answer.trim().length > 0) : 
          Boolean(answer));
       
       if (hasAnswer) {
