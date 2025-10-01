@@ -27,7 +27,8 @@ async function handler(request: AuthenticatedRequest, { params }: { params: Prom
       return NextResponse.json({ error: 'Payment not found' }, { status: 404 });
     }
 
-    if (payment.status !== 'awaiting_verification') {
+    // Allow verification for awaiting_verification status, or pending status for konnect_gateway payments
+    if (payment.status !== 'awaiting_verification' && !(payment.status === 'pending' && payment.method === 'konnect_gateway')) {
       return NextResponse.json({ error: 'Payment is not pending verification' }, { status: 400 });
     }
 

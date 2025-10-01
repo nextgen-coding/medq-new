@@ -113,7 +113,7 @@ async function verifyPaymentAmount(
 async function handler(request: AuthenticatedRequest) {
   try {
     const body = await request.json()
-    const { method, subscriptionType, customPaymentDetails, voucherCode, proofFileUrl, couponCode } = body
+    const { method, subscriptionType, customPaymentDetails, voucherCode, proofFileUrl, couponCode, isBuyingKey, activationKey } = body
 
     // Validate input
     if (!method || !subscriptionType) {
@@ -247,7 +247,8 @@ async function handler(request: AuthenticatedRequest) {
             method: PaymentMethod.voucher_code,
             status: 'completed',
             subscriptionType,
-            voucherCodeId: voucher.id
+            voucherCodeId: voucher.id,
+            isBuyingKey: false
           }
         })
 
@@ -291,20 +292,97 @@ async function handler(request: AuthenticatedRequest) {
       })
     }
 
-    // Handle custom payment method
-    if (method === PaymentMethod.custom_payment) {
-      if (!customPaymentDetails) {
-        return NextResponse.json(
-          { error: 'Payment details are required for custom payment' },
-          { status: 400 }
-        )
+    // Handle activation key method
+    if (method === PaymentMethod.activation_key) {
+      const { activationKey } = body
+      
+      if (!activationKey) {
+        return NextResponse.json({ error: 'Activation key is required' }, { status: 400 })
       }
 
-      if (!proofFileUrl) {
-        return NextResponse.json(
-          { error: 'Proof of payment is required for custom payment' },
-          { status: 400 }
-        )
+      // Find the voucher code
+      const voucherCode = await prisma.voucherCode.findFirst({
+        where: {
+          code: activationKey,
+          isUsed: false
+        }
+      })
+
+      if (!voucherCode) {
+        return NextResponse.json({ error: 'Invalid or already used activation key' }, { status: 400 })
+      }
+
+      // Check if user already has an active subscription
+      const user = await prisma.user.findUnique({
+        where: { id: request.user!.userId },
+        select: { hasActiveSubscription: true, subscriptionExpiresAt: true }
+      })
+
+      if (user?.hasActiveSubscription && user.subscriptionExpiresAt && user.subscriptionExpiresAt > new Date()) {
+        return NextResponse.json({ error: 'You already have an active subscription' }, { status: 400 })
+      }
+
+      // Complete the activation and update subscription (no payment record for activation keys)
+      await prisma.$transaction(async (tx) => {
+        // Mark voucher as used
+        await tx.voucherCode.update({
+          where: { id: voucherCode.id },
+          data: {
+            isUsed: true,
+            usedAt: new Date()
+          }
+        })
+
+        // Create voucher usage record
+        await tx.voucherCodeUsage.create({
+          data: {
+            userId: request.user!.userId,
+            voucherCodeId: voucherCode.id
+          }
+        })
+
+        // Update user subscription
+        const expiresAt = voucherCode.subscriptionType === SubscriptionType.annual
+          ? new Date(Date.now() + 365 * 24 * 60 * 60 * 1000) // 1 year
+          : new Date(Date.now() + 6 * 30 * 24 * 60 * 60 * 1000) // 6 months
+
+        console.log('Activating subscription for user', request.user!.userId, 'expires at', expiresAt)
+
+        await tx.user.update({
+          where: { id: request.user!.userId },
+          data: {
+            hasActiveSubscription: true,
+            subscriptionExpiresAt: expiresAt
+          }
+        })
+      })
+
+      return NextResponse.json({
+        success: true,
+        message: 'Subscription activated successfully with activation key!'
+      })
+    }
+
+    // Handle custom payment method
+    if (method === PaymentMethod.custom_payment) {
+      // For cash payments when buying key, no requirements - team will contact
+      if (isBuyingKey) {
+        // No validation needed for cash payments when buying keys
+      } else {
+        // For regular custom payments, require both details and proof
+        if (!customPaymentDetails) {
+          return NextResponse.json(
+            { error: 'Payment details are required for custom payment' },
+            { status: 400 }
+          )
+        }
+
+        if (!proofFileUrl) {
+          return NextResponse.json(
+            { error: 'Proof of payment is required for custom payment' },
+            { status: 400 }
+          )
+        }
       }
 
       const payment = await prisma.payment.create({
@@ -314,16 +392,17 @@ async function handler(request: AuthenticatedRequest) {
           method: PaymentMethod.custom_payment,
           status: 'awaiting_verification',
           subscriptionType,
-          customPaymentDetails,
-          proofImageUrl: proofFileUrl
+          customPaymentDetails: customPaymentDetails || (isBuyingKey ? 'Cash payment - team will contact' : ''),
+          proofImageUrl: proofFileUrl,
+          isBuyingKey: isBuyingKey || false
         }
       })
 
       return NextResponse.json({
         success: true,
         paymentId: payment.id,
-        message: 'Payment submitted for verification',
-        requiresProof: true
+        message: isBuyingKey ? 'Cash payment submitted - team will contact you' : 'Payment submitted for verification',
+        requiresProof: !isBuyingKey
       })
     }
 
@@ -341,7 +420,8 @@ async function handler(request: AuthenticatedRequest) {
           amount: finalAmount,
           method: PaymentMethod.konnect_gateway,
           status: 'pending',
-          subscriptionType
+          subscriptionType,
+          isBuyingKey: isBuyingKey || false
         }
       })
 

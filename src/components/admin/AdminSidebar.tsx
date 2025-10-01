@@ -147,7 +147,7 @@ export function AdminSidebar() {
 
   const paymentMenuItems = React.useMemo(() => [
     { label: 'Paiements', icon: CreditCard, href: '/admin/payments', description: 'Gérer les paiements et abonnements' },
-    { label: 'Codes de Bon', icon: Gift, href: '/admin/vouchers', description: 'Créer et gérer les codes de bon' },
+    { label: 'Clés d\'Activation', icon: Gift, href: '/admin/vouchers', description: 'Créer et gérer les clés d\'activation' },
     { label: 'Prix et Remises', icon: DollarSign, href: '/admin/pricing', description: 'Configurer les prix et remises' }
   ], []);
 

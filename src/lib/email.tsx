@@ -2,6 +2,8 @@ import { Resend } from 'resend';
 import { VerificationCodeEmail } from '@/components/email/VerificationCodeEmail';
 import { VerificationEmail } from '@/components/email/VerificationEmail';
 import { ResetPasswordEmail } from '@/components/email/ResetPasswordEmail';
+import { PaymentLinkEmail } from '@/components/email/PaymentLinkEmail';
+import { ActivationKeyEmail } from '@/components/email/ActivationKeyEmail';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -83,6 +85,70 @@ export const sendPasswordChangeVerificationEmail = async (email: string, code: s
     return result;
   } catch (error) {
     console.error('Error sending password change verification email:', error);
+    throw error;
+  }
+};
+
+export const sendPaymentLinkEmail = async (
+  email: string,
+  paymentLink: string,
+  amount: number,
+  currency: string,
+  subscriptionType: string,
+  name?: string
+) => {
+  try {
+    const fromEmail = process.env.RESEND_FROM_EMAIL || 'info@medq.tn';
+
+    const result = await resend.emails.send({
+      from: fromEmail,
+      to: [email],
+      subject: 'Lien de paiement personnalisé • MedQ',
+      react: PaymentLinkEmail({
+        firstName: name,
+        paymentLink,
+        amount,
+        currency,
+        subscriptionType
+      }),
+    });
+
+    return result;
+  } catch (error) {
+    console.error('Error sending payment link email:', error);
+    throw error;
+  }
+};
+
+export const sendActivationKeyEmail = async (
+  email: string,
+  activationKey: string,
+  amount: number,
+  currency: string,
+  subscriptionType: string,
+  name?: string
+) => {
+  console.log('Sending activation key email to:', email, 'with key:', activationKey);
+  try {
+    const fromEmail = process.env.RESEND_FROM_EMAIL || 'info@medq.tn';
+
+    const result = await resend.emails.send({
+      from: fromEmail,
+      to: [email],
+      subject: 'Votre clé d\'activation • MedQ',
+      react: ActivationKeyEmail({
+        firstName: name,
+        activationKey,
+        amount,
+        currency,
+        subscriptionType
+      }),
+    });
+
+    console.log('Activation key email sent successfully:', result);
+    return result;
+  } catch (error) {
+    console.error('Error sending activation key email:', error);
     throw error;
   }
 }; 
