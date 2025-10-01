@@ -595,6 +595,17 @@ export function ClinicalCaseQuestion({
       }
     });
     
+    // Auto-assign 'partial' results to QROC questions when self-assessment is disabled
+    const userShowsSelfAssessment = (user as any)?.showSelfAssessment ?? true;
+    if (!userShowsSelfAssessment) {
+      clinicalCase.questions.forEach(question => {
+        if ((question.type as any) === 'clinic_croq' && updatedAnswers[question.id] !== undefined && updatedResults[question.id] === undefined) {
+          // Auto-assign partial result to answered QROC questions when evaluation is disabled
+          updatedResults[question.id] = 'partial';
+        }
+      });
+    }
+    
     // Update state with auto-submitted QCM results
     setAnswers(updatedAnswers);
     setQuestionResults(updatedResults);
@@ -616,6 +627,14 @@ export function ClinicalCaseQuestion({
     
     // Reset evaluation state
     setEvaluationComplete(false);
+    
+    // If self-assessment is disabled, mark evaluation as complete since all QROC questions already have results
+    if (!userShowsSelfAssessment) {
+      const allQrocHaveResults = openIds.every(id => updatedResults[id] !== undefined);
+      if (allQrocHaveResults) {
+        setEvaluationComplete(true);
+      }
+    }
     
     // For multi-QROC cases, start evaluation from the first unanswered QROC
     // For mixed clinical cases, start from current QROC if applicable
@@ -1315,11 +1334,6 @@ export function ClinicalCaseQuestion({
               <div className="text-base sm:text-lg leading-relaxed whitespace-pre-wrap text-foreground font-medium">
                 <HighlightableCaseText lectureId={lectureId} text={clinicalCase.caseText} className="break-words" />
               </div>
-              {!showResults && (
-                <div className="mt-3 text-sm text-gray-600 dark:text-gray-400 font-medium">
-                  📋 Lisez attentivement ce cas clinique puis répondez aux questions ci-dessous
-                </div>
-              )}
             </div>
           )}
           <div className="flex flex-wrap gap-2 mb-4">
@@ -1418,11 +1432,14 @@ export function ClinicalCaseQuestion({
                             } else {
                               // For cases with open questions, check if evaluation is complete
                               if (evaluationComplete) {
-                                const correctCount = Object.values(questionResults).filter(r => r === true).length;
-                                const totalCount = Object.keys(questionResults).length;
-                                if (correctCount === totalCount) return true;
-                                if (correctCount > 0) return 'partial';
-                                return false;
+                                const subResults = Object.values(questionResults);
+                                const allCorrect = subResults.every(r => r === true);
+                                const hasCorrect = subResults.some(r => r === true);
+                                const hasPartial = subResults.some(r => r === 'partial');
+                                
+                                if (allCorrect) return true;
+                                else if (hasCorrect || hasPartial) return 'partial';
+                                else return false;
                               }
                               return null;
                             }
