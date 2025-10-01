@@ -147,6 +147,25 @@ export default function CoursPageRoute() {
     setIsPinned(prev => (prev !== computed ? computed : prev));
   }, [currentQuestion, pinnedQuestionIds]);
 
+  // Handle question parameter from URL (for admin reports navigation)
+  useEffect(() => {
+    const questionParam = searchParams?.get('question');
+    if (questionParam && questions && questions.length > 0) {
+      const questionIndex = questions.findIndex(q => {
+        if ('id' in q) {
+          return q.id === questionParam;
+        } else if ('questions' in q) {
+          // ClinicalCase - check if any sub-question matches
+          return q.questions.some(sq => sq.id === questionParam);
+        }
+        return false;
+      });
+      if (questionIndex !== -1 && questionIndex !== currentQuestionIndex) {
+        setCurrentQuestionIndex(questionIndex);
+      }
+    }
+  }, [searchParams, questions, currentQuestionIndex, setCurrentQuestionIndex]);
+
   if (!lectureId) {
     return <div>ID de cours introuvable</div>
   }

@@ -1135,7 +1135,7 @@ export function ClinicalCaseQuestion({
                     highlightConfirm
                     hideMeta={true}
                     suppressReminder={true}
-                    showEyeButton={displayMode !== 'multi_qroc'}
+                    showEyeButton={true}
                     enableAnswerHighlighting={true}
                     // In grouped mode, let the container manage Enter for navigation
                     disableEnterHandlers={true}
@@ -1280,7 +1280,7 @@ export function ClinicalCaseQuestion({
                 disableEnterHandlers={true}
                 onFocus={() => { if (activeIndex !== index) setActiveIndex(index); }}
                 autoFocus={index === activeIndex}
-                showEyeButton={displayMode !== 'multi_qroc'}
+                showEyeButton={true}
               />
             )}
           </>

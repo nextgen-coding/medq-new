@@ -108,9 +108,9 @@ export function OpenQuestion({
   const [showNotesArea, setShowNotesArea] = useState(false); // Control showing notes/comments after click
   const [submittedAnswer, setSubmittedAnswer] = useState(''); // Preserve the user's answer for display
   const [shouldShowUserAnswer, setShouldShowUserAnswer] = useState(false); // Flag to control what to display
+  const [previewMode, setPreviewMode] = useState(false); // Preview mode for eye button
   const [notesHasContent, setNotesHasContent] = useState(false); // track if notes have content
   const [notesManuallyControlled, setNotesManuallyControlled] = useState(false); // track if user manually opened/closed notes
-  const [showInlineAnswer, setShowInlineAnswer] = useState(false); // Control inline answer visibility
 
   // Helper function to get color classes based on evaluation result
   const getEvaluationColors = (result: boolean | 'partial' | null | undefined) => {
@@ -787,11 +787,20 @@ export function OpenQuestion({
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => setShowInlineAnswer(!showInlineAnswer)}
+                      onClick={() => {
+                        if (!previewMode) {
+                          // Submit with empty answer when eye is clicked
+                          onSubmit('', false);
+                          setPreviewMode(true);
+                        } else {
+                          // Reset preview mode when clicked again
+                          setPreviewMode(false);
+                        }
+                      }}
                       className="h-8 w-8 p-0 hover:bg-blue-100 dark:hover:bg-blue-900/20 rounded-md shadow-sm"
-                      title={showInlineAnswer ? "Masquer la réponse" : "Voir la réponse"}
+                      title={previewMode ? "Masquer la réponse" : "Voir la réponse"}
                     >
-                      {showInlineAnswer ? (
+                      {previewMode ? (
                         <EyeOff className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                       ) : (
                         <Eye className="h-4 w-4 text-blue-600 dark:text-blue-400" />
@@ -801,17 +810,6 @@ export function OpenQuestion({
                 )}
               </div>
               
-              {/* Show correct answer when eye button is clicked */}
-              {showInlineAnswer && showEyeButton && (question.correct_answers || question.correctAnswers) && ((question.correct_answers && question.correct_answers.length > 0) || (question.correctAnswers && question.correctAnswers.length > 0)) && (
-                <div className="mb-3 rounded-xl border border-green-200 bg-green-50 p-3 dark:border-green-800 dark:bg-green-950">
-                  <div className="text-sm font-medium text-green-800 dark:text-green-200 mb-2">
-                    Réponse attendue :
-                  </div>
-                  <div className="text-sm text-green-700 dark:text-green-300">
-                    <RichTextDisplay content={(question.correct_answers || question.correctAnswers || []).join(', ')} />
-                  </div>
-                </div>
-              )}
             </>
           )}
           {/* Inline media attached to the question (not the reminder) */}
@@ -871,7 +869,7 @@ export function OpenQuestion({
 
     {/* Show input field OR self-assessment */}
     {(() => {
-      const showInput = (!submitted || keepInputAfterSubmit) && (!hideActions || disableIndividualSubmit);
+      const showInput = (!submitted || keepInputAfterSubmit) && (!hideActions || disableIndividualSubmit) && !previewMode;
       const showSelfAssessmentInPlace = showSelfAssessment && (!hideImmediateResults || showDeferredSelfAssessment);
       // Show self-assessment results for active evaluation OR for pre-answered questions with results
       const showSelfAssessmentResults = assessmentCompleted && submitted;
@@ -935,22 +933,22 @@ export function OpenQuestion({
     if (usingWrapper) return null;
     // Show results only for new submissions, not for already answered questions  
     // Already answered questions use the OpenQuestionSelfAssessment component for results
-    const canShowReference = submitted && expectedReference && (!hideImmediateResults || (showSelfAssessment && showDeferredSelfAssessment) || assessmentCompleted) && !showSelfAssessment && !isAnswered;
+    const canShowReference = (submitted || previewMode) && expectedReference && (!hideImmediateResults || previewMode || (showSelfAssessment && showDeferredSelfAssessment) || assessmentCompleted) && !showSelfAssessment && !isAnswered;
     
     if (!canShowReference) return null;
     
     // After self-assessment completion, show user's answer instead of correct answer
-    const showUserAnswerForResults = shouldShowUserAnswer;
+    const showUserAnswerForResults = shouldShowUserAnswer && !previewMode;
     const displayText = showUserAnswerForResults ? (submittedAnswer || userAnswer || answer || "Aucune réponse saisie") : expectedReference;
     const titleText = showUserAnswerForResults ? "Votre réponse" : "Réponse de référence";
     
     return (
       <div className="mt-0.5">
-        <div className={`rounded-xl border ${showUserAnswerForResults ? getEvaluationColors(deferredAssessmentResult || answerResult).border : 'border-emerald-300/60 dark:border-emerald-600/70'} ${showUserAnswerForResults ? getEvaluationColors(deferredAssessmentResult || answerResult).background : 'bg-emerald-50/80 dark:bg-emerald-900/50'} px-6 py-2 shadow-sm`}>
+        <div className={`rounded-xl border ${showUserAnswerForResults ? getEvaluationColors(previewMode ? false : (deferredAssessmentResult || answerResult)).border : 'border-emerald-300/60 dark:border-emerald-600/70'} ${showUserAnswerForResults ? getEvaluationColors(previewMode ? false : (deferredAssessmentResult || answerResult)).background : 'bg-emerald-50/80 dark:bg-emerald-900/50'} px-6 py-2 shadow-sm`}>
           <div className="mb-2">
-            <h3 className={`text-base md:text-lg font-bold tracking-tight ${showUserAnswerForResults ? getEvaluationColors(deferredAssessmentResult || answerResult).text : 'text-emerald-800 dark:text-emerald-50'}`}>{titleText}</h3>
+            <h3 className={`text-base md:text-lg font-bold tracking-tight ${showUserAnswerForResults ? getEvaluationColors(previewMode ? false : (deferredAssessmentResult || answerResult)).text : 'text-emerald-800 dark:text-emerald-50'}`}>{titleText}</h3>
           </div>
-          <div className={`prose prose-sm md:prose-base dark:prose-invert max-w-none leading-relaxed ${showUserAnswerForResults ? getEvaluationColors(deferredAssessmentResult || answerResult).text : 'text-emerald-800 dark:text-emerald-50'}`}>
+          <div className={`prose prose-sm md:prose-base dark:prose-invert max-w-none leading-relaxed ${showUserAnswerForResults ? getEvaluationColors(previewMode ? false : (deferredAssessmentResult || answerResult)).text : 'text-emerald-800 dark:text-emerald-50'}`}>
             <RichTextDisplay text={displayText} enableImageZoom={true} />
           </div>
         </div>

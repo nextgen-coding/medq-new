@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
+import { useEffect, useState, useCallback } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { AdminLayout } from '@/components/admin/AdminLayout'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
@@ -27,7 +28,8 @@ import {
   MessageSquare,
   User,
   BookOpen,
-  BarChart3
+  BarChart3,
+  ExternalLink
 } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
 import { formatDistanceToNow } from 'date-fns'
@@ -413,9 +415,18 @@ export default function AdminReportsPage() {
                         </div>
 
                         <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 sm:p-4">
-                          <p className="font-medium text-blue-900 dark:text-blue-100 mb-1 text-sm">
-                            Question ({report.question.type}):
-                          </p>
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="font-medium text-blue-900 dark:text-blue-100 text-sm">
+                              Question ({report.question.type}):
+                            </p>
+                            <Link
+                              href={`/matieres/${report.lecture.specialty.id}/cours/${report.lecture.id}?question=${report.question.id}`}
+                              className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 hover:underline"
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                              View in Lecture
+                            </Link>
+                          </div>
                           <p className="text-blue-800 dark:text-blue-200 text-xs sm:text-sm line-clamp-3">
                             {report.question.text}
                           </p>
