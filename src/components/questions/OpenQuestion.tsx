@@ -29,7 +29,7 @@ import ZoomableImage from './ZoomableImage';
 
 interface OpenQuestionProps {
   question: Question;
-  onSubmit: (answer: string, resultValue: boolean | 'partial') => void;
+  onSubmit: (answer: string, resultValue?: boolean | 'partial') => void;
   onAnswerChange?: (answer: string, hasAnswer: boolean) => void;
   onNext: () => void;
   lectureId?: string;
@@ -416,11 +416,20 @@ export function OpenQuestion({
     
     // For clinical case questions (hideImmediateResults = true), 
     // call onSubmit immediately with a default result since self-assessment is hidden
-    if (hideImmediateResults) {
+    // EXCEPT for QROC questions which need deferred self-assessment
+    const isQrocInClinicalCase = hideImmediateResults && (question.type === 'qroc' || question.type === 'clinic_croq');
+    if (hideImmediateResults && !isQrocInClinicalCase) {
       setAssessmentCompleted(true);
       // Call onSubmit immediately with answer and a placeholder result
       // The actual result will be determined when "Show Results" is clicked
       onSubmit(answer, 'partial'); // Use 'partial' as default for clinic questions
+    } else if (hideImmediateResults && isQrocInClinicalCase) {
+      // For QROC in clinical cases, always defer self-assessment to evaluation phase
+      // The ClinicalCaseQuestion component will control when to show self-assessment
+      setAssessmentCompleted(false);
+      
+      // Call onSubmit with answer but no result - result will be set during self-assessment
+      onSubmit(answer, undefined);
     } else {
       // For regular questions, check if answer is empty
       const isEmpty = !answer || answer.trim() === '';
@@ -429,9 +438,9 @@ export function OpenQuestion({
       const shouldShowSelfAssessment = (user as any)?.showSelfAssessment ?? true;
       
       if (isEmpty) {
-        // If answer is empty, skip self-assessment and go directly to results
-        setAssessmentCompleted(true);
-        onSubmit(answer, false); // false indicates incorrect/no answer (empty submission)
+        // For empty answers, show self-assessment to encourage evaluation
+        setAssessmentCompleted(false);
+        setShowSelfAssessment(true);
       } else if (shouldShowSelfAssessment) {
         // For non-empty answers, show self-assessment if user prefers it
         setAssessmentCompleted(false); // Reset assessment state for new evaluation
@@ -533,6 +542,15 @@ export function OpenQuestion({
       }
     }, 100);
   };
+
+  const wrappedOnNext = useCallback(() => {
+    // If self-assessment is active, skip it instead of going to next
+    if (showSelfAssessment && !assessmentCompleted) {
+      handleSelfAssessment('partial');
+    } else {
+      onNext();
+    }
+  }, [showSelfAssessment, assessmentCompleted, onNext]);
 
   const handleQuestionUpdated = async () => {
     try {
@@ -933,7 +951,10 @@ export function OpenQuestion({
     if (usingWrapper) return null;
     // Show results only for new submissions, not for already answered questions  
     // Already answered questions use the OpenQuestionSelfAssessment component for results
-    const canShowReference = (submitted || previewMode) && expectedReference && (!hideImmediateResults || previewMode || (showSelfAssessment && showDeferredSelfAssessment) || assessmentCompleted) && !showSelfAssessment && !isAnswered;
+    // Exception: in clinical cases, show reference answers for evaluated questions
+    const isClinicalCase = hideImmediateResults && disableIndividualSubmit;
+    const isQrocInClinicalCase = isClinicalCase && (question.type === 'qroc' || question.type === 'clinic_croq');
+    const canShowReference = (submitted || previewMode) && (expectedReference || isQrocInClinicalCase) && (!hideImmediateResults || previewMode || (showSelfAssessment && showDeferredSelfAssessment) || assessmentCompleted) && !showSelfAssessment && (!isAnswered || isClinicalCase);
     
     if (!canShowReference) return null;
     
@@ -953,15 +974,15 @@ export function OpenQuestion({
           </div>
         </div>
         
-        {/* Show reference answer when displaying user results and reference exists */}
-        {showUserAnswerForResults && expectedReference && (
+        {/* Show reference answer when displaying user results and reference exists, or for QROC in clinical cases */}
+        {showUserAnswerForResults && (expectedReference || isQrocInClinicalCase) && (
           <div className="mt-3">
             <div className="rounded-xl border border-emerald-300/60 dark:border-emerald-600/70 bg-emerald-50/80 dark:bg-emerald-900/50 px-6 py-2 shadow-sm">
               <div className="mb-2">
                 <h3 className="text-base md:text-lg font-bold tracking-tight text-emerald-800 dark:text-emerald-50">Réponse de référence</h3>
               </div>
               <div className="prose prose-sm md:prose-base dark:prose-invert max-w-none leading-relaxed text-emerald-800 dark:text-emerald-50">
-                <RichTextDisplay text={expectedReference} enableImageZoom={true} />
+                <RichTextDisplay text={expectedReference || (isQrocInClinicalCase ? "Consultez vos notes de cours pour la réponse attendue." : "")} enableImageZoom={true} />
               </div>
             </div>
           </div>
@@ -978,7 +999,7 @@ export function OpenQuestion({
         isSubmitted={submitted}
         canSubmit={!hasSubmitted}
         onSubmit={handleSubmit}
-        onNext={onNext}
+        onNext={wrappedOnNext}
         showNext={submitted || isRevisionMode} // Show "Suivant" immediately after submission, or always in revision mode
         hasSubmitted={hasSubmitted}
         assessmentCompleted={assessmentCompleted}
@@ -1007,7 +1028,7 @@ export function OpenQuestion({
       isSubmitted={submitted}
       canSubmit={!hasSubmitted}
       onSubmit={handleSubmit}
-      onNext={onNext}
+      onNext={wrappedOnNext}
       showNext={submitted || isRevisionMode} // Show "Suivant" immediately after submission, or always in revision mode
       hasSubmitted={hasSubmitted}
       assessmentCompleted={assessmentCompleted}

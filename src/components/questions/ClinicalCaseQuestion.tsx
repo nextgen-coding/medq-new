@@ -216,21 +216,21 @@ export function ClinicalCaseQuestion({
   useEffect(() => {
     if (isAnswered && showResults) {
       const openIds = clinicalCase.questions
-        .filter(q => (q.type as any) === 'clinic_croq')
+        .filter(q => (q.type as any) === 'clinic_croq' && answers[q.id] !== undefined)
         .map(q => q.id);
       
-      // Check if all QROC questions have evaluation results
+      // Check if all submitted QROC questions have evaluation results
       const allEvaluated = openIds.length > 0 && openIds.every(id => questionResults[id] !== undefined);
       
       if (allEvaluated) {
         setEvaluationComplete(true);
         setEvaluationOrder(openIds);
       } else if (openIds.length === 0) {
-        // No QROC questions, evaluation is complete by default
+        // No submitted QROC questions, evaluation is complete by default
         setEvaluationComplete(true);
       }
     }
-  }, [isAnswered, showResults, clinicalCase.questions, questionResults]);
+  }, [isAnswered, showResults, clinicalCase.questions, questionResults, answers]);
 
   // Separate effect to synchronize parent state with existing evaluation results (run only once on mount)
   const hasSyncedParent = useRef(false);
@@ -258,6 +258,9 @@ export function ClinicalCaseQuestion({
 
   // Count only non-empty answers for progress (arrays with length, non-empty strings, or truthy values)
   const answeredQuestions = clinicalCase.questions.reduce((count, q) => {
+    // Count as answered if there's an answer result (evaluation completed)
+    if (questionResults[q.id] !== undefined) return count + 1;
+    
     const a = answers[q.id];
     if (Array.isArray(a)) return count + (a.length > 0 ? 1 : 0);
     if (typeof a === 'string') return count + (a.trim().length > 0 ? 1 : 0);
@@ -372,6 +375,9 @@ export function ClinicalCaseQuestion({
 
   // Helper function to check if a question is answered
   const isQuestionAnswered = (question: Question): boolean => {
+    // Count as answered if there's an answer result (evaluation completed)
+    if (questionResults[question.id] !== undefined) return true;
+    
     const answer = answers[question.id];
     if (answer === undefined || answer === null) return false;
     
@@ -438,30 +444,53 @@ export function ClinicalCaseQuestion({
         if (caseTextRef.current) {
           scrollIntoViewWithOffset(caseTextRef.current, 'smooth');
         }
+        
+        // For cases that start with QROC questions, focus the input after showing the case text
+        // This allows users to start typing immediately without extra clicks
+        const firstQuestion = clinicalCase.questions[targetIndex];
+        if (firstQuestion && (firstQuestion.type as any) === 'clinic_croq') {
+          setTimeout(() => {
+            focusFirstInput(firstQuestion.id);
+          }, 500); // Give time for scrolling to complete
+        }
       }, 100);
     }
   }, [clinicalCase.caseNumber, showResults]); // Remove answers dep to prevent auto-shifting active frame on each answer
 
   const handleQuestionAnswer = (questionId: string, answer: any, result?: boolean | 'partial') => {
+    const question = clinicalCase.questions.find(q => q.id === questionId);
+    const isQrocQuestion = question && (question.type as any) === 'clinic_croq';
+    
     const wasAnswered = answers[questionId] !== undefined;
     setAnswers(prev => {
       const next = { ...prev } as Record<string, any>;
-      // If the answer is empty (cleared), remove the key so progress reflects it
+      // For QROC questions, always store the answer (even if empty) to track submission
+      // For other question types, remove empty answers
       const isEmpty = (Array.isArray(answer) && answer.length === 0) || (typeof answer === 'string' && answer.trim().length === 0);
-      if (isEmpty) {
+      if (isEmpty && !isQrocQuestion) {
         delete next[questionId];
       } else {
         next[questionId] = answer;
       }
       return next;
     });
-    if (result !== undefined) {
+    
+    // For QROC questions, don't set the result during initial submission - wait for evaluation
+    // For other question types, set the result if provided
+    if (result !== undefined && !isQrocQuestion) {
       setQuestionResults(prev => ({ ...prev, [questionId]: result }));
     }
 
     // Propagate to parent for global progress/state (works for MCQ and open)
+    // For QROC questions, don't pass the result since it's deferred
     if (onAnswerUpdate) {
-      try { onAnswerUpdate(questionId, answer, result); } catch {}
+      try { 
+        if (isQrocQuestion) {
+          onAnswerUpdate(questionId, answer, undefined);
+        } else {
+          onAnswerUpdate(questionId, answer, result); 
+        }
+      } catch {}
     }
 
     // Check if this was the last unanswered question and complete immediately if so
@@ -551,13 +580,32 @@ export function ClinicalCaseQuestion({
     };
   }, [answers, isCaseComplete, showResults, clinicalCase.questions, manualSubmitRequired, displayMode, hasQrocQuestions]);
 
-  const handleCompleteCase = () => {
+  const handleCompleteCase = (autoSubmittedAnswers?: Record<string, any>) => {
     setIsCaseComplete(true);
     setShowResults(true); // enter evaluation phase (results visible)
     
-    // Build evaluation order (only open questions that require self assessment)
+    // Use auto-submitted answers if provided, otherwise use current answers
+    const currentAnswers = autoSubmittedAnswers || answers;
+    
+    // Auto-submit unanswered QCM questions as incorrect
+    const updatedAnswers = { ...currentAnswers };
+    const updatedResults = { ...questionResults };
+    
+    clinicalCase.questions.forEach(question => {
+      if ((question.type as any) === 'clinic_mcq' && currentAnswers[question.id] === undefined) {
+        // Auto-submit unanswered QCM as incorrect with empty selection
+        updatedAnswers[question.id] = [];
+        updatedResults[question.id] = false;
+      }
+    });
+    
+    // Update state with auto-submitted QCM results
+    setAnswers(updatedAnswers);
+    setQuestionResults(updatedResults);
+    
+    // Build evaluation order (only QROC questions that have been submitted and need evaluation)
     const openIds = clinicalCase.questions
-      .filter(q => (q.type as any) === 'clinic_croq')
+      .filter(q => (q.type as any) === 'clinic_croq' && updatedAnswers[q.id] !== undefined)
       .map(q => q.id);
     
     console.log('🔍 Multi QROC Evaluation Setup:', {
@@ -573,10 +621,12 @@ export function ClinicalCaseQuestion({
     // Reset evaluation state
     setEvaluationComplete(false);
     
-    // For multi-QROC cases, always start evaluation from the first QROC
+    // For multi-QROC cases, start evaluation from the first unanswered QROC
     // For mixed clinical cases, start from current QROC if applicable
     if (displayMode === 'multi_qroc') {
-      setEvaluationIndex(0); // Always start from first QROC in multi-QROC cases
+      // Find the first unanswered QROC
+      const firstUnansweredIndex = openIds.findIndex(id => updatedResults[id] === undefined);
+      setEvaluationIndex(firstUnansweredIndex !== -1 ? firstUnansweredIndex : 0);
     } else {
       // For clinical cases with mixed question types, try to stay on current QROC
       const currentQuestion = clinicalCase.questions[activeIndex];
@@ -586,12 +636,7 @@ export function ClinicalCaseQuestion({
       setEvaluationIndex(currentQrocIndex !== -1 ? currentQrocIndex : 0);
     }
     
-    // In revision mode, auto-complete evaluation to align with "show correct and move on"
-    if (revisionMode || openIds.length === 0) {
-      setEvaluationComplete(true);
-    }
-    
-    onSubmit(clinicalCase.caseNumber, answers, questionResults); // results will be updated as user evaluates
+    onSubmit(clinicalCase.caseNumber, updatedAnswers, updatedResults); // results will be updated as user evaluates
     
     // Don't manually scroll here - let the evaluation effect handle scrolling to the correct question
   };
@@ -621,80 +666,47 @@ export function ClinicalCaseQuestion({
   };
   const handleShowResults = () => setShowResults(true);
   const handleSelfAssessmentUpdate = (questionId: string, result: boolean | 'partial') => {
-    console.log('📝 Self Assessment Update:', {
-      questionId,
-      result,
-      currentIndex: evaluationIndex,
-      currentTarget: evaluationOrder[evaluationIndex],
-      evaluationOrder,
-      evaluationComplete
+    // Update the results first
+    setQuestionResults(prev => {
+      const updatedResults = { ...prev, [questionId]: result };
+      
+      // Handle evaluation advancement for multi QROC
+      if (showResults && !evaluationComplete) {
+        const currentId = evaluationOrder[evaluationIndex];
+        
+        // Check if this was the current evaluation target
+        if (currentId === questionId) {
+          // Find next unanswered question in evaluation order
+          let nextIndex = -1;
+          for (let i = evaluationIndex + 1; i < evaluationOrder.length; i++) {
+            const id = evaluationOrder[i];
+            if (updatedResults[id] === undefined) {
+              nextIndex = i;
+              break;
+            }
+          }
+          
+          if (nextIndex !== -1) {
+            // Move to next unanswered question
+            setEvaluationIndex(nextIndex);
+          } else {
+            // Check if all questions have been evaluated
+            const remaining = evaluationOrder.filter(id => updatedResults[id] === undefined);
+            if (remaining.length === 0) {
+              setEvaluationComplete(true);
+            }
+          }
+        }
+      }
+      
+      return updatedResults;
     });
     
-    setQuestionResults(prev => ({ ...prev, [questionId]: result }));
     if (onAnswerUpdate) {
       const userAnswer = answers[questionId];
       onAnswerUpdate(questionId, userAnswer, result);
     }
-    
-    // Handle evaluation advancement for multi QROC
-    if (showResults && !evaluationComplete) {
-      const currentId = evaluationOrder[evaluationIndex];
-      
-      // Always update the results first, then check advancement
-      setTimeout(() => {
-        setQuestionResults(currentResults => {
-          const updatedResults = { ...currentResults, [questionId]: result };
-          
-          console.log('🔄 Evaluation State Check:', {
-            questionId,
-            currentId,
-            isCurrentTarget: currentId === questionId,
-            updatedResults,
-            evaluationOrder
-          });
-          
-          // Check if this was the current evaluation target
-          if (currentId === questionId) {
-            // Find next unanswered question in evaluation order
-            let nextIndex = -1;
-            for (let i = evaluationIndex + 1; i < evaluationOrder.length; i++) {
-              const id = evaluationOrder[i];
-              if (updatedResults[id] === undefined) {
-                nextIndex = i;
-                break;
-              }
-            }
-            
-            console.log('🎯 Advancing Evaluation:', {
-              currentIndex: evaluationIndex,
-              nextIndex,
-              totalQuestions: evaluationOrder.length
-            });
-            
-            if (nextIndex !== -1) {
-              // Move to next unanswered question
-              setEvaluationIndex(nextIndex);
-            } else {
-              // All questions in evaluation order have been evaluated
-              const remaining = evaluationOrder.filter(id => updatedResults[id] === undefined);
-              console.log('✅ Evaluation Check Complete:', {
-                remaining: remaining.length,
-                isComplete: remaining.length === 0
-              });
-              
-              if (remaining.length === 0) {
-                setEvaluationComplete(true);
-              }
-            }
-          }
-          
-          return updatedResults;
-        });
-      }, 50); // Small delay to ensure state consistency
-    }
-  };
-
-  // Simplified Enter key navigation for clinical cases
+  };  // Simplified Enter key navigation for clinical cases
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Enter' || e.ctrlKey || e.metaKey) return;
@@ -847,31 +859,34 @@ export function ClinicalCaseQuestion({
           }, 300);
         }
       } else {
-        // No unanswered questions ahead, cycle back to first unanswered question
+        // No unanswered questions ahead, check if there are any unanswered questions at all
         const firstUnansweredIndex = findFirstUnansweredQuestion();
         if (firstUnansweredIndex !== -1) {
-          setActiveIndex(firstUnansweredIndex);
-          const unansweredQuestion = clinicalCase.questions[firstUnansweredIndex];
-          const element = questionRefs.current[unansweredQuestion.id];
-          
-          if (element) {
-            scrollIntoViewWithOffset(element, 'smooth');
-            setTimeout(() => {
-              focusFirstInput(unansweredQuestion.id);
-            }, 300);
-          }
+          // Auto-submit all unanswered questions to allow case completion
+          const updatedAnswers = { ...answers };
+          clinicalCase.questions.forEach(q => {
+            if (!isQuestionAnswered(q)) {
+              // Auto-submit unanswered questions with default values
+              if ((q.type as any) === 'clinic_croq') {
+                // For QROC, submit empty answer
+                updatedAnswers[q.id] = '';
+              } else if ((q.type as any) === 'clinic_mcq') {
+                // For MCQ, submit with empty array (no selection)
+                updatedAnswers[q.id] = [];
+              }
+            }
+          });
+          // Update the answers state
+          setAnswers(updatedAnswers);
+          // Now submit the case with the updated answers
+          setTimeout(() => {
+            handleCompleteCase(updatedAnswers);
+          }, 100);
         } else {
-          // All questions answered - check if manual submission is required
-          if (manualSubmitRequired) {
-            // For cas clinic with all QCM, all questions are answered but require Enter to submit
-            // Don't auto-submit, just show the user that they can submit
-            // The user must press Enter again or click the Submit button
-          } else {
-            // All questions answered - submit the case immediately
-            setTimeout(() => {
-              handleCompleteCase();
-            }, 100); // Small delay to ensure UI updates
-          }
+          // All questions answered - submit the case immediately
+          setTimeout(() => {
+            handleCompleteCase();
+          }, 100);
         }
       }
     };
@@ -1337,13 +1352,8 @@ export function ClinicalCaseQuestion({
         <CardContent>
           <div className="space-y-6 mt-6">
             {clinicalCase.questions.map((question, index) => {
-              const isCurrentEval = showResults && !evaluationComplete && (question.type as any) === 'clinic_croq' && evaluationOrder[evaluationIndex] === question.id;
-              
               return (
-                <div key={question.id} className={cn(
-                  'transition-all duration-300',
-                  isCurrentEval ? 'ring-2 ring-blue-500 rounded-lg transition-shadow' : ''
-                )}>
+                <div key={question.id} className="transition-all duration-300">
                   {renderQuestion(question, index)}
                   {/* Removed post-evaluation textual status (Correct/Partiel/Incorrect) for QROC */}
                 </div>
@@ -1372,10 +1382,28 @@ export function ClinicalCaseQuestion({
                 {/* Group submit: shown for any grouped block (MCQ or open) */}
                 {!showResults && (
                   <Button
-                    onClick={handleCompleteCase}
+                    onClick={() => {
+                      // Auto-submit any unanswered questions before completing the case
+                      const updatedAnswers = { ...answers };
+                      clinicalCase.questions.forEach(q => {
+                        if (!isQuestionAnswered(q)) {
+                          if ((q.type as any) === 'clinic_croq') {
+                            // For QROC, submit empty answer
+                            updatedAnswers[q.id] = '';
+                          } else if ((q.type as any) === 'clinic_mcq') {
+                            // For MCQ, submit with empty array (no selection)
+                            updatedAnswers[q.id] = [];
+                          }
+                        }
+                      });
+                      // Update the answers state
+                      setAnswers(updatedAnswers);
+                      // Then complete the case with the updated answers
+                      setTimeout(() => handleCompleteCase(updatedAnswers), 100);
+                    }}
                     size="sm"
-                    disabled={answeredQuestions !== clinicalCase.totalQuestions || isCaseComplete}
-                    className={`font-semibold w-full xs:w-auto ${answeredQuestions === clinicalCase.totalQuestions && !isCaseComplete ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-600/50 text-white cursor-not-allowed'}`}
+                    disabled={isCaseComplete || (displayMode === 'multi_qroc' && activeIndex < clinicalCase.questions.length - 1)}
+                    className={`font-semibold w-full xs:w-auto ${(!isCaseComplete && (displayMode !== 'multi_qroc' || activeIndex >= clinicalCase.questions.length - 1)) ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-600/50 text-white cursor-not-allowed'}`}
                     data-submit-case
                   >Soumettre la réponse</Button>
                 )}

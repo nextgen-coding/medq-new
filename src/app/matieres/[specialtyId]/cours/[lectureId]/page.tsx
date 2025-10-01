@@ -279,7 +279,7 @@ export default function CoursPageRoute() {
     // Don't automatically move to next question - let user see the result first
   };
 
-  const handleOpenSubmit = (answer: string, resultValue: boolean | 'partial') => {
+  const handleOpenSubmit = (answer: string, resultValue?: boolean | 'partial') => {
     // Only handle regular questions here, clinical cases are handled separately
     // Check if this is actually a clinical case (has questions array) vs a regular question
     if (!('questions' in currentQuestion!)) {
@@ -600,7 +600,7 @@ export default function CoursPageRoute() {
           lectureTitle={lecture?.title}
           specialtyName={lecture?.specialty?.name}
           displayMode={(clinicalCase.questions.every((q: any)=> q.type==='clinic_croq') ? 'multi_qroc' : clinicalCase.questions.every((q: any)=> q.type==='clinic_mcq') ? 'multi_qcm' : 'clinical') as any}
-          isAnswered={mode === 'revision' ? true : clinicalCase.questions.every((q: any)=> answers[q.id] !== undefined)}
+          isAnswered={mode === 'revision' ? true : clinicalCase.questions.every((q: any)=> answers[q.id] !== undefined || answerResults[q.id] !== undefined)}
           answerResult={mode === 'revision' ? true : (() => {
             const resVals = clinicalCase.questions.map((q: any) => answerResults[q.id]).filter((r: any) => r !== undefined);
             if (!resVals.length) return undefined;
@@ -626,7 +626,11 @@ export default function CoursPageRoute() {
   // Regular question handling
   const revisionMode = mode === 'revision';
   const simpleQuestion = currentQuestion as Question;
-  const isAnswered = revisionMode ? true : (answers[simpleQuestion.id] !== undefined);
+  const isAnswered = revisionMode ? true : (
+    simpleQuestion.type === 'mcq' 
+      ? answers[simpleQuestion.id] !== undefined 
+      : answerResults[simpleQuestion.id] !== undefined
+  );
   const answerResult = revisionMode ? true : answerResults[simpleQuestion.id];
   const userAnswer = revisionMode
     ? (simpleQuestion.type === 'mcq'
@@ -1134,7 +1138,7 @@ function GroupedQrocContainer({ clinicalCase, answers, answerResults, pinnedQues
     // Don't auto-hide when content becomes empty - let user manually close
   }, [notesHasContent, openNotes]);
 
-  const groupAnswered = clinicalCase.questions.every((q: any) => answers[q.id] !== undefined);
+  const groupAnswered = clinicalCase.questions.every((q: any) => answers[q.id] !== undefined || answerResults[q.id] !== undefined);
   // Duplicate group-level controls (pin/hide/edit/report/delete) removed to avoid redundancy with header actions
 
 
@@ -1149,7 +1153,7 @@ function GroupedQrocContainer({ clinicalCase, answers, answerResults, pinnedQues
         {/* Group-level action buttons removed; use global header Admin/Pin/Report */}
         <div className="grid gap-2">
           {clinicalCase.questions.map((q: any) => {
-            const answered = answers[q.id] !== undefined;
+            const answered = answers[q.id] !== undefined || answerResults[q.id] !== undefined;
             const resultVal = answerResults[q.id];
             const userAnswerVal = answers[q.id];
             return (

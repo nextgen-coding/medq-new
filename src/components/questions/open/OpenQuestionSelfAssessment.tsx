@@ -55,6 +55,9 @@ export function OpenQuestionSelfAssessment({ onAssessment, userAnswerText, quest
       } else if (event.key === '3') {
         event.preventDefault();
         handleRatingSelect('wrong');
+      } else if (event.key === 'Enter') {
+        event.preventDefault();
+        handleSkip();
       }
     };
 
@@ -68,6 +71,13 @@ export function OpenQuestionSelfAssessment({ onAssessment, userAnswerText, quest
     setUserRating(rating);
     // Immediately trigger the assessment when a rating is selected
     onAssessment(rating);
+  };
+
+  const handleSkip = () => {
+    // Skip assessment with partial result
+    setAssessmentCompleted(true);
+    setUserRating('partial');
+    onAssessment('partial');
   };
 
   return (
@@ -117,7 +127,7 @@ export function OpenQuestionSelfAssessment({ onAssessment, userAnswerText, quest
           )}
 
           {/* Show evaluation phase in a card wrapper */}
-          {!isCompleted && (correctAnswer && showCorrectAnswer || userAnswerText) && (
+          {!isCompleted && (
             <Card className="mb-4">
               <CardContent className="pt-4">
                 {/* Question Text (Énoncé) Section */}
@@ -151,47 +161,54 @@ export function OpenQuestionSelfAssessment({ onAssessment, userAnswerText, quest
                 )}
 
                 {/* User Answer Evaluation Section */}
-                {userAnswerText && (
-                  <div className="mb-4">
-                    <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
-                      <h5 className="text-sm font-semibold mb-2 uppercase tracking-wide text-blue-700 dark:text-blue-300">
-                        Évaluer votre réponse : {userAnswerText}
-                      </h5>
-                      
-                      {/* Evaluation Buttons inside blue box */}
-                      <div className="mt-4">
-                        <div className="flex flex-col xs:flex-row gap-3 w-full">
-                          <Button
-                            size="lg"
-                            className="flex items-center justify-center gap-2 px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-medium rounded-lg transition-all duration-200 flex-1"
-                            onClick={() => handleRatingSelect('correct')}
-                          >
-                            <CheckCircle className="h-4 w-4" />
-                            Correct!
-                          </Button>
+                <div className="mb-4">
+                  <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
+                    <h5 className="text-sm font-semibold mb-2 uppercase tracking-wide text-blue-700 dark:text-blue-300">
+                      Évaluer votre réponse : {userAnswerText || "Aucune réponse saisie"}
+                    </h5>
+                    
+                    {/* Evaluation Buttons inside blue box */}
+                    <div className="mt-4">
+                      <div className="flex flex-col xs:flex-row gap-3 w-full">
+                        <Button
+                          size="lg"
+                          className="flex items-center justify-center gap-2 px-6 py-3 bg-green-500 hover:bg-green-600 text-white font-medium rounded-lg transition-all duration-200 flex-1"
+                          onClick={() => handleRatingSelect('correct')}
+                        >
+                          <CheckCircle className="h-4 w-4" />
+                          Correct!
+                        </Button>
 
-                          <Button
-                            size="lg" 
-                            className="flex items-center justify-center gap-2 px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-lg transition-all duration-200 flex-1"
-                            onClick={() => handleRatingSelect('partial')}
-                          >
-                            <MinusCircle className="h-4 w-4" />
-                            Partiellement correcte
-                          </Button>
+                        <Button
+                          size="lg" 
+                          className="flex items-center justify-center gap-2 px-6 py-3 bg-orange-500 hover:bg-orange-600 text-white font-medium rounded-lg transition-all duration-200 flex-1"
+                          onClick={() => handleRatingSelect('partial')}
+                        >
+                          <MinusCircle className="h-4 w-4" />
+                          Partiellement correcte
+                        </Button>
 
-                          <Button
-                            size="lg"
-                            className="flex items-center justify-center gap-2 px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-medium rounded-lg transition-all duration-200 flex-1"
-                            onClick={() => handleRatingSelect('wrong')}
-                          >
-                            <XCircle className="h-4 w-4" />
-                            Incorrect
-                          </Button>
-                        </div>
+                        <Button
+                          size="lg"
+                          className="flex items-center justify-center gap-2 px-6 py-3 bg-red-500 hover:bg-red-600 text-white font-medium rounded-lg transition-all duration-200 flex-1"
+                          onClick={() => handleRatingSelect('wrong')}
+                        >
+                          <XCircle className="h-4 w-4" />
+                          Incorrect
+                        </Button>
+
+                        <Button
+                          size="lg"
+                          variant="outline"
+                          className="flex items-center justify-center gap-2 px-6 py-3 border-gray-300 text-gray-700 hover:bg-gray-50 font-medium rounded-lg transition-all duration-200 flex-1"
+                          onClick={handleSkip}
+                        >
+                          Passer
+                        </Button>
                       </div>
                     </div>
                   </div>
-                )}
+                </div>
               </CardContent>
             </Card>
           )}
@@ -214,11 +231,11 @@ export function OpenQuestionSelfAssessment({ onAssessment, userAnswerText, quest
           )}
 
           {/* User Answer Evaluation Section - Only show during evaluation (not after completion) */}
-          {!isCompleted && userAnswerText && (
+          {!isCompleted && (
             <div className="mb-4">
               <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
                 <h5 className="text-sm font-semibold mb-2 uppercase tracking-wide text-blue-700 dark:text-blue-300">
-                  Évaluer votre réponse : {userAnswerText}
+                  Évaluer votre réponse : {userAnswerText || "Aucune réponse saisie"}
                 </h5>
                 
                 {/* Evaluation Buttons inside blue box */}
@@ -249,6 +266,15 @@ export function OpenQuestionSelfAssessment({ onAssessment, userAnswerText, quest
                     >
                       <XCircle className="h-4 w-4" />
                       Incorrect
+                    </Button>
+
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      className="flex items-center justify-center gap-2 px-6 py-3 border-gray-300 text-gray-700 hover:bg-gray-50 font-medium rounded-lg transition-all duration-200 flex-1"
+                      onClick={handleSkip}
+                    >
+                      Passer
                     </Button>
                   </div>
                 </div>
