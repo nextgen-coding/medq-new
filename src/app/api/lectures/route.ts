@@ -112,8 +112,21 @@ async function getHandler(request: AuthenticatedRequest) {
           }
         });
 
-  const totalQuestions = (lecture as any)._count?.questions ?? 0;
-  const commentsCount = (lecture as any)._count?.comments ?? 0;
+        // For non-admins, count only non-hidden questions
+        let totalQuestions: number;
+        if (user.role === 'admin') {
+          totalQuestions = (lecture as any)._count?.questions ?? 0;
+        } else {
+          const visibleQuestionsCount = await prisma.question.count({
+            where: {
+              lectureId: lecture.id,
+              hidden: false
+            }
+          });
+          totalQuestions = visibleQuestionsCount;
+        }
+
+        const commentsCount = (lecture as any)._count?.comments ?? 0;
         const completedQuestions = userProgress.filter(p => p.completed).length;
         const correctAnswers = userProgress.filter(p => p.completed && (p.score || 0) > 0.7).length;
         const partialAnswers = userProgress.filter(p => p.completed && (p.score || 0) > 0.3 && (p.score || 0) <= 0.7).length;
