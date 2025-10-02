@@ -545,44 +545,30 @@ export default function UpgradePage() {
     }
   }
 
-  const getTotalSteps = (): number => {
+  const getActiveSteps = (): typeof steps => {
     if (state.method === 'activation_key') {
-      return 3 // plan, activation_key, confirmation
+      // Activation key flow: plan -> activation_key -> confirmation
+      return steps.filter(s => ['plan', 'activation_key', 'confirmation'].includes(s.key))
     } else if (state.isBuyingKey) {
       if (state.method === 'custom_payment') {
-        return 4 // plan, activation_key, method, confirmation
-      } else if (state.method === 'autre_payment') {
-        return 5 // plan, activation_key, method, details, confirmation
-      } else if (state.method === 'konnect_gateway') {
-        return 5 // plan, activation_key, method, details, confirmation
+        // plan -> activation_key -> method -> confirmation
+        return steps.filter(s => ['plan', 'activation_key', 'method', 'confirmation'].includes(s.key))
+      } else if (state.method === 'autre_payment' || state.method === 'konnect_gateway') {
+        // All 5 steps
+        return steps
       }
     }
-    return 5 // default
+    // Default: show all steps
+    return steps
+  }
+
+  const getTotalSteps = (): number => {
+    return getActiveSteps().length
   }
 
   const getStepIndex = (step: WizardStep): number => {
-    if (state.method === 'activation_key') {
-      // Activation key flow: plan -> activation_key -> confirmation
-      const activationFlow: WizardStep[] = ['plan', 'activation_key', 'confirmation']
-      return activationFlow.indexOf(step)
-    } else if (state.isBuyingKey) {
-      // Buying key flow depends on method
-      if (state.method === 'custom_payment') {
-        // plan -> activation_key -> method -> confirmation
-        const cashFlow: WizardStep[] = ['plan', 'activation_key', 'method', 'confirmation']
-        return cashFlow.indexOf(step)
-      } else if (state.method === 'autre_payment') {
-        // plan -> activation_key -> method -> details -> confirmation
-        const autreFlow: WizardStep[] = ['plan', 'activation_key', 'method', 'details', 'confirmation']
-        return autreFlow.indexOf(step)
-      } else if (state.method === 'konnect_gateway') {
-        // plan -> activation_key -> method -> details -> confirmation
-        const konnectFlow: WizardStep[] = ['plan', 'activation_key', 'method', 'details', 'confirmation']
-        return konnectFlow.indexOf(step)
-      }
-    }
-    // Default flow
-    return ['plan', 'activation_key', 'method', 'details', 'confirmation'].indexOf(step)
+    const activeSteps = getActiveSteps()
+    return activeSteps.findIndex(s => s.key === step)
   }
 
   if (isPricingLoading || !pricing) {
@@ -665,53 +651,78 @@ export default function UpgradePage() {
                 
                 {/* Progress Steps */}
                 <div className="mb-6 sm:mb-8 lg:mb-12">
-                  <div className="flex items-center justify-center sm:justify-between relative px-1 sm:px-0 max-w-2xl mx-auto">
-                    {/* Progress line */}
-                    <div className="absolute top-1/2 left-8 right-8 sm:left-0 sm:right-0 h-1 bg-medblue-200 dark:bg-gray-700 rounded-full -translate-y-1/2 z-0">
-                      <div 
-                        className="h-full bg-gradient-to-r from-medblue-500 to-medblue-600 rounded-full transition-all duration-500 ease-out"
-                        style={{ width: `${(getStepIndex(currentStep) / (getTotalSteps() - 1)) * 100}%` }}
-                      />
-                    </div>
-                    
-                    {steps.map((step, index) => {
-                      const isCompleted = getStepIndex(currentStep) > index
-                      const isCurrent = step.key === currentStep
-                      const Icon = step.icon
-                      
-                      return (
-                        <div key={step.key} className="flex flex-col items-center group relative z-10 flex-1 sm:flex-initial">
-                          <div className={`
-                            relative w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-full border-2 sm:border-3 flex items-center justify-center transition-all duration-300 mb-2 sm:mb-3 bg-white dark:bg-gray-800
-                            ${isCompleted 
-                              ? 'border-medblue-500 bg-medblue-500 text-white shadow-lg' 
-                              : isCurrent 
-                                ? 'border-medblue-500 text-medblue-600 dark:text-medblue-400 shadow-lg ring-2 sm:ring-4 ring-medblue-500/20' 
-                                : 'border-medblue-200 dark:border-gray-600 text-gray-400 dark:text-gray-500'
-                            }
-                          `}>
-                            {isCompleted ? (
-                              <Check className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5" />
-                            ) : (
-                              <Icon className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5" />
+                  <div className="relative max-w-4xl mx-auto px-2 sm:px-4">
+                    {/* Progress line container */}
+                    <div className="relative flex items-start justify-between gap-1 sm:gap-2">
+                      {getActiveSteps().map((step, index) => {
+                        const isCompleted = getStepIndex(currentStep) > index
+                        const isCurrent = step.key === currentStep
+                        const Icon = step.icon
+                        const activeSteps = getActiveSteps()
+                        const isLast = index === activeSteps.length - 1
+                        
+                        return (
+                          <div key={step.key} className="flex items-center flex-1 last:flex-initial">
+                            {/* Step Circle */}
+                            <div className="relative z-10 flex flex-col items-center w-full">
+                              <div className={`
+                                relative w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 lg:w-14 lg:h-14 rounded-full flex items-center justify-center transition-all duration-300 shadow-md mx-auto
+                                ${isCompleted 
+                                  ? 'bg-gradient-to-br from-medblue-500 to-medblue-600 text-white shadow-medblue-500/50' 
+                                  : isCurrent 
+                                    ? 'bg-white dark:bg-gray-800 border-3 sm:border-4 border-medblue-500 text-medblue-600 dark:text-medblue-400 shadow-xl ring-2 sm:ring-4 ring-medblue-500/20 scale-105 sm:scale-110' 
+                                    : 'bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 text-gray-400 dark:text-gray-500'
+                                }
+                              `}>
+                                {isCompleted ? (
+                                  <Check className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 lg:h-7 lg:w-7 stroke-[3] animate-in zoom-in duration-300" />
+                                ) : (
+                                  <Icon className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 lg:h-7 lg:w-7" />
+                                )}
+                                
+                                {/* Pulsing animation for current step */}
+                                {isCurrent && (
+                                  <span className="absolute inset-0 rounded-full bg-medblue-500 animate-ping opacity-20"></span>
+                                )}
+                              </div>
+                              
+                              {/* Step Label */}
+                              <div className="mt-2 sm:mt-3 text-center w-full px-0.5">
+                                <div className={`text-[10px] sm:text-xs md:text-sm font-semibold transition-all duration-300 leading-tight ${
+                                  isCompleted || isCurrent 
+                                    ? 'text-medblue-700 dark:text-medblue-400' 
+                                    : 'text-gray-500 dark:text-gray-400'
+                                }`}>
+                                  <span className="hidden lg:inline">{step.title}</span>
+                                  <span className="lg:hidden break-words">{step.title.length > 12 ? step.title.split(' ')[0] : step.title}</span>
+                                </div>
+                                <div className={`text-[9px] sm:text-[10px] md:text-xs mt-0.5 transition-colors duration-300 hidden xl:block ${
+                                  isCompleted || isCurrent
+                                    ? 'text-medblue-600/70 dark:text-medblue-400/70'
+                                    : 'text-gray-400 dark:text-gray-500'
+                                }`}>
+                                  {step.description}
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {/* Connecting Line */}
+                            {!isLast && (
+                              <div className="flex-1 h-0.5 sm:h-1 mx-1 sm:mx-2 relative self-start mt-4 sm:mt-5 md:mt-6 lg:mt-7 min-w-[8px] sm:min-w-[16px]">
+                                <div className="absolute inset-0 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+                                <div 
+                                  className={`absolute inset-0 rounded-full transition-all duration-500 ease-out ${
+                                    isCompleted 
+                                      ? 'bg-gradient-to-r from-medblue-500 to-medblue-600 w-full shadow-sm' 
+                                      : 'w-0'
+                                  }`}
+                                />
+                              </div>
                             )}
                           </div>
-                          <div className="text-center px-1 min-w-0 w-full">
-                            <div className={`text-xs sm:text-sm font-medium transition-colors leading-tight ${
-                              isCompleted || isCurrent 
-                                ? 'text-medblue-700 dark:text-medblue-400' 
-                                : 'text-gray-500 dark:text-gray-400'
-                            }`}>
-                              <span className="hidden sm:inline whitespace-nowrap">{step.title}</span>
-                              <span className="sm:hidden text-center block truncate">{step.title.split(' ')[0]}</span>
-                            </div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 hidden lg:block">
-                              {step.description}
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })}
+                        )
+                      })}
+                    </div>
                   </div>
                 </div>
 
