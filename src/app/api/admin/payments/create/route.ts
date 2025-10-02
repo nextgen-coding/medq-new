@@ -19,7 +19,8 @@ async function handler(request: AuthenticatedRequest) {
         voucherCode,
         customPaymentDetails,
         proofImageUrl,
-        adminCreated = false
+        adminCreated = false,
+        isBuyingKey = false
       } = body;
 
       // Validate required fields
@@ -33,7 +34,7 @@ async function handler(request: AuthenticatedRequest) {
       // Validate method-specific requirements
       if (method === 'voucher_code' && !voucherCode) {
         return NextResponse.json(
-          { error: 'Code de bon requis' },
+          { error: 'Clé d\'activation requise' },
           { status: 400 }
         );
       }
@@ -79,7 +80,7 @@ async function handler(request: AuthenticatedRequest) {
           });
 
           if (!voucher) {
-            throw new Error('Code de bon invalide ou expiré');
+            throw new Error('Clé d\'activation invalide ou expirée');
           }
 
           // Mark voucher as used
@@ -108,6 +109,7 @@ async function handler(request: AuthenticatedRequest) {
             method,
             status: finalStatus as PaymentStatus,
             subscriptionType,
+            isBuyingKey,
             customPaymentDetails: method === 'custom_payment' ? customPaymentDetails : undefined,
             proofImageUrl: method === 'custom_payment' ? proofImageUrl : undefined,
             voucherCodeId: voucherRecord?.id,

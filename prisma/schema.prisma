@@ -25,6 +25,8 @@ enum PaymentMethod {
   konnect_gateway
   voucher_code
   custom_payment
+  activation_key
+  autre_payment
 }
 
 enum PaymentStatus {
@@ -622,6 +624,8 @@ model Payment {
   method                PaymentMethod
   status                PaymentStatus  @default(pending)
   subscriptionType      SubscriptionType
+  isBuyingKey           Boolean        @default(false) @map("is_buying_key")
+  activationKey         String?        @map("activation_key")
   
   // Konnect gateway fields
   konnectPaymentRef     String?        @map("konnect_payment_ref")

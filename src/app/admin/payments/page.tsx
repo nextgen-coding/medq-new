@@ -24,7 +24,10 @@ import {
   CreditCard,
   Gift,
   Upload,
-  Clock
+  Clock,
+  FileText,
+  Mail,
+  Link
 } from 'lucide-react';
 
 interface Payment {
@@ -32,7 +35,7 @@ interface Payment {
   userId: string;
   amount: number;
   currency: string;
-  method: 'konnect_gateway' | 'voucher_code' | 'custom_payment';
+  method: 'konnect_gateway' | 'voucher_code' | 'custom_payment' | 'activation_key' | 'autre_payment';
   status: 'pending' | 'completed' | 'failed' | 'cancelled' | 'awaiting_verification' | 'verified' | 'rejected';
   subscriptionType: 'semester' | 'annual';
   customPaymentDetails?: string;
@@ -47,6 +50,8 @@ interface Payment {
   voucherCode?: {
     code: string;
   };
+  activationKey?: string;
+  isBuyingKey?: boolean;
 }
 
 const getStatusColor = (status: string) => {
@@ -75,6 +80,10 @@ const getMethodIcon = (method: string) => {
       return <Gift className="h-4 w-4" />;
     case 'custom_payment':
       return <Upload className="h-4 w-4" />;
+    case 'activation_key':
+      return <Gift className="h-4 w-4" />;
+    case 'autre_payment':
+      return <FileText className="h-4 w-4" />;
     default:
       return null;
   }
@@ -85,9 +94,13 @@ const getMethodLabel = (method: string) => {
     case 'konnect_gateway':
       return 'Paiement en ligne';
     case 'voucher_code':
-      return 'Code de bon';
+      return 'Clé d\'activation';
     case 'custom_payment':
       return 'Paiement personnalisé';
+    case 'activation_key':
+      return 'Clé d\'activation';
+    case 'autre_payment':
+      return 'Autre méthode';
     default:
       return method;
   }
@@ -99,6 +112,17 @@ export default function AdminPaymentsPage() {
   const [loading, setLoading] = useState(true);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [isProofDialogOpen, setIsProofDialogOpen] = useState(false);
+  const [isSendLinkDialogOpen, setIsSendLinkDialogOpen] = useState(false);
+  const [isSendKeyDialogOpen, setIsSendKeyDialogOpen] = useState(false);
+  const [paymentLink, setPaymentLink] = useState('');
+  const [activationKey, setActivationKey] = useState('');
+  
+  // Generate activation key
+  const generateActivationKey = (subscriptionType: 'semester' | 'annual') => {
+    const prefix = subscriptionType === 'annual' ? 'MEDQ-Y' : 'MEDQ-S'
+    const randomStr = Math.random().toString(36).substring(2, 8).toUpperCase()
+    return `${prefix}-${randomStr}`
+  }
   
   // Filters
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -137,9 +161,13 @@ export default function AdminPaymentsPage() {
 
       if (!response.ok) throw new Error('Failed to verify payment');
 
+      const data = await response.json();
+
       toast({
         title: 'Succès',
-        description: `Paiement ${action === 'verify' ? 'vérifié' : 'rejeté'} avec succès`,
+        description: action === 'verify' 
+          ? `Paiement vérifié. Une clé d'activation a été générée et envoyée à l'utilisateur par email.`
+          : 'Paiement rejeté avec succès',
         variant: 'default',
       });
 
@@ -151,6 +179,83 @@ export default function AdminPaymentsPage() {
       toast({
         title: 'Erreur',
         description: 'Impossible de traiter la vérification',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleSendPaymentLink = async (paymentId: string) => {
+    if (!paymentLink.trim()) {
+      toast({
+        title: 'Erreur',
+        description: 'Veuillez entrer un lien de paiement',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/admin/payments/${paymentId}/send-link`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paymentLink: paymentLink.trim() }),
+      });
+
+      if (!response.ok) throw new Error('Failed to send payment link');
+
+      toast({
+        title: 'Succès',
+        description: 'Lien de paiement envoyé avec succès',
+        variant: 'default',
+      });
+
+      setIsSendLinkDialogOpen(false);
+      setPaymentLink('');
+      setSelectedPayment(null);
+    } catch (error) {
+      console.error('Error sending payment link:', error);
+      toast({
+        title: 'Erreur',
+        description: 'Impossible d\'envoyer le lien de paiement',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleSendActivationKey = async (paymentId: string) => {
+    if (!activationKey.trim()) {
+      toast({
+        title: 'Erreur',
+        description: 'Veuillez générer une clé d\'activation',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/admin/payments/${paymentId}/send-key`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ activationKey }),
+      });
+
+      if (!response.ok) throw new Error('Failed to send activation key');
+
+      toast({
+        title: 'Succès',
+        description: 'Clé d\'activation générée et envoyée avec succès',
+        variant: 'default',
+      });
+
+      setIsSendKeyDialogOpen(false);
+      setActivationKey('');
+      setSelectedPayment(null);
+      fetchPayments(); // Refresh to update status
+    } catch (error) {
+      console.error('Error sending activation key:', error);
+      toast({
+        title: 'Erreur',
+        description: 'Impossible d\'envoyer la clé d\'activation',
         variant: 'destructive',
       });
     }
@@ -296,7 +401,7 @@ export default function AdminPaymentsPage() {
                       <SelectContent>
                         <SelectItem value="all">Toutes les méthodes</SelectItem>
                         <SelectItem value="konnect_gateway">Paiement en ligne</SelectItem>
-                        <SelectItem value="voucher_code">Code de bon</SelectItem>
+                        <SelectItem value="voucher_code">Clé d'activation</SelectItem>
                         <SelectItem value="custom_payment">Paiement personnalisé</SelectItem>
                       </SelectContent>
                     </Select>
@@ -339,12 +444,19 @@ export default function AdminPaymentsPage() {
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => router.push(`/admin/users/${payment.userId}`)}
-                                  className="p-0.5 h-auto flex-shrink-0 mt-0.5"
+                                  className="p-0.5 h-auto flex-shrink-0 mt-0.5 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                                  title="Voir le profil utilisateur"
                                 >
-                                  <User className="h-3 w-3" />
+                                  <User className="h-3 w-3 text-blue-600 dark:text-blue-400" />
                                 </Button>
                                 <div className="min-w-0 flex-1 overflow-hidden">
-                                  <div className="font-medium text-xs truncate">{payment.user.name}</div>
+                                  <button
+                                    onClick={() => router.push(`/admin/users/${payment.userId}`)}
+                                    className="font-medium text-xs truncate text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 hover:underline cursor-pointer text-left w-full"
+                                    title="Cliquez pour voir le profil"
+                                  >
+                                    {payment.user.name}
+                                  </button>
                                   <div className="text-xs text-gray-500 truncate">{payment.user.email}</div>
                                   <div className="flex flex-wrap gap-0.5 mt-0.5 sm:hidden">
                                     <span className="text-xs px-1 py-0.5 bg-green-100 dark:bg-green-900/30 rounded text-green-600 dark:text-green-400 truncate">
@@ -365,7 +477,7 @@ export default function AdminPaymentsPage() {
                             </TableCell>
                             <TableCell className="hidden md:table-cell p-2 sm:p-4">
                               <Badge variant="outline" className="text-xs truncate">
-                                {payment.subscriptionType === 'annual' ? 'Annuel' : 'Semestriel'}
+                                {payment.isBuyingKey ? 'Clé d\'activation' : (payment.subscriptionType === 'annual' ? 'Annuel' : 'Semestriel')}
                               </Badge>
                             </TableCell>
                             <TableCell className="hidden sm:table-cell text-xs sm:text-sm p-2 sm:p-4">
@@ -384,8 +496,8 @@ export default function AdminPaymentsPage() {
                             </TableCell>
                             <TableCell className="p-1 sm:p-4">
                               <div className="flex flex-col gap-1 w-full">
-                                {/* View proof button for custom payments */}
-                                {payment.method === 'custom_payment' && payment.proofImageUrl && (
+                                {/* View proof button for custom and autre payments */}
+                                {(payment.method === 'custom_payment' || payment.method === 'autre_payment') && payment.proofImageUrl && (
                                   <Button
                                     variant="outline"
                                     size="sm"
@@ -400,8 +512,8 @@ export default function AdminPaymentsPage() {
                                   </Button>
                                 )}
                                 
-                                {/* Verification buttons for pending custom payments only */}
-                                {payment.method === 'custom_payment' && (payment.status === 'awaiting_verification' || payment.status === 'pending') && (
+                                {/* Verification buttons for pending payments */}
+                                {(payment.method === 'custom_payment' || payment.method === 'autre_payment' || payment.method === 'konnect_gateway') && (payment.status === 'awaiting_verification' || payment.status === 'pending') && (
                                   <div className="flex gap-1 w-full">
                                     <Button
                                       variant="outline"
@@ -424,15 +536,38 @@ export default function AdminPaymentsPage() {
                                   </div>
                                 )}
                                 
-                                {/* Status display for completed states */}
+                                {/* Action buttons for key purchases */}
+                                {payment.isBuyingKey && payment.method === 'konnect_gateway' && (payment.status === 'pending' || payment.status === 'awaiting_verification') && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      setSelectedPayment(payment);
+                                      setIsSendLinkDialogOpen(true);
+                                    }}
+                                    className="px-2 py-1 text-xs h-7 w-full"
+                                  >
+                                    <Link className="h-3 w-3 mr-1" />
+                                    Envoyer lien paiement
+                                  </Button>
+                                )}
+                                
+                                {/* Status display for completed states */}                                {/* Status display for completed states */}
                                 {payment.status === 'completed' && (
                                   <div className="text-xs text-green-600 text-center py-2 bg-green-50 dark:bg-green-900/20 rounded">
                                     ✓ Payé
                                   </div>
                                 )}
                                 {payment.status === 'verified' && (
-                                  <div className="text-xs text-green-600 text-center py-2 bg-green-50 dark:bg-green-900/20 rounded">
-                                    ✓ Vérifié
+                                  <div className="flex flex-col gap-1">
+                                    <div className="text-xs text-green-600 text-center py-2 bg-green-50 dark:bg-green-900/20 rounded">
+                                      ✓ Vérifié
+                                    </div>
+                                    {payment.activationKey && (
+                                      <div className="text-xs text-blue-600 text-center py-1 px-2 bg-blue-50 dark:bg-blue-900/20 rounded font-mono">
+                                        Clé: {payment.activationKey}
+                                      </div>
+                                    )}
                                   </div>
                                 )}
                                 {['failed', 'rejected', 'cancelled'].includes(payment.status) && (
@@ -466,7 +601,16 @@ export default function AdminPaymentsPage() {
                     <div className="grid grid-cols-1 xs:grid-cols-2 gap-3 sm:gap-4">
                       <div>
                         <label className="text-sm font-medium">Utilisateur</label>
-                        <p className="text-sm break-words">{selectedPayment.user.name} ({selectedPayment.user.email})</p>
+                        <div className="text-sm break-words">
+                          <Button
+                            variant="link"
+                            onClick={() => router.push(`/admin/users/${selectedPayment.userId}`)}
+                            className="p-0 h-auto font-normal text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                          >
+                            {selectedPayment.user.name}
+                          </Button>
+                          {' '}({selectedPayment.user.email})
+                        </div>
                       </div>
                       <div>
                         <label className="text-sm font-medium">Montant</label>
@@ -487,6 +631,18 @@ export default function AdminPaymentsPage() {
                         <label className="text-sm font-medium">Détails du paiement</label>
                         <p className="mt-1 p-2 bg-gray-50 dark:bg-gray-800 rounded border text-sm text-gray-900 dark:text-gray-100">
                           {selectedPayment.customPaymentDetails}
+                        </p>
+                      </div>
+                    )}
+
+                    {selectedPayment.activationKey && (
+                      <div>
+                        <label className="text-sm font-medium">Clé d'activation générée</label>
+                        <p className="mt-1 p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800 text-sm font-mono text-blue-600 dark:text-blue-400">
+                          {selectedPayment.activationKey}
+                        </p>
+                        <p className="mt-1 text-xs text-gray-500">
+                          Cette clé a été envoyée à l'utilisateur par email
                         </p>
                       </div>
                     )}
@@ -520,6 +676,157 @@ export default function AdminPaymentsPage() {
                       >
                         <X className="h-4 w-4 mr-2" />
                         Rejeter
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </DialogContent>
+            </Dialog>
+
+            {/* Send Payment Link Dialog */}
+            <Dialog open={isSendLinkDialogOpen} onOpenChange={setIsSendLinkDialogOpen}>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="text-lg">Envoyer un lien de paiement</DialogTitle>
+                  <DialogDescription className="text-sm">
+                    Envoyez un lien de paiement privé à l'utilisateur pour compléter sa commande de clé d'activation
+                  </DialogDescription>
+                </DialogHeader>
+                
+                {selectedPayment && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-sm font-medium">Utilisateur</label>
+                      <div className="text-sm break-words">
+                        <Button
+                          variant="link"
+                          onClick={() => router.push(`/admin/users/${selectedPayment.userId}`)}
+                          className="p-0 h-auto font-normal text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                        >
+                          {selectedPayment.user.name}
+                        </Button>
+                        {' '}({selectedPayment.user.email})
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <label htmlFor="paymentLink" className="text-sm font-medium">Lien de paiement</label>
+                      <Input
+                        id="paymentLink"
+                        value={paymentLink}
+                        onChange={(e) => setPaymentLink(e.target.value)}
+                        placeholder="https://..."
+                        className="mt-1"
+                      />
+                    </div>
+
+                    <div className="flex gap-2 pt-4">
+                      <Button
+                        onClick={() => handleSendPaymentLink(selectedPayment.id)}
+                        className="flex-1"
+                        disabled={!paymentLink.trim()}
+                      >
+                        <Mail className="h-4 w-4 mr-2" />
+                        Envoyer
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          setIsSendLinkDialogOpen(false);
+                          setPaymentLink('');
+                          setSelectedPayment(null);
+                        }}
+                        variant="outline"
+                        className="flex-1"
+                      >
+                        Annuler
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </DialogContent>
+            </Dialog>
+
+            {/* Send Activation Key Dialog */}
+            <Dialog open={isSendKeyDialogOpen} onOpenChange={(open) => {
+              setIsSendKeyDialogOpen(open);
+              if (!open) {
+                setActivationKey('');
+                setSelectedPayment(null);
+              } else if (selectedPayment) {
+                // Auto-generate key when dialog opens
+                const generatedKey = generateActivationKey(selectedPayment.subscriptionType);
+                setActivationKey(generatedKey);
+              }
+            }}>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="text-lg">Envoyer une clé d'activation</DialogTitle>
+                  <DialogDescription className="text-sm">
+                    Une clé d'activation sera générée automatiquement pour cet abonnement
+                  </DialogDescription>
+                </DialogHeader>
+                
+                {selectedPayment && (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-sm font-medium">Utilisateur</label>
+                      <div className="text-sm break-words">
+                        <Button
+                          variant="link"
+                          onClick={() => router.push(`/admin/users/${selectedPayment.userId}`)}
+                          className="p-0 h-auto font-normal text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                        >
+                          {selectedPayment.user.name}
+                        </Button>
+                        {' '}({selectedPayment.user.email})
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <label className="text-sm font-medium">Clé d'activation générée</label>
+                      <div className="flex gap-2 mt-1">
+                        <Input
+                          value={activationKey}
+                          readOnly
+                          className="font-mono text-center bg-gray-50"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const newKey = generateActivationKey(selectedPayment.subscriptionType);
+                            setActivationKey(newKey);
+                          }}
+                          title="Régénérer la clé"
+                        >
+                          🔄
+                        </Button>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Cette clé sera envoyée par email et permettra à l'utilisateur d'activer son abonnement
+                      </p>
+                    </div>
+
+                    <div className="flex gap-2 pt-4">
+                      <Button
+                        onClick={() => handleSendActivationKey(selectedPayment.id)}
+                        className="flex-1"
+                        disabled={!activationKey.trim()}
+                      >
+                        <Mail className="h-4 w-4 mr-2" />
+                        Envoyer par email
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          setIsSendKeyDialogOpen(false);
+                          setActivationKey('');
+                          setSelectedPayment(null);
+                        }}
+                        variant="outline"
+                        className="flex-1"
+                      >
+                        Annuler
                       </Button>
                     </div>
                   </div>
