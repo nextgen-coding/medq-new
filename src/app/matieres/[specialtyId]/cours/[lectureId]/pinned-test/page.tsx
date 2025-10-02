@@ -703,7 +703,7 @@ export default function QuestionsEpingleesTestPage() {
                     <OpenQuestion
                       key={currentQuestion.id}
                       question={currentQuestion}
-                      onSubmit={(answer: string, resultValue: boolean | 'partial') => {
+                      onSubmit={(answer: string, resultValue?: boolean | 'partial') => {
                         // Handle the submission
                         if (!questionStartTime) return
                         
