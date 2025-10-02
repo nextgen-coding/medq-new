@@ -406,6 +406,49 @@ async function handler(request: AuthenticatedRequest) {
       })
     }
 
+    // Handle autre payment method (other payment methods)
+    if (method === PaymentMethod.autre_payment) {
+      // For other payment methods when buying key, no requirements - team will contact
+      if (isBuyingKey) {
+        // No validation needed for other payments when buying keys
+      } else {
+        // For regular autre payments, require both details and proof
+        if (!customPaymentDetails) {
+          return NextResponse.json(
+            { error: 'Payment details are required for other payment methods' },
+            { status: 400 }
+          )
+        }
+
+        if (!proofFileUrl) {
+          return NextResponse.json(
+            { error: 'Proof of payment is required for other payment methods' },
+            { status: 400 }
+          )
+        }
+      }
+
+      const payment = await prisma.payment.create({
+        data: {
+          userId: request.user!.userId,
+          amount: finalAmount,
+          method: PaymentMethod.autre_payment,
+          status: 'awaiting_verification',
+          subscriptionType,
+          customPaymentDetails: customPaymentDetails || (isBuyingKey ? 'Other payment method - team will contact' : ''),
+          proofImageUrl: proofFileUrl,
+          isBuyingKey: isBuyingKey || false
+        }
+      })
+
+      return NextResponse.json({
+        success: true,
+        paymentId: payment.id,
+        message: isBuyingKey ? 'Payment request submitted - team will contact you' : 'Payment submitted for verification',
+        requiresProof: !isBuyingKey
+      })
+    }
+
     // Handle Konnect gateway method
     if (method === PaymentMethod.konnect_gateway) {
       // Get user details for Konnect

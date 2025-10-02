@@ -161,9 +161,13 @@ export default function AdminPaymentsPage() {
 
       if (!response.ok) throw new Error('Failed to verify payment');
 
+      const data = await response.json();
+
       toast({
         title: 'Succès',
-        description: `Paiement ${action === 'verify' ? 'vérifié' : 'rejeté'} avec succès`,
+        description: action === 'verify' 
+          ? `Paiement vérifié. Une clé d'activation a été générée et envoyée à l'utilisateur par email.`
+          : 'Paiement rejeté avec succès',
         variant: 'default',
       });
 
@@ -440,12 +444,19 @@ export default function AdminPaymentsPage() {
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => router.push(`/admin/users/${payment.userId}`)}
-                                  className="p-0.5 h-auto flex-shrink-0 mt-0.5"
+                                  className="p-0.5 h-auto flex-shrink-0 mt-0.5 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                                  title="Voir le profil utilisateur"
                                 >
-                                  <User className="h-3 w-3" />
+                                  <User className="h-3 w-3 text-blue-600 dark:text-blue-400" />
                                 </Button>
                                 <div className="min-w-0 flex-1 overflow-hidden">
-                                  <div className="font-medium text-xs truncate">{payment.user.name}</div>
+                                  <button
+                                    onClick={() => router.push(`/admin/users/${payment.userId}`)}
+                                    className="font-medium text-xs truncate text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 hover:underline cursor-pointer text-left w-full"
+                                    title="Cliquez pour voir le profil"
+                                  >
+                                    {payment.user.name}
+                                  </button>
                                   <div className="text-xs text-gray-500 truncate">{payment.user.email}</div>
                                   <div className="flex flex-wrap gap-0.5 mt-0.5 sm:hidden">
                                     <span className="text-xs px-1 py-0.5 bg-green-100 dark:bg-green-900/30 rounded text-green-600 dark:text-green-400 truncate">
@@ -485,8 +496,8 @@ export default function AdminPaymentsPage() {
                             </TableCell>
                             <TableCell className="p-1 sm:p-4">
                               <div className="flex flex-col gap-1 w-full">
-                                {/* View proof button for custom payments */}
-                                {payment.method === 'custom_payment' && payment.proofImageUrl && (
+                                {/* View proof button for custom and autre payments */}
+                                {(payment.method === 'custom_payment' || payment.method === 'autre_payment') && payment.proofImageUrl && (
                                   <Button
                                     variant="outline"
                                     size="sm"
@@ -502,7 +513,7 @@ export default function AdminPaymentsPage() {
                                 )}
                                 
                                 {/* Verification buttons for pending payments */}
-                                {(payment.method === 'custom_payment' || payment.method === 'konnect_gateway') && (payment.status === 'awaiting_verification' || payment.status === 'pending') && (
+                                {(payment.method === 'custom_payment' || payment.method === 'autre_payment' || payment.method === 'konnect_gateway') && (payment.status === 'awaiting_verification' || payment.status === 'pending') && (
                                   <div className="flex gap-1 w-full">
                                     <Button
                                       variant="outline"
@@ -526,62 +537,37 @@ export default function AdminPaymentsPage() {
                                 )}
                                 
                                 {/* Action buttons for key purchases */}
-                                {payment.isBuyingKey && (payment.status === 'pending' || payment.status === 'awaiting_verification') && (
-                                  <div className="flex flex-col gap-1 w-full">
-                                    {payment.method === 'konnect_gateway' && (
-                                      <div className="flex flex-col gap-1">
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          onClick={() => {
-                                            setSelectedPayment(payment);
-                                            setIsSendLinkDialogOpen(true);
-                                          }}
-                                          className="px-2 py-1 text-xs h-7 w-full"
-                                        >
-                                          <Link className="h-3 w-3 mr-1" />
-                                          Envoyer lien paiement
-                                        </Button>
-                                        <Button
-                                          variant="outline"
-                                          size="sm"
-                                          onClick={() => {
-                                            setSelectedPayment(payment);
-                                            setIsSendKeyDialogOpen(true);
-                                          }}
-                                          className="px-2 py-1 text-xs h-7 w-full"
-                                        >
-                                          <Mail className="h-3 w-3 mr-1" />
-                                          Envoyer clé activation
-                                        </Button>
-                                      </div>
-                                    )}
-                                    {(payment.method === 'custom_payment' || payment.method === 'autre_payment') && (
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => {
-                                          setSelectedPayment(payment);
-                                          setIsSendKeyDialogOpen(true);
-                                        }}
-                                        className="px-2 py-1 text-xs h-7 w-full"
-                                      >
-                                        <Mail className="h-3 w-3 mr-1" />
-                                        Envoyer clé activation
-                                      </Button>
-                                    )}
-                                  </div>
+                                {payment.isBuyingKey && payment.method === 'konnect_gateway' && (payment.status === 'pending' || payment.status === 'awaiting_verification') && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      setSelectedPayment(payment);
+                                      setIsSendLinkDialogOpen(true);
+                                    }}
+                                    className="px-2 py-1 text-xs h-7 w-full"
+                                  >
+                                    <Link className="h-3 w-3 mr-1" />
+                                    Envoyer lien paiement
+                                  </Button>
                                 )}
                                 
-                                {/* Status display for completed states */}
+                                {/* Status display for completed states */}                                {/* Status display for completed states */}
                                 {payment.status === 'completed' && (
                                   <div className="text-xs text-green-600 text-center py-2 bg-green-50 dark:bg-green-900/20 rounded">
                                     ✓ Payé
                                   </div>
                                 )}
                                 {payment.status === 'verified' && (
-                                  <div className="text-xs text-green-600 text-center py-2 bg-green-50 dark:bg-green-900/20 rounded">
-                                    ✓ Vérifié
+                                  <div className="flex flex-col gap-1">
+                                    <div className="text-xs text-green-600 text-center py-2 bg-green-50 dark:bg-green-900/20 rounded">
+                                      ✓ Vérifié
+                                    </div>
+                                    {payment.activationKey && (
+                                      <div className="text-xs text-blue-600 text-center py-1 px-2 bg-blue-50 dark:bg-blue-900/20 rounded font-mono">
+                                        Clé: {payment.activationKey}
+                                      </div>
+                                    )}
                                   </div>
                                 )}
                                 {['failed', 'rejected', 'cancelled'].includes(payment.status) && (
@@ -615,7 +601,16 @@ export default function AdminPaymentsPage() {
                     <div className="grid grid-cols-1 xs:grid-cols-2 gap-3 sm:gap-4">
                       <div>
                         <label className="text-sm font-medium">Utilisateur</label>
-                        <p className="text-sm break-words">{selectedPayment.user.name} ({selectedPayment.user.email})</p>
+                        <div className="text-sm break-words">
+                          <Button
+                            variant="link"
+                            onClick={() => router.push(`/admin/users/${selectedPayment.userId}`)}
+                            className="p-0 h-auto font-normal text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                          >
+                            {selectedPayment.user.name}
+                          </Button>
+                          {' '}({selectedPayment.user.email})
+                        </div>
                       </div>
                       <div>
                         <label className="text-sm font-medium">Montant</label>
@@ -636,6 +631,18 @@ export default function AdminPaymentsPage() {
                         <label className="text-sm font-medium">Détails du paiement</label>
                         <p className="mt-1 p-2 bg-gray-50 dark:bg-gray-800 rounded border text-sm text-gray-900 dark:text-gray-100">
                           {selectedPayment.customPaymentDetails}
+                        </p>
+                      </div>
+                    )}
+
+                    {selectedPayment.activationKey && (
+                      <div>
+                        <label className="text-sm font-medium">Clé d'activation générée</label>
+                        <p className="mt-1 p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800 text-sm font-mono text-blue-600 dark:text-blue-400">
+                          {selectedPayment.activationKey}
+                        </p>
+                        <p className="mt-1 text-xs text-gray-500">
+                          Cette clé a été envoyée à l'utilisateur par email
                         </p>
                       </div>
                     )}
@@ -690,7 +697,16 @@ export default function AdminPaymentsPage() {
                   <div className="space-y-4">
                     <div>
                       <label className="text-sm font-medium">Utilisateur</label>
-                      <p className="text-sm break-words">{selectedPayment.user.name} ({selectedPayment.user.email})</p>
+                      <div className="text-sm break-words">
+                        <Button
+                          variant="link"
+                          onClick={() => router.push(`/admin/users/${selectedPayment.userId}`)}
+                          className="p-0 h-auto font-normal text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                        >
+                          {selectedPayment.user.name}
+                        </Button>
+                        {' '}({selectedPayment.user.email})
+                      </div>
                     </div>
                     
                     <div>
@@ -754,7 +770,16 @@ export default function AdminPaymentsPage() {
                   <div className="space-y-4">
                     <div>
                       <label className="text-sm font-medium">Utilisateur</label>
-                      <p className="text-sm break-words">{selectedPayment.user.name} ({selectedPayment.user.email})</p>
+                      <div className="text-sm break-words">
+                        <Button
+                          variant="link"
+                          onClick={() => router.push(`/admin/users/${selectedPayment.userId}`)}
+                          className="p-0 h-auto font-normal text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                        >
+                          {selectedPayment.user.name}
+                        </Button>
+                        {' '}({selectedPayment.user.email})
+                      </div>
                     </div>
                     
                     <div>

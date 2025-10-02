@@ -310,6 +310,24 @@ export default function UpgradePage() {
       return
     }
 
+    if (state.method === 'autre_payment' && !state.isBuyingKey && !state.customPaymentDetails.trim()) {
+      toast({
+        title: 'Erreur',
+        description: 'Veuillez entrer les détails du paiement',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    if (state.method === 'autre_payment' && !state.isBuyingKey && !state.proofFileUrl) {
+      toast({
+        title: 'Erreur',
+        description: 'Veuillez téléverser une preuve de paiement',
+        variant: 'destructive'
+      })
+      return
+    }
+
     setState(prev => ({ ...prev, isLoading: true, status: 'processing' }))
 
     try {
@@ -378,6 +396,9 @@ export default function UpgradePage() {
             } else if (state.method === 'custom_payment') {
               title = '🎉 Paiement enregistré !'
               enhancedDescription = `Votre demande de paiement personnalisé a été enregistrée. ${data.message}`
+            } else if (state.method === 'autre_payment') {
+              title = '🎉 Paiement enregistré !'
+              enhancedDescription = `Votre demande de paiement a été enregistrée. ${data.message}`
             }
           }
           
