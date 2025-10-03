@@ -30,21 +30,64 @@ type ImportSession = {
   cancelled?: boolean;
 };
 
-const activeImports = new Map<string, ImportSession>();
-
-// Periodic cleanup (keep sessions for 30 minutes after completion)
+// Database-backed session management (fixes serverless "Import not found" errors)
 const SESSION_TTL_MS = 30 * 60 * 1000;
+
+// Helper functions for database-backed sessions
+async function createSession(importId: string, userId: string, initialSession: Omit<ImportSession, 'lastUpdated' | 'createdAt'>) {
+  await prisma.bulkImportSession.create({
+    data: {
+      id: importId,
+      userId,
+      progress: initialSession.progress,
+      phase: initialSession.phase,
+      message: initialSession.message,
+      logs: initialSession.logs,
+      stats: initialSession.stats || {},
+      cancelled: initialSession.cancelled || false,
+    },
+  });
+}
+
+async function getSession(importId: string): Promise<ImportSession | null> {
+  const session = await prisma.bulkImportSession.findUnique({ where: { id: importId } });
+  if (!session) return null;
+  return {
+    progress: session.progress,
+    phase: session.phase as Phase,
+    message: session.message,
+    logs: (session.logs as string[]) || [],
+    stats: session.stats as ImportStats | undefined,
+    lastUpdated: session.lastUpdated.getTime(),
+    createdAt: session.createdAt.getTime(),
+    cancelled: session.cancelled,
+  };
+}
+
+async function updateSession(importId: string, updates: Partial<ImportSession>) {
+  const data: any = { lastUpdated: new Date() };
+  if (updates.progress !== undefined) data.progress = updates.progress;
+  if (updates.phase !== undefined) data.phase = updates.phase;
+  if (updates.message !== undefined) data.message = updates.message;
+  if (updates.logs !== undefined) data.logs = updates.logs;
+  if (updates.stats !== undefined) data.stats = updates.stats;
+  if (updates.cancelled !== undefined) data.cancelled = updates.cancelled;
+  await prisma.bulkImportSession.update({ where: { id: importId }, data });
+}
+
+async function deleteSession(importId: string) {
+  await prisma.bulkImportSession.delete({ where: { id: importId } }).catch(() => {});
+}
+
+// Periodic cleanup (delete sessions older than 30 minutes)
 const CLEAN_INTERVAL_MS = 5 * 60 * 1000;
 if (!(global as any).__bulkImportCleanerStarted) {
   (global as any).__bulkImportCleanerStarted = true;
-  setInterval(() => {
-    const now = Date.now();
-    for (const [id, sess] of activeImports.entries()) {
-      const isComplete = sess.phase === 'complete' || sess.cancelled;
-      if (isComplete && now - sess.lastUpdated > SESSION_TTL_MS) {
-        activeImports.delete(id);
-      }
-    }
+  setInterval(async () => {
+    const cutoff = new Date(Date.now() - SESSION_TTL_MS);
+    await prisma.bulkImportSession.deleteMany({
+      where: { lastUpdated: { lt: cutoff } },
+    }).catch(console.error);
   }, CLEAN_INTERVAL_MS).unref?.();
 }
 
@@ -200,16 +243,14 @@ function buildCombinedExplanation(rowData: Record<string, string>): string | und
 }
 
 // Function to update progress for an import session
-function updateProgress(importId: string, progress: number, message: string, log?: string, phase?: Phase) {
-  const current = activeImports.get(importId);
+async function updateProgress(importId: string, progress: number, message: string, log?: string, phase?: Phase) {
+  const current = await getSession(importId);
   if (!current) return; // session might have been cleaned/cancelled
-  activeImports.set(importId, {
-    ...current,
+  await updateSession(importId, {
     progress,
     message,
     phase: phase ?? current.phase,
     logs: log ? [...current.logs, log] : current.logs,
-    lastUpdated: Date.now()
   });
 }
 
@@ -229,7 +270,7 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
 
 async function processFile(file: File, importId: string) {
   try {
-  updateProgress(importId, 5, 'Reading Excel file...', undefined, 'validating');
+  await updateProgress(importId, 5, 'Reading Excel file...', undefined, 'validating');
     
     const buffer = await file.arrayBuffer();
     const workbook = read(buffer);
@@ -355,21 +396,21 @@ async function processFile(file: File, importId: string) {
     }
     
     for (const sheetName of sheets) {
-      const session = activeImports.get(importId);
+      const session = await getSession(importId);
       if (!session || session.cancelled) break; // cancellation check
       const actualName = canonicalToActual.get(sheetName);
       if (!actualName || !workbook.Sheets[actualName]) {
-        updateProgress(importId, 10, `Sheet '${sheetName}' not found, skipping...`);
+        await updateProgress(importId, 10, `Sheet '${sheetName}' not found, skipping...`);
         continue;
       }
 
-      updateProgress(importId, 15, `Processing sheet: ${sheetName}...`, undefined, 'importing');
+      await updateProgress(importId, 15, `Processing sheet: ${sheetName}...`, undefined, 'importing');
       
   const sheet = workbook.Sheets[actualName];
   const jsonData = utils.sheet_to_json(sheet, { header: 1 });
       
       if (jsonData.length < 2) {
-        updateProgress(importId, 20, `Sheet '${sheetName}' is empty, skipping...`);
+        await updateProgress(importId, 20, `Sheet '${sheetName}' is empty, skipping...`);
         continue;
       }
 
@@ -382,7 +423,7 @@ async function processFile(file: File, importId: string) {
   const dataRows = rawRows.filter((row) => Array.isArray(row) && (row as unknown[]).some(cell => String(cell ?? '').trim() !== ''));
     importStats.total += dataRows.length;
 
-  updateProgress(importId, 25, `Found ${dataRows.length} rows in ${sheetName}...`);
+  await updateProgress(importId, 25, `Found ${dataRows.length} rows in ${sheetName}...`);
 
   // Track last seen specialty and course to forward-fill missing cells
   let lastSpecialtyName: string = '';
@@ -390,11 +431,11 @@ async function processFile(file: File, importId: string) {
 
   // Process each row
       for (let i = 0; i < dataRows.length; i++) {
-        const sessionLoop = activeImports.get(importId);
+        const sessionLoop = await getSession(importId);
         if (!sessionLoop || sessionLoop.cancelled) break; // cancellation check
         const row = dataRows[i];
   const progress = 25 + (i / dataRows.length) * 60;
-        updateProgress(importId, progress, `Processing row ${i + 1} in ${sheetName}...`);
+        await updateProgress(importId, progress, `Processing row ${i + 1} in ${sheetName}...`);
 
         try {
           // Build rowData with canonical headers
@@ -502,7 +543,7 @@ async function processFile(file: File, importId: string) {
           let hostedType: string | null = null;
           if (hasInlineImage) {
             inlineImageCount++;
-            updateProgress(importId, progress, `Found inline image link in text`, `🖼️ Inline image URL detected in question text`);
+            await updateProgress(importId, progress, `Found inline image link in text`, `🖼️ Inline image URL detected in question text`);
           }
 
           // Prepare question data based on sheet type
@@ -550,7 +591,7 @@ async function processFile(file: File, importId: string) {
               hostedUrl = questionData.mediaUrl; // keep for stats increment below
               hostedType = questionData.mediaType || null;
               importStats.questionsWithImages++;
-              updateProgress(importId, progress, 'Attached image column to question', `🖼️ Image column used: ${rawImg.substring(0,80)}`);
+              await updateProgress(importId, progress, 'Attached image column to question', `🖼️ Image column used: ${rawImg.substring(0,80)}`);
             }
           }
 
@@ -671,12 +712,12 @@ async function processFile(file: File, importId: string) {
               caseQuestionNumber: questionData.caseQuestionNumber ?? null
             }
           });
-          updateProgress(importId, progress, `Validated row ${i + 1}`, `✅ Valid row: ${questionText.substring(0, 50)}...`);
+          await updateProgress(importId, progress, `Validated row ${i + 1}`, `✅ Valid row: ${questionText.substring(0, 50)}...`);
 
         } catch (error) {
           importStats.failed++;
           const errorMsg = `Row ${i + 1} in ${sheetName}: ${(error as Error).message}`;
-          updateProgress(importId, progress, `Error in row ${i + 1}`, `❌ ${errorMsg}`);
+          await updateProgress(importId, progress, `Error in row ${i + 1}`, `❌ ${errorMsg}`);
           importStats.errors.push(errorMsg);
           console.error(`Error processing row ${i + 1} in ${sheetName}:`, error);
         }
@@ -690,16 +731,16 @@ async function processFile(file: File, importId: string) {
 
     // Early exit if any row-level validation errors
     if (importStats.errors.length > 0) {
-      updateProgress(importId, 60, 'Validation failed. No data was imported.', `❌ Validation failed with ${importStats.errors.length} error(s). Aborting import.`, 'complete');
-      const sess = activeImports.get(importId);
+      await updateProgress(importId, 60, 'Validation failed. No data was imported.', `❌ Validation failed with ${importStats.errors.length} error(s). Aborting import.`, 'complete');
+      const sess = await getSession(importId);
       if (sess) {
-        activeImports.set(importId, { ...sess, stats: { ...importStats }, progress: 100, phase: 'complete', message: 'Validation failed' });
+        await updateSession(importId, { stats: { ...importStats }, progress: 100, phase: 'complete', message: 'Validation failed' });
       }
       return;
     }
 
     // File-level duplicate detection (within uploaded file)
-    updateProgress(importId, 62, 'Checking duplicates within the file...');
+    await updateProgress(importId, 62, 'Checking duplicates within the file...');
     const fileDupKey = (p: PlannedQuestion) => {
       const ca = (p.questionData.correctAnswers || []).join('|');
       return [p.specialtyName, p.lectureTitle, p.questionData.type, p.questionData.text.trim(), ca, p.questionData.number ?? '', p.questionData.session ?? '', p.questionData.courseReminder ?? ''].join('||');
@@ -715,16 +756,16 @@ async function processFile(file: File, importId: string) {
     });
 
     if (importStats.errors!.length > 0) {
-      updateProgress(importId, 65, 'Duplicate check failed in file', `❌ Found ${importStats.errors.length} duplicate(s) in file`, 'complete');
-      const sess = activeImports.get(importId);
+      await updateProgress(importId, 65, 'Duplicate check failed in file', `❌ Found ${importStats.errors.length} duplicate(s) in file`, 'complete');
+      const sess = await getSession(importId);
       if (sess) {
-        activeImports.set(importId, { ...sess, stats: { ...importStats, failed: importStats.errors.length }, progress: 100, phase: 'complete', message: 'Duplicate check failed' });
+        await updateSession(importId, { stats: { ...importStats, failed: importStats.errors.length }, progress: 100, phase: 'complete', message: 'Duplicate check failed' });
       }
       return;
     }
 
   // DB duplicate detection for existing lectures
-  updateProgress(importId, 70, 'Checking duplicates in database...');
+  await updateProgress(importId, 70, 'Checking duplicates in database...');
   // 1) Resolve existing specialties/lectures
     const specialtyList = Array.from(specialtyNamesSet);
     const titlesBySpec: Record<string, string[]> = {};
@@ -789,16 +830,16 @@ async function processFile(file: File, importId: string) {
     }
 
     if (importStats.errors!.length > 0) {
-      updateProgress(importId, 75, 'Duplicate check failed against database', `❌ Found ${importStats.errors.length} duplicate(s)`, 'complete');
-      const sess = activeImports.get(importId);
+      await updateProgress(importId, 75, 'Duplicate check failed against database', `❌ Found ${importStats.errors.length} duplicate(s)`, 'complete');
+      const sess = await getSession(importId);
       if (sess) {
-        activeImports.set(importId, { ...sess, stats: { ...importStats, failed: importStats.errors.length }, progress: 100, phase: 'complete', message: 'Duplicate check failed' });
+        await updateSession(importId, { stats: { ...importStats, failed: importStats.errors.length }, progress: 100, phase: 'complete', message: 'Duplicate check failed' });
       }
       return;
     }
 
     // If not all-or-nothing, we could fall back to row-wise inserts, but default is all-or-nothing
-    updateProgress(importId, 80, ALL_OR_NOTHING ? 'Starting transactional import...' : 'Starting import...');
+    await updateProgress(importId, 80, ALL_OR_NOTHING ? 'Starting transactional import...' : 'Starting import...');
 
     // Transactional import: create missing entities and then all questions
     let createdSpecCount = 0;
@@ -912,7 +953,7 @@ async function processFile(file: File, importId: string) {
           processed += rows.length;
           const base = 80;
           const pct = base + Math.floor((processed / total) * 19);
-          updateProgress(importId, pct, `Imported ${processed}/${total}...`);
+          await updateProgress(importId, pct, `Imported ${processed}/${total}...`);
           continue;
         }
         for (const chunk of chunkArray(rows, CREATE_MANY_CHUNK)) {
@@ -920,7 +961,7 @@ async function processFile(file: File, importId: string) {
           processed += chunk.length;
           const base = 80;
           const pct = base + Math.floor((processed / total) * 19);
-          updateProgress(importId, pct, `Imported ${processed}/${total}...`);
+          await updateProgress(importId, pct, `Imported ${processed}/${total}...`);
         }
       }
     }, { maxWait: TX_MAX_WAIT, timeout: TX_TIMEOUT });
@@ -933,22 +974,20 @@ async function processFile(file: File, importId: string) {
     importStats.createdCases = plannedCases.size;
     importStats.questionsWithImages = inlineImageCount;
 
-    const finalSession = activeImports.get(importId);
+    const finalSession = await getSession(importId);
     if (finalSession && !finalSession.cancelled) {
-      activeImports.set(importId, {
-        ...finalSession,
+      await updateSession(importId, {
         progress: 100,
         phase: 'complete',
         stats: importStats,
         message: 'Import completed',
-        lastUpdated: Date.now()
       });
     }
-    updateProgress(importId, 100, 'Import completed!', `🎉 Import completed! Total: ${importStats.total}, Imported: ${importStats.imported}, Failed: ${importStats.failed}, Created: ${importStats.createdSpecialties} specialties, ${importStats.createdLectures} lectures, ${importStats.createdCases} cases, ${importStats.questionsWithImages} questions with images`, 'complete');
+    await updateProgress(importId, 100, 'Import completed!', `🎉 Import completed! Total: ${importStats.total}, Imported: ${importStats.imported}, Failed: ${importStats.failed}, Created: ${importStats.createdSpecialties} specialties, ${importStats.createdLectures} lectures, ${importStats.createdCases} cases, ${importStats.questionsWithImages} questions with images`, 'complete');
 
   } catch (error) {
     console.error('File processing error:', error);
-    updateProgress(importId, 0, 'Import failed', `❌ Import failed: ${(error as Error).message}`);
+    await updateProgress(importId, 0, 'Import failed', `❌ Import failed: ${(error as Error).message}`);
   }
 }
 
@@ -968,9 +1007,8 @@ async function postHandler(request: AuthenticatedRequest) {
     const importId = `import_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     console.log('Creating import session with ID:', importId);
     
-    // Initialize import session
-    const now = Date.now();
-    const initialSession: ImportSession = {
+    // Initialize import session in database (fixes serverless "Import not found" error)
+    await createSession(importId, request.user!.userId, {
       progress: 0,
       phase: 'validating',
       message: 'Starting import...',
@@ -985,14 +1023,11 @@ async function postHandler(request: AuthenticatedRequest) {
         createdCases: 0,
         errors: []
       },
-      lastUpdated: now,
-      createdAt: now
-    };
-    
-    activeImports.set(importId, initialSession);
+    });
 
-    console.log('Import session created. Total active imports:', activeImports.size);
-    console.log('Session data:', activeImports.get(importId));
+    console.log('Import session created in database');
+    const session = await getSession(importId);
+    console.log('Session data:', session);
 
     // Process file in background
     console.log('Starting file processing in background');
@@ -1016,20 +1051,17 @@ async function getHandler(request: AuthenticatedRequest) {
     const importId = searchParams.get('importId');
 
     console.log('GET request for importId:', importId);
-    console.log('Total active imports:', activeImports.size);
-    console.log('Available import IDs:', Array.from(activeImports.keys()));
 
     if (!importId) {
       console.log('No importId provided');
       return NextResponse.json({ error: 'Import ID required' }, { status: 400 });
     }
 
-    const importData = activeImports.get(importId);
+    const importData = await getSession(importId);
     console.log('Import data found:', importData ? 'Yes' : 'No');
     
     if (!importData) {
       console.log('Import session not found for ID:', importId);
-      console.log('Current active imports:', Array.from(activeImports.entries()));
       return NextResponse.json({ error: 'Import not found' }, { status: 404 });
     }
 
@@ -1053,8 +1085,8 @@ async function getHandler(request: AuthenticatedRequest) {
           sendEvent(importData);
 
           // Set up polling to send updates
-          const interval = setInterval(() => {
-            const currentData = activeImports.get(importId);
+          const interval = setInterval(async () => {
+            const currentData = await getSession(importId);
             if (currentData) {
               sendEvent(currentData);
               
@@ -1102,9 +1134,9 @@ async function deleteHandler(request: AuthenticatedRequest) {
   const { searchParams } = new URL(request.url);
   const importId = searchParams.get('importId');
   if (!importId) return NextResponse.json({ error: 'Import ID required' }, { status: 400 });
-  const session = activeImports.get(importId);
+  const session = await getSession(importId);
   if (!session) return NextResponse.json({ error: 'Import not found' }, { status: 404 });
-  activeImports.set(importId, { ...session, cancelled: true, message: 'Cancelled by user', phase: 'complete', lastUpdated: Date.now() });
+  await updateSession(importId, { cancelled: true, message: 'Cancelled by user', phase: 'complete' });
   return NextResponse.json({ ok: true });
 }
 
