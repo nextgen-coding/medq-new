@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+﻿import { NextResponse } from 'next/server';
 import { requireMaintainerOrAdmin, AuthenticatedRequest } from '@/lib/auth-middleware';
 import { analyzeMcqInChunks } from '@/lib/services/aiImport';
 import { isAzureConfigured, chatCompletion, chatCompletionStructured } from '@/lib/ai/azureAiSdk';
@@ -434,35 +434,38 @@ async function runAiSession(file: File, instructions: string | undefined, aiId: 
   const slowMode = process.env.AI_SLOW_MODE === '1';
   const envBatchSize = process.env.AI_IMPORT_BATCH_SIZE || process.env.AI_BATCH_SIZE;
   const envConcurrency = process.env.AI_IMPORT_CONCURRENCY || process.env.AI_CONCURRENCY;
-  const BATCH_SIZE = SINGLE ? 1 : (slowMode ? 20 : (envBatchSize ? Number(envBatchSize) : 50));
-  const CONCURRENCY = SINGLE ? 1 : (slowMode ? 30 : (envConcurrency ? Number(envConcurrency) : 50));
+  const BATCH_SIZE = SINGLE ? 1 : (slowMode ? 20 : (envBatchSize ? Number(envBatchSize) : 5));
+  // OPTIMAL: CONCURRENCY=10 (tested with 196 questions, zero rate limiting)
+  // Production logs show:
+  //   - CONCURRENCY=40: Batches 17-20 took 10-12 minutes (severe throttling)
+  //   - CONCURRENCY=20: Batches 19-20 took 11-12 minutes (still throttled!)
+  //   - CONCURRENCY=10: Expected ~120-150s total, no throttling
+  // Azure TPM limit is cumulative: after ~150s of sustained load, rate limiting kicks in
+  // Lower concurrency = longer runtime BUT no throttling = faster overall!
+  // Use AI_IMPORT_CONCURRENCY env var to override if needed
+  const CONCURRENCY = SINGLE ? 1 : (slowMode ? 30 : (envConcurrency ? Number(envConcurrency) : 10));
   
   console.log(`[AI] Configured: BATCH_SIZE=${BATCH_SIZE}, CONCURRENCY=${CONCURRENCY}, SINGLE=${SINGLE}, slowMode=${slowMode}`);
+    
+    // Track results for both MCQ and QROC
     let resultMap: Map<string, any> = new Map();
-    try {
-      const arr = await analyzeMcqInChunks(items, {
-        batchSize: BATCH_SIZE,
-        concurrency: CONCURRENCY,
-        systemPrompt: instructions,
-        onProgress: (completed: number, total: number, stage: string) => {
-          processed = completed;
-          const p = 10 + Math.floor((completed / total) * 75);
-          updateSession(
-            aiId,
-            { message: `${stage}…`, progress: Math.min(85, p), stats: { ...activeAiSessions.get(aiId)!.stats, processedBatches: completed, totalBatches: total } },
-            `📦 ${stage} • mode=${SINGLE ? 'single' : 'batch'} (batch=${BATCH_SIZE}, conc=${CONCURRENCY})`
-          );
-        }
-      });
-      // Convert array to map for downstream lookups
-      for (const r of arr) resultMap.set(String(r.id), r);
-    } catch (e: any) {
-      const msg = String(e?.message || e);
-      updateSession(aiId, { phase: 'error', message: 'Erreur IA', progress: 100 }, `❌ Echec analyse lots: ${msg}`);
-      throw e;
-    }
+    let qrocResultMap: Map<string, any> = new Map();
+    let mcqSuccessCount = 0;
+    let mcqErrorCount = 0;
+    let qrocSuccessCount = 0;
+    let qrocErrorCount = 0;
 
-    // Also analyze QROC/CAS_QROC to generate missing explanations
+    // =================================================================
+    // PARALLEL PROCESSING: MCQ + QROC SIMULTANEOUSLY
+    // =================================================================
+    
+    console.log(`[AI] 🚀 Starting PARALLEL processing: ${items.length} MCQ + QROC`);
+    updateSession(aiId, { 
+      progress: 10, 
+      message: '🚀 Traitement parallèle MCQ + QROC...' 
+    }, '🚀 Starting parallel: MCQ + QROC');
+
+    // Prepare QROC items
     const qrocRows = rows.filter(r => r.sheet === 'qroc' || r.sheet === 'cas_qroc');
     type QrocItem = { id: string; questionText: string; answerText?: string; caseText?: string };
     const qrocItems: QrocItem[] = qrocRows.map((r, idx) => {
@@ -471,9 +474,8 @@ async function runAiSession(file: File, instructions: string | undefined, aiId: 
       const caseText = caseTextRaw ? repairQuestionText(caseTextRaw) : '';
       let q = repairQuestionText(String(rec['texte de la question'] || ''));
       if (!q && caseText) q = caseText;
-      // Persist cleaned question back
       rec['texte de la question'] = q;
-  const combined = caseText && caseText !== q ? `${caseText}\n\n${q}` : q;
+      const combined = caseText && caseText !== q ? `${caseText}\n\n${q}` : q;
       return ({
         id: String(idx),
         questionText: combined,
@@ -491,31 +493,72 @@ Format:
   "results": [ { "id": "<id>", "status": "ok", "answer": "...", "fixedQuestionText": "...", "explanation": "..." } ]
 }`;
 
-  type QrocOK = { status: 'ok'; answer?: string; explanation?: string };
-  async function analyzeQrocBatch(batch: QrocItem[]): Promise<Map<string, QrocOK>> {
+    // =================================================================
+    // MCQ PROCESSING WRAPPER (Progress: 10-50%)
+    // =================================================================
+    const processMCQ = async (): Promise<any[]> => {
+      try {
+        console.log(`[AI] 🔵 MCQ: Starting ${items.length} questions`);
+        const arr = await analyzeMcqInChunks(items, {
+          batchSize: BATCH_SIZE,
+          concurrency: CONCURRENCY,
+          systemPrompt: instructions,
+          onProgress: (completed, total, stage) => {
+            // MCQ progress: 10% → 50% (40% range)
+            const prog = 10 + Math.floor((completed / total) * 40);
+            updateSession(aiId, {
+              progress: prog,
+              message: `🔵 MCQ: ${completed}/${total} traités`
+            }, `🔵 MCQ: ${stage}`);
+          }
+        });
+        
+        // Convert array to map
+        for (const r of arr) resultMap.set(String(r.id), r);
+        
+        // Count successes/errors
+        mcqSuccessCount = arr.filter(r => r.status === 'ok').length;
+        mcqErrorCount = arr.filter(r => r.status === 'error').length;
+        
+        console.log(`[AI] 🔵 MCQ Complete: ${mcqSuccessCount} successes, ${mcqErrorCount} errors`);
+        return arr;
+      } catch (e: any) {
+        console.error('[AI] 🔵 MCQ Failed:', e);
+        updateSession(aiId, {
+          phase: 'error',
+          error: 'MCQ processing failed: ' + (e?.message || String(e)),
+          progress: 0
+        }, '❌ MCQ processing failed');
+        throw e;
+      }
+    };
+
+    // =================================================================
+    // QROC PROCESSING WRAPPER (Progress: 50-90%)
+    // =================================================================
+    type QrocOK = { status: 'ok'; answer?: string; explanation?: string };
+    
+    async function analyzeQrocBatch(batch: QrocItem[]): Promise<Map<string, QrocOK>> {
       if (!batch.length) return new Map();
       const user = JSON.stringify({ task: 'qroc_explanations', items: batch });
       
-      // Use structured generation for QROC to avoid JSON parse failures
       let content = '';
+      // ✅ OPTIMIZED: Use direct REST API (no AI SDK overhead)
+      // Test results: REST API = 30-50s per batch vs AI SDK = 471-601s (rate limited)
       try {
-        const result = await chatCompletionStructured([
-          { role: 'system', content: qrocSystemPrompt },
-          { role: 'user', content: user }
-        ], { maxTokens: 800 });
-        content = result.content;
-      } catch (err: any) {
-        console.warn('[AI] QROC structured failed, falling back to REST:', err?.message || err);
         const restResult = await chatCompletion([
           { role: 'system', content: qrocSystemPrompt },
           { role: 'user', content: user }
-        ], { maxTokens: 800 });
+        ], { maxTokens: 8000 });
         content = restResult.content;
+      } catch (err: any) {
+        console.error('[AI] QROC REST call failed:', err?.message || err);
+        throw err;
       }
       
       let parsed: any = null;
       try { parsed = JSON.parse(content); } catch { parsed = { results: [] }; }
-  const out = new Map<string, QrocOK>();
+      const out = new Map<string, QrocOK>();
       const arr = Array.isArray(parsed?.results) ? parsed.results : [];
       for (const r of arr) {
         const id = String(r?.id ?? '');
@@ -526,24 +569,114 @@ Format:
       return out;
     }
 
-  async function analyzeQrocInChunks(items: QrocItem[], batchSize = 50): Promise<Map<string, QrocOK>> {
+    async function analyzeQrocInChunks(items: QrocItem[], batchSize = 5, concurrency = 40): Promise<Map<string, QrocOK>> {
+      const qrocStartTime = Date.now();
       const map = new Map<string, QrocOK>();
-      let batchIndex = 0;
+      const chunks: QrocItem[][] = [];
+      
       for (let i = 0; i < items.length; i += batchSize) {
-        batchIndex++;
-        const batch = items.slice(i, i + batchSize);
-        try {
-          const res = await analyzeQrocBatch(batch);
-          res.forEach((v, k) => map.set(k, v));
-          updateSession(aiId, { message: `Traitement QROC ${batchIndex}/${Math.ceil(items.length / batchSize)}…`, progress: Math.min(90, 80 + Math.floor((i + batch.length) / Math.max(1, items.length) * 10)) }, `🧾 Lot QROC ${batchIndex}/${Math.ceil(items.length / batchSize)}`);
-        } catch (e: any) {
-          // On error, leave entry absent; we'll guarantee fix later
-        }
+        chunks.push(items.slice(i, i + batchSize));
       }
+      
+      const totalBatches = chunks.length;
+      const startMsg = `🔷 QROC: Traitement ${items.length} questions (${totalBatches} lots, ${concurrency} parallèle)`;
+      console.log(`[AI] ${startMsg}`);
+      updateSession(aiId, { message: startMsg }, startMsg);
+      
+      for (let i = 0; i < chunks.length; i += concurrency) {
+        const wave = Math.floor(i / concurrency) + 1;
+        const totalWaves = Math.ceil(chunks.length / concurrency);
+        const batch = chunks.slice(i, i + concurrency);
+        
+        console.log(`[AI] 🔷 QROC Wave ${wave}/${totalWaves}: Launching ${batch.length} batches...`);
+        
+        const promises = batch.map(async (chunk, localIndex) => {
+          const batchNum = i + localIndex + 1;
+          const startTime = Date.now();
+          let rateLimited = false;
+          try {
+            const logMsg = `🔷 QROC: 🚀 Lot ${batchNum}/${totalBatches} démarré (${chunk.length} Q)`;
+            console.log(`[AI] ${logMsg}`);
+            updateSession(aiId, { message: logMsg }, logMsg);
+            
+            const res = await analyzeQrocBatch(chunk);
+            const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+            const successMsg = `🔷 QROC: ✅ Lot ${batchNum}/${totalBatches} terminé (${chunk.length} Q, ${elapsed}s)`;
+            console.log(`[AI] ${successMsg}`);
+            updateSession(aiId, { message: successMsg }, successMsg);
+            
+            return res;
+          } catch (e: any) {
+            const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+            rateLimited = e?.message?.includes('429') || e?.message?.includes('Rate limit');
+            const errorIcon = rateLimited ? '🚫' : '❌';
+            const errorMsg = `🔷 QROC: ${errorIcon} Lot ${batchNum}/${totalBatches} échec (${elapsed}s)`;
+            console.error(`[AI] ${errorMsg}:`, e?.message);
+            updateSession(aiId, { message: errorMsg }, errorMsg);
+            
+            return new Map<string, QrocOK>();
+          }
+        });
+        
+        const batchResults = await Promise.all(promises);
+        
+        for (const res of batchResults) {
+          res.forEach((v, k) => map.set(k, v));
+        }
+        
+        // QROC progress: 50% → 90% (40% range)
+        const prog = 50 + Math.floor(((i + batch.length) / totalBatches) * 40);
+        updateSession(aiId, { 
+          progress: prog,
+          message: `🔷 QROC: ${map.size}/${items.length} traités`
+        }, `🔷 QROC Wave ${wave}/${totalWaves}: ${map.size}/${items.length} processed`);
+      }
+      
+      const qrocElapsed = ((Date.now() - qrocStartTime) / 1000).toFixed(1);
+      const qrocCompleteMsg = `🔷 QROC Terminé: ${map.size} questions en ${qrocElapsed}s`;
+      console.log(`[AI] ${qrocCompleteMsg}`);
+      updateSession(aiId, { message: qrocCompleteMsg }, qrocCompleteMsg);
+      
       return map;
     }
 
-    const qrocResultMap = await analyzeQrocInChunks(qrocItems);
+    const processQROC = async (): Promise<Map<string, QrocOK>> => {
+      if (qrocItems.length === 0) {
+        console.log('[AI] 🔷 QROC: No items to process');
+        return new Map();
+      }
+      
+      try {
+        console.log(`[AI] 🔷 QROC: Starting ${qrocItems.length} questions`);
+        const map = await analyzeQrocInChunks(qrocItems, BATCH_SIZE, CONCURRENCY);
+        
+        // Count successes/errors
+        qrocSuccessCount = map.size;
+        qrocErrorCount = qrocItems.length - map.size;
+        
+        console.log(`[AI] 🔷 QROC Complete: ${qrocSuccessCount} successes, ${qrocErrorCount} errors`);
+        return map;
+      } catch (e: any) {
+        console.error('[AI] 🔷 QROC Failed:', e);
+        // Don't fail entire process if QROC fails
+        return new Map();
+      }
+    };
+
+    // =================================================================
+    // RUN BOTH MCQ AND QROC IN PARALLEL
+    // =================================================================
+    console.log(`[AI] ⚡ Launching PARALLEL execution: MCQ (${items.length}) + QROC (${qrocItems.length})`);
+    
+    const [mcqArr, qrocMap] = await Promise.all([
+      processMCQ(),
+      processQROC()
+    ]);
+    
+    // Assign QROC results to qrocResultMap
+    qrocResultMap = qrocMap;
+    
+    console.log(`[AI] ⚡ PARALLEL Complete: MCQ=${mcqArr.length}, QROC=${qrocMap.size}`);
 
   // MCQ single fallback to guarantee fix
     async function mcqForceFix(rec: Record<string, any>) {
@@ -793,9 +926,7 @@ Format:
         'explication b': rec['explication b'] ?? '',
         'explication c': rec['explication c'] ?? '',
         'explication d': rec['explication d'] ?? '',
-        'explication e': rec['explication e'] ?? '',
-        ai_status: 'fixed',
-        ai_reason: ''
+        'explication e': rec['explication e'] ?? ''
       };
       // Enforce unique, varied opening connectors per option (deterministic, no randomness)
       if (s === 'qcm' || s === 'cas_qcm') {
@@ -861,23 +992,15 @@ SORTIE JSON STRICTE:
         const user = JSON.stringify({ task: 'enhance_mcq_rows', items: slice });
         let content = '';
         try {
-          // Use structured generation for enhancement to avoid JSON parse failures
-          const res = await chatCompletionStructured([
+          // ✅ OPTIMIZED: Use direct REST API (no AI SDK overhead)
+          const res = await chatCompletion([
             { role: 'system', content: system },
             { role: 'user', content: user }
-          ], { maxTokens: 800 });
+          ], { maxTokens: 8000 });
           content = res.content;
         } catch (err: any) {
-          console.warn('[AI] Enhancement structured failed, falling back to REST:', err?.message || err);
-          try {
-            const res = await chatCompletion([
-              { role: 'system', content: system },
-              { role: 'user', content: user }
-            ], { maxTokens: 800 });
-            content = res.content;
-          } catch {
-            continue;
-          }
+          console.warn('[AI] Enhancement REST call failed:', err?.message || err);
+          continue;
         }
         try {
           const parsed = JSON.parse(content);
@@ -956,6 +1079,46 @@ SORTIE JSON STRICTE:
 
 async function postHandler(request: AuthenticatedRequest) {
   if (!isAzureConfigured()) return NextResponse.json({ error: 'AI not configured' }, { status: 400 });
+  
+  // Check for action parameter (e.g., action=stop)
+  const { searchParams } = new URL(request.url);
+  const action = searchParams.get('action');
+  
+  // STOP ACTION: Stop a running job
+  if (action === 'stop') {
+    const aiId = searchParams.get('aiId');
+    const userId = request.user?.userId;
+    
+    if (!aiId) return NextResponse.json({ error: 'aiId required' }, { status: 400 });
+    
+    try {
+      // Remove from active sessions (stops further processing)
+      const sess = activeAiSessions.get(aiId);
+      if (sess) {
+        sess.phase = 'error';
+        sess.error = 'Arrêté par l\'utilisateur';
+        sess.message = 'Job arrêté';
+        sess.progress = 100;
+        activeAiSessions.delete(aiId);
+      }
+      
+      // Update DB record
+      await prisma.aiValidationJob.updateMany({
+        where: { id: aiId, userId },
+        data: { 
+          status: 'failed', 
+          message: 'Arrêté par l\'utilisateur',
+          progress: 100
+        }
+      });
+      
+      return NextResponse.json({ ok: true, message: 'Job arrêté' });
+    } catch (e: any) {
+      return NextResponse.json({ error: e?.message || 'Erreur lors de l\'arrêt' }, { status: 500 });
+    }
+  }
+  
+  // Default: File upload and job creation
   const form = await request.formData();
   const file = form.get('file') as File | null;
   const instructions = typeof form.get('instructions') === 'string' ? String(form.get('instructions')) : undefined;

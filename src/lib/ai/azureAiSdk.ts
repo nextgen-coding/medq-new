@@ -45,17 +45,21 @@ export async function chatCompletionStructured(messages: ChatMessage[], options:
   const prepend = hasJson ? [] : [{ role: 'system' as const, content: 'Return a strict JSON object only. Reply in json. No prose.' }];
   const all = [...prepend, ...sysBase, ...messages];
 
-  // Zod schema for MCQ results to enforce structured JSON
+  // Zod schema for MCQ results - LENIENT to prevent validation failures
+  // Production logs showed "response did not match schema" errors forcing REST fallbacks
+  // Make all fields optional and allow additional properties
   const resultItemSchema = z.object({
-    id: z.union([z.string(), z.number()]).transform(v => String(v)),
-    status: z.union([z.literal('ok'), z.literal('error')]).optional(),
-    correctAnswers: z.array(z.number()).optional(),
+    id: z.union([z.string(), z.number(), z.null(), z.undefined()]).transform(v => String(v || '')).optional(),
+    status: z.union([z.literal('ok'), z.literal('error'), z.string()]).optional(),
+    correctAnswers: z.union([z.array(z.number()), z.array(z.string()), z.null()]).optional(),
     noAnswer: z.boolean().optional(),
-    globalExplanation: z.string().optional(),
-    optionExplanations: z.array(z.string()).optional(),
-    error: z.string().optional(),
+    globalExplanation: z.union([z.string(), z.null()]).optional(),
+    optionExplanations: z.union([z.array(z.string()), z.array(z.any()), z.null()]).optional(),
+    error: z.union([z.string(), z.null()]).optional(),
   }).passthrough();
-  const mcqResultsSchema = z.object({ results: z.array(resultItemSchema) });
+  const mcqResultsSchema = z.object({ 
+    results: z.union([z.array(resultItemSchema), z.array(z.any())]).optional().default([]) 
+  }).passthrough();
 
   try {
     // Use dynamic import to avoid build-time dependency on a specific ai version
@@ -122,13 +126,14 @@ export async function chatCompletion(messages: ChatMessage[], options: { maxToke
   if (!Number.isNaN(presencePenalty)) baseBody.presence_penalty = Math.max(-2, Math.min(2, presencePenalty));
   if (!Number.isNaN(frequencyPenalty)) baseBody.frequency_penalty = Math.max(-2, Math.min(2, frequencyPenalty));
 
-  const attempts = 3;
+  const attempts = 5; // Increase attempts for rate limit retries
   const timeoutMs = 120000;
   let lastErr: any = null;
 
   for (let i = 1; i <= attempts; i++) {
+    const attemptStart = Date.now();
     try {
-      console.log(`[AzureAI] Direct REST call to: ${url}`);
+      console.log(`[AzureAI] 🚀 API Call attempt ${i}/${attempts} to: ${url}`);
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), timeoutMs);
       
@@ -143,9 +148,46 @@ export async function chatCompletion(messages: ChatMessage[], options: { maxToke
       });
 
       clearTimeout(timeout);
+      const apiCallDuration = ((Date.now() - attemptStart) / 1000).toFixed(1);
 
       if (!response.ok) {
         const text = await response.text();
+        
+        // Handle rate limiting with exponential backoff
+        if (response.status === 429) {
+          const retryAfter = response.headers.get('retry-after');
+          const retryAfterMs = response.headers.get('retry-after-ms');
+          const retryAfterMsValue = retryAfterMs ? parseInt(retryAfterMs) : null;
+          
+          // Calculate wait time: use retry-after-ms, retry-after, or exponential backoff
+          let waitTime;
+          if (retryAfterMsValue && !isNaN(retryAfterMsValue)) {
+            waitTime = retryAfterMsValue;
+            console.warn(`[AzureAI] 🕒 Azure requested wait: ${(waitTime/1000).toFixed(1)}s (retry-after-ms header)`);
+          } else if (retryAfter) {
+            waitTime = parseInt(retryAfter) * 1000;
+            console.warn(`[AzureAI] 🕒 Azure requested wait: ${(waitTime/1000).toFixed(1)}s (retry-after header)`);
+          } else {
+            // Exponential backoff: 2s, 4s, 8s, 16s, 32s (max 60s)
+            waitTime = Math.min(2000 * Math.pow(2, i - 1), 60000);
+            console.warn(`[AzureAI] 🕒 Using exponential backoff: ${(waitTime/1000).toFixed(1)}s`);
+          }
+          
+          console.warn(`[AzureAI] ⚠️ RATE LIMITED (429) after ${apiCallDuration}s on attempt ${i}/${attempts}`);
+          console.warn(`[AzureAI] 🔄 Waiting ${(waitTime/1000).toFixed(1)}s before retry...`);
+          console.warn(`[AzureAI] 📋 Response snippet: ${text.substring(0, 150)}`);
+          
+          lastErr = new Error(`Rate limit (429) - attempt ${i}/${attempts}`);
+          
+          if (i < attempts) {
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+            console.log(`[AzureAI] 🔄 Retrying after ${(waitTime/1000).toFixed(1)}s wait...`);
+            continue; // Retry
+          } else {
+            const totalTime = ((Date.now() - attemptStart) / 1000).toFixed(1);
+            throw new Error(`Rate limit exceeded after ${attempts} attempts and ${totalTime}s total. Last wait: ${(waitTime/1000).toFixed(1)}s. Azure response: ${text.substring(0, 200)}`);
+          }
+        }
         
         // Handle specific Azure errors like the legacy client
         if (response.status === 404) {
@@ -166,6 +208,8 @@ export async function chatCompletion(messages: ChatMessage[], options: { maxToke
       const json = await response.json();
       let content = json?.choices?.[0]?.message?.content || '';
       let finishReason = json?.choices?.[0]?.finish_reason || '';
+      
+      console.log(`[AzureAI] ✅ API Call successful (${apiCallDuration}s, attempt ${i}/${attempts})`);
 
       // If response was cut off by token limit, retry once with more tokens
       if (finishReason === 'length') {
