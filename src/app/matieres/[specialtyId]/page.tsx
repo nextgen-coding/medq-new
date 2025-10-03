@@ -9,6 +9,7 @@ import { AppSidebar, AppSidebarProvider } from '@/components/layout/AppSidebar'
 import { SidebarInset } from '@/components/ui/sidebar'
 import { EditSpecialtyDialog } from '@/components/specialties/EditSpecialtyDialog'
 import { AddLectureDialog } from '@/components/specialties/AddLectureDialog'
+import { EditLectureDialog } from '@/components/specialties/EditLectureDialog'
 import { AddQuestionDialog } from '@/components/specialties/AddQuestionDialog'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { Card, CardContent } from '@/components/ui/card'
@@ -70,6 +71,9 @@ export default function SpecialtyPageRoute() {
   const router = useRouter()
   const { t } = useTranslation()
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [isAddLectureOpen, setIsAddLectureOpen] = useState(false)
+  const [isEditLectureOpen, setIsEditLectureOpen] = useState(false)
+  const [selectedLecture, setSelectedLecture] = useState<any>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedFilter, setSelectedFilter] = useState('all')
   const [sortOption, setSortOption] = useState<'default' | 'name' | 'note' | 'lastAccessed'>('default')
@@ -97,8 +101,12 @@ export default function SpecialtyPageRoute() {
   // Reset confirmation dialog state
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false)
   const [lectureToReset, setLectureToReset] = useState<{ id: string; title: string } | null>(null)
+  // Delete confirmation dialog state
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [lectureToDelete, setLectureToDelete] = useState<{ id: string; title: string } | null>(null)
 
   const { isAdmin, user } = useAuth()
+  const isAdminOrMaintainer = user?.role === 'admin' || user?.role === 'maintainer'
   const specialtyId = params?.specialtyId as string
 
   const {
@@ -276,6 +284,49 @@ export default function SpecialtyPageRoute() {
   // const handleCommentsOpen = (lecture: any) => { setSelectedLecture(lecture); setCommentsDialogOpen(true) }
   // const handleQuestionTypeOpen = (lecture: any) => { setSelectedLecture(lecture); setQuestionTypeDialogOpen(true) }
   const handleSpecialtyUpdated = () => { window.location.reload() }
+
+  const handleEditLecture = (lecture: any) => {
+    setSelectedLecture(lecture)
+    setIsEditLectureOpen(true)
+  }
+
+  const openDeleteConfirmation = (lectureId: string, lectureTitle: string) => {
+    setLectureToDelete({ id: lectureId, title: lectureTitle })
+    setDeleteConfirmOpen(true)
+  }
+
+  const handleDeleteLecture = async () => {
+    if (!lectureToDelete) return
+    
+    setDeleteConfirmOpen(false)
+
+    try {
+      const response = await fetch(`/api/lectures/${lectureToDelete.id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      })
+
+      if (!response.ok) {
+        throw new Error('Échec de la suppression du cours')
+      }
+
+      toast({
+        title: 'Succès',
+        description: `Le cours "${lectureToDelete.title}" a été supprimé avec succès.`,
+      })
+
+      await fetchSpecialtyAndLectures()
+    } catch (error) {
+      console.error('Error deleting lecture:', error)
+      toast({
+        title: 'Erreur',
+        description: 'Échec de la suppression du cours',
+        variant: 'destructive',
+      })
+    } finally {
+      setLectureToDelete(null)
+    }
+  }
 
   const openResetConfirmation = (lectureId: string, lectureTitle: string) => {
     setLectureToReset({ id: lectureId, title: lectureTitle })
@@ -558,15 +609,14 @@ export default function SpecialtyPageRoute() {
                       <span className="flex-shrink-0">/</span>
                       <span className="text-gray-900 dark:text-gray-100 font-medium truncate text-sm sm:text-base">{specialty.name}</span>
                     </div>
-                    {isAdmin && (
+                    {isAdminOrMaintainer && (
                       <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={handleEdit} 
-                        className="flex items-center gap-1 sm:gap-2 bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-700 dark:hover:text-gray-100 transition-colors flex-shrink-0 text-xs sm:text-sm px-2 sm:px-3"
+                        onClick={() => setIsAddLectureOpen(true)} 
+                        className="flex items-center gap-1 sm:gap-2 bg-green-600 hover:bg-green-700 text-white flex-shrink-0 text-xs sm:text-sm px-2 sm:px-3"
+                        size="sm"
                       >
-                        <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
-                        <span className="hidden xs:inline">Modifier</span>
+                        <Plus className="w-3 h-3 sm:w-4 sm:h-4" />
+                        <span className="hidden xs:inline">Ajouter un cours</span>
                       </Button>
                     )}
                   </div>
@@ -1005,6 +1055,28 @@ export default function SpecialtyPageRoute() {
                                           >
                                             <RotateCcw className="w-4 h-4" />
                                           </Button>
+                                          {isAdminOrMaintainer && (
+                                            <>
+                                              <Button
+                                                variant="outline"
+                                                size="icon"
+                                                onClick={() => handleEditLecture(lecture)}
+                                                className="h-9 w-9 rounded-md bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
+                                                title="Modifier le cours"
+                                              >
+                                                <Edit className="w-4 h-4" />
+                                              </Button>
+                                              <Button
+                                                variant="outline"
+                                                size="icon"
+                                                onClick={() => openDeleteConfirmation(lecture.id, lecture.title)}
+                                                className="h-9 w-9 rounded-md bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
+                                                title="Supprimer le cours"
+                                              >
+                                                <Trash className="w-4 h-4" />
+                                              </Button>
+                                            </>
+                                          )}
                                         </div>
                                       </div>
                                     </div>
@@ -1207,6 +1279,28 @@ export default function SpecialtyPageRoute() {
                                   >
                                     <RotateCcw className="w-3 h-3 sm:w-4 sm:h-4" />
                                   </Button>
+                                  {isAdminOrMaintainer && (
+                                    <>
+                                      <Button
+                                        variant="outline"
+                                        size="icon"
+                                        onClick={() => handleEditLecture(lecture)}
+                                        className="h-8 w-8 rounded-md bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
+                                        title="Modifier le cours"
+                                      >
+                                        <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
+                                      </Button>
+                                      <Button
+                                        variant="outline"
+                                        size="icon"
+                                        onClick={() => openDeleteConfirmation(lecture.id, lecture.title)}
+                                        className="h-8 w-8 rounded-md bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
+                                        title="Supprimer le cours"
+                                      >
+                                        <Trash className="w-3 h-3 sm:w-4 sm:h-4" />
+                                      </Button>
+                                    </>
+                                  )}
                                 </div>
                               </TableCell>
                             </TableRow>
@@ -1387,6 +1481,28 @@ export default function SpecialtyPageRoute() {
                                   >
                                     <RotateCcw className="w-3 h-3 sm:w-4 sm:h-4" />
                                   </Button>
+                                  {isAdminOrMaintainer && (
+                                    <>
+                                      <Button
+                                        variant="outline"
+                                        size="icon"
+                                        onClick={() => handleEditLecture(lecture)}
+                                        className="h-8 w-8 rounded-md bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
+                                        title="Modifier le cours"
+                                      >
+                                        <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
+                                      </Button>
+                                      <Button
+                                        variant="outline"
+                                        size="icon"
+                                        onClick={() => openDeleteConfirmation(lecture.id, lecture.title)}
+                                        className="h-8 w-8 rounded-md bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
+                                        title="Supprimer le cours"
+                                      >
+                                        <Trash className="w-3 h-3 sm:w-4 sm:h-4" />
+                                      </Button>
+                                    </>
+                                  )}
                                 </div>
                               </TableCell>
                             </TableRow>
@@ -1447,6 +1563,57 @@ export default function SpecialtyPageRoute() {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
+
+            {/* Delete Course Confirmation Dialog */}
+            <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+              <DialogContent className="max-w-md bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
+                <DialogHeader>
+                  <DialogTitle className="text-xl font-semibold flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5 text-red-600" />
+                    Supprimer le cours
+                  </DialogTitle>
+                  <DialogDescription className="text-base pt-2">
+                    Êtes-vous sûr de vouloir supprimer le cours{' '}
+                    <span className="font-semibold text-gray-900 dark:text-gray-100">
+                      "{lectureToDelete?.title}"
+                    </span>{' '}
+                    ? Cette action est définitive et supprimera également toutes les questions et la progression associées.
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter className="gap-2 sm:gap-0">
+                  <Button
+                    variant="outline"
+                    onClick={() => setDeleteConfirmOpen(false)}
+                    className="bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700"
+                  >
+                    Annuler
+                  </Button>
+                  <Button
+                    onClick={handleDeleteLecture}
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    <Trash className="w-4 h-4 mr-2" />
+                    Supprimer
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            {/* Add Lecture Dialog */}
+            <AddLectureDialog
+              isOpen={isAddLectureOpen}
+              onOpenChange={setIsAddLectureOpen}
+              specialtyId={specialtyId}
+              onLectureAdded={fetchSpecialtyAndLectures}
+            />
+
+            {/* Edit Lecture Dialog */}
+            <EditLectureDialog
+              isOpen={isEditLectureOpen}
+              onOpenChange={setIsEditLectureOpen}
+              lecture={selectedLecture}
+              onLectureUpdated={fetchSpecialtyAndLectures}
+            />
           </SidebarInset>
         </div>
       </AppSidebarProvider>

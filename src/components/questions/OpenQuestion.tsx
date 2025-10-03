@@ -636,16 +636,16 @@ export function OpenQuestion({
         setLocalHidden(undefined);
         onQuestionUpdate(question.id, { hidden: question.hidden });
         toast({
-          title: "Error",
-          description: "Failed to update question visibility",
+          title: "Erreur",
+          description: "Échec de la mise à jour de la visibilité",
           variant: "destructive",
         });
       } else {
         toast({
-          title: newHiddenStatus ? 'Question hidden' : 'Question unhidden',
+          title: newHiddenStatus ? 'Question masquée' : 'Question visible',
           description: newHiddenStatus
-            ? 'The question is now hidden from students.'
-            : 'The question is now visible to students.',
+            ? 'La question est maintenant masquée des étudiants.'
+            : 'La question est maintenant visible aux étudiants.',
         });
       }
     } catch (error) {
@@ -653,8 +653,8 @@ export function OpenQuestion({
       setLocalHidden(undefined);
       onQuestionUpdate(question.id, { hidden: question.hidden });
       toast({
-        title: "Error",
-        description: "Failed to update question visibility",
+        title: "Erreur",
+        description: "Échec de la mise à jour de la visibilité",
         variant: "destructive",
       });
     } finally {

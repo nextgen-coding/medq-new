@@ -243,7 +243,7 @@ export function LectureComplete({
                 {totalQuestions}
               </div>
               <div className="text-lg text-gray-600 dark:text-gray-400 font-medium">
-                Total Tâches
+                Total questions
               </div>
             </CardContent>
           </Card>
@@ -288,7 +288,7 @@ export function LectureComplete({
               <div className="text-center mb-6">
                 <h3 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-2">Progrès Global</h3>
                 <p className="text-lg text-gray-600 dark:text-gray-400">
-                  {answeredQuestions} sur {totalQuestions} tâches terminées ({safeCompletionPercentage}%)
+                  {answeredQuestions} sur {totalQuestions} questions terminées ({safeCompletionPercentage}%)
                 </p>
               </div>
               <div className="max-w-2xl mx-auto">

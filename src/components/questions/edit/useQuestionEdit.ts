@@ -240,8 +240,8 @@ export function useQuestionEdit({
     } catch (error) {
       console.error('Error fetching question:', error);
       toast({
-        title: t('common.error'),
-        description: t('common.tryAgain'),
+        title: 'Erreur',
+        description: 'Veuillez réessayer.',
         variant: "destructive",
       });
     } finally {
@@ -252,8 +252,8 @@ export function useQuestionEdit({
   const saveQuestion = async (updatedQuestion: Partial<Question>) => {
     if (!user) {
       toast({
-        title: t('auth.notAuthenticated'),
-        description: t('auth.pleaseSignIn'),
+        title: 'Non authentifié',
+        description: 'Veuillez vous connecter.',
         variant: "destructive",
       });
       return;
@@ -262,8 +262,8 @@ export function useQuestionEdit({
     const questionIdToUse = questionId || question?.id;
     if (!questionIdToUse) {
       toast({
-        title: t('common.error'),
-        description: 'No question ID available',
+        title: 'Erreur',
+        description: 'Identifiant de question manquant.',
         variant: "destructive",
       });
       return;
@@ -289,8 +289,8 @@ export function useQuestionEdit({
       setQuestion(data);
       
       toast({
-        title: t('common.success'),
-        description: t('questions.updatedSuccessfully'),
+        title: 'Succès',
+        description: 'Question mise à jour avec succès.',
       });
       
       onSave?.();
@@ -298,14 +298,14 @@ export function useQuestionEdit({
       onOpenChange?.(false);
     } catch (error: any) {
       console.error('Error updating question:', error);
-      let errorMessage = t('common.tryAgain');
+      let errorMessage = 'Veuillez réessayer.';
       
       if (error instanceof Error && error.message) {
         errorMessage = error.message;
       }
       
       toast({
-        title: t('common.error'),
+        title: 'Erreur',
         description: errorMessage,
         variant: "destructive",
       });

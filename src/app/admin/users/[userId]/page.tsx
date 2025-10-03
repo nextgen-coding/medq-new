@@ -60,6 +60,7 @@ interface User {
   name: string | null;
   email: string;
   phone?: string | null;
+  image?: string | null;
   role: 'student' | 'maintainer' | 'admin';
   status: 'active' | 'inactive' | 'banned' | 'pending' | string;
   createdAt: string;
@@ -412,7 +413,7 @@ export default function UserDetailPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-4">
           <Avatar className="h-14 w-14 sm:h-16 sm:w-16 ring-2 ring-medblue-100 dark:ring-medblue-900/30">
-            <AvatarImage src={''} alt={user?.name || user?.email || 'user'} />
+            <AvatarImage src={user?.image || ''} alt={user?.name || user?.email || 'user'} />
             <AvatarFallback className="bg-medblue-50 text-medblue-700">
               {(user?.name || user?.email || '?').slice(0, 2).toUpperCase()}
             </AvatarFallback>
