@@ -31,6 +31,7 @@ async function handler(request: AuthenticatedRequest) {
                 id: true,
                 name: true,
                 email: true,
+                phone: true,
                 image: true
               }
             },

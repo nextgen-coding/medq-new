@@ -48,11 +48,17 @@ async function handler(request: AuthenticatedRequest, { params }: { params: Prom
       payment.user.name || undefined
     )
 
-    // Update payment with admin notes
+    // Update payment with admin notes and metadata
+    const currentMetadata = (payment.metadata as any) || {}
     await prisma.payment.update({
       where: { id: paymentId },
       data: {
-        adminNotes: `Lien de paiement envoyé: ${paymentLink.trim()}`
+        adminNotes: `Lien de paiement envoyé: ${paymentLink.trim()}`,
+        metadata: {
+          ...currentMetadata,
+          linkSent: true,
+          linkSentAt: new Date().toISOString()
+        }
       }
     })
 

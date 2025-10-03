@@ -59,6 +59,7 @@ interface User {
   id: string;
   name: string | null;
   email: string;
+  phone?: string | null;
   role: 'student' | 'maintainer' | 'admin';
   status: 'active' | 'inactive' | 'banned' | 'pending' | string;
   createdAt: string;
@@ -73,7 +74,7 @@ interface User {
   profile?: {
     specialty?: string;
     niveau?: string;
-    university?: string;
+    faculte?: string;
   };
   paymentHistory?: Array<{
     id: string;
@@ -516,6 +517,12 @@ export default function UserDetailPage() {
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">
+                    {t('admin.phone', { defaultValue: 'Téléphone' })}
+                  </Label>
+                  <p className="text-lg font-medium">{user?.phone || 'Non renseigné'}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">
                     {t('admin.role', { defaultValue: 'Rôle' })}
                   </Label>
                   <div className="mt-1">
@@ -610,9 +617,9 @@ export default function UserDetailPage() {
                   </div>
                   <div>
                     <Label className="text-sm font-medium text-muted-foreground">
-                      {t('admin.university', { defaultValue: 'Université' })}
+                      {t('admin.faculty', { defaultValue: 'Faculté' })}
                     </Label>
-                    <p className="text-lg font-medium">{user.profile?.university || 'N/A'}</p>
+                    <p className="text-lg font-medium">{user.profile?.faculte || 'N/A'}</p>
                   </div>
                 </div>
               </CardContent>

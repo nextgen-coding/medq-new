@@ -46,12 +46,17 @@ interface Payment {
   user: {
     name: string;
     email: string;
+    phone?: string;
   };
   voucherCode?: {
     code: string;
   };
   activationKey?: string;
   isBuyingKey?: boolean;
+  metadata?: {
+    linkSent?: boolean;
+    linkSentAt?: string;
+  };
 }
 
 const getStatusColor = (status: string) => {
@@ -212,6 +217,7 @@ export default function AdminPaymentsPage() {
       setIsSendLinkDialogOpen(false);
       setPaymentLink('');
       setSelectedPayment(null);
+      fetchPayments(); // Refresh to update the link sent status
     } catch (error) {
       console.error('Error sending payment link:', error);
       toast({
@@ -427,8 +433,8 @@ export default function AdminPaymentsPage() {
                       <TableHeader>
                         <TableRow>
                           <TableHead className="w-[45%] sm:w-auto">Utilisateur</TableHead>
+                          <TableHead className="hidden lg:table-cell">Téléphone</TableHead>
                           <TableHead className="hidden sm:table-cell">Méthode</TableHead>
-                          <TableHead className="hidden md:table-cell">Type</TableHead>
                           <TableHead className="hidden sm:table-cell">Montant</TableHead>
                           <TableHead className="w-[25%] sm:w-auto">Statut</TableHead>
                           <TableHead className="hidden lg:table-cell">Date</TableHead>
@@ -469,16 +475,16 @@ export default function AdminPaymentsPage() {
                                 </div>
                               </div>
                             </TableCell>
+                            <TableCell className="hidden lg:table-cell p-2 sm:p-4">
+                              <div className="text-xs text-gray-600 dark:text-gray-400">
+                                {payment.user.phone || 'Non renseigné'}
+                              </div>
+                            </TableCell>
                             <TableCell className="hidden sm:table-cell p-2 sm:p-4">
                               <div className="flex items-center gap-2 min-w-0">
                                 {getMethodIcon(payment.method)}
                                 <span className="text-xs sm:text-sm truncate">{getMethodLabel(payment.method)}</span>
                               </div>
-                            </TableCell>
-                            <TableCell className="hidden md:table-cell p-2 sm:p-4">
-                              <Badge variant="outline" className="text-xs truncate">
-                                {payment.isBuyingKey ? 'Clé d\'activation' : (payment.subscriptionType === 'annual' ? 'Annuel' : 'Semestriel')}
-                              </Badge>
                             </TableCell>
                             <TableCell className="hidden sm:table-cell text-xs sm:text-sm p-2 sm:p-4">
                               <div className="truncate">{payment.amount} {payment.currency}</div>
@@ -538,18 +544,36 @@ export default function AdminPaymentsPage() {
                                 
                                 {/* Action buttons for key purchases */}
                                 {payment.isBuyingKey && payment.method === 'konnect_gateway' && (payment.status === 'pending' || payment.status === 'awaiting_verification') && (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => {
-                                      setSelectedPayment(payment);
-                                      setIsSendLinkDialogOpen(true);
-                                    }}
-                                    className="px-2 py-1 text-xs h-7 w-full"
-                                  >
-                                    <Link className="h-3 w-3 mr-1" />
-                                    Envoyer lien paiement
-                                  </Button>
+                                  <>
+                                    {payment.metadata?.linkSent ? (
+                                      <div className="text-xs text-blue-600 text-center py-2 bg-blue-50 dark:bg-blue-900/20 rounded">
+                                        ✓ Lien envoyé
+                                        {payment.metadata?.linkSentAt && (
+                                          <div className="text-[10px] text-gray-500 mt-0.5">
+                                            {new Date(payment.metadata.linkSentAt).toLocaleDateString('fr-FR', {
+                                              day: '2-digit',
+                                              month: 'short',
+                                              hour: '2-digit',
+                                              minute: '2-digit'
+                                            })}
+                                          </div>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                          setSelectedPayment(payment);
+                                          setIsSendLinkDialogOpen(true);
+                                        }}
+                                        className="px-2 py-1 text-xs h-7 w-full"
+                                      >
+                                        <Link className="h-3 w-3 mr-1" />
+                                        Envoyer lien paiement
+                                      </Button>
+                                    )}
+                                  </>
                                 )}
                                 
                                 {/* Status display for completed states */}                                {/* Status display for completed states */}
