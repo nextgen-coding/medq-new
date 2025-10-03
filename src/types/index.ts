@@ -127,6 +127,7 @@ export type Option = {
   id: string;
   text: string;
   explanation?: string;
+  isAI?: boolean; // Whether the explanation is AI-generated
 };
 
 import type { ImageData } from '@/components/ui/rich-text-display';

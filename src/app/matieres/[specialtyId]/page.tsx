@@ -37,7 +37,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { 
   Search, 
   Filter, 
@@ -54,7 +54,8 @@ import {
   ArrowLeft,
   AlertTriangle,
   MessageCircle,
-  ArrowUpDown
+  ArrowUpDown,
+  RotateCcw,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { toast } from '@/hooks/use-toast'
@@ -93,6 +94,9 @@ export default function SpecialtyPageRoute() {
   const [selectedCourseIds, setSelectedCourseIds] = useState<Record<string, boolean>>({})
   // Comments modal state
   const [commentsLectureId, setCommentsLectureId] = useState<string | null>(null)
+  // Reset confirmation dialog state
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false)
+  const [lectureToReset, setLectureToReset] = useState<{ id: string; title: string } | null>(null)
 
   const { isAdmin, user } = useAuth()
   const specialtyId = params?.specialtyId as string
@@ -101,6 +105,7 @@ export default function SpecialtyPageRoute() {
     specialty,
     lectures,
     isLoading,
+    fetchSpecialtyAndLectures,
   } = useSpecialty(specialtyId)
 
   if (!specialtyId) {
@@ -271,6 +276,44 @@ export default function SpecialtyPageRoute() {
   // const handleCommentsOpen = (lecture: any) => { setSelectedLecture(lecture); setCommentsDialogOpen(true) }
   // const handleQuestionTypeOpen = (lecture: any) => { setSelectedLecture(lecture); setQuestionTypeDialogOpen(true) }
   const handleSpecialtyUpdated = () => { window.location.reload() }
+
+  const openResetConfirmation = (lectureId: string, lectureTitle: string) => {
+    setLectureToReset({ id: lectureId, title: lectureTitle })
+    setResetConfirmOpen(true)
+  }
+
+  const resetLectureProgress = async () => {
+    if (!user?.id || !lectureToReset) return
+    
+    setResetConfirmOpen(false)
+
+    try {
+      const response = await fetch(`/api/progress?lectureId=${lectureToReset.id}&userId=${user.id}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        toast({ 
+          title: 'Progression réinitialisée', 
+          description: `La progression du cours "${lectureToReset.title}" a été réinitialisée.` 
+        })
+        
+        // Reload specialty data to refresh progress without full page reload
+        await fetchSpecialtyAndLectures()
+      } else {
+        throw new Error('Failed to reset progress')
+      }
+    } catch (error) {
+      console.error('Error resetting progress:', error)
+      toast({ 
+        title: 'Erreur', 
+        description: 'Échec de la réinitialisation de la progression', 
+        variant: 'destructive' 
+      })
+    } finally {
+      setLectureToReset(null)
+    }
+  }
 
   if (isLoading) {
     return (
@@ -819,6 +862,15 @@ export default function SpecialtyPageRoute() {
                                         <DropdownMenuItem onClick={() => setLectureMode(lecture.id, 'pinned')}>Épinglé</DropdownMenuItem>
                                       </DropdownMenuContent>
                                     </DropdownMenu>
+                                    <Button
+                                      variant="outline"
+                                      size="icon"
+                                      onClick={() => openResetConfirmation(lecture.id, lecture.title)}
+                                      className="h-9 w-9 rounded-md bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800 text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-900/40 transition-colors"
+                                      title="Réinitialiser la progression"
+                                    >
+                                      <RotateCcw className="w-4 h-4" />
+                                    </Button>
                                   </div>
                                 </div>
                               </div>
@@ -944,6 +996,15 @@ export default function SpecialtyPageRoute() {
                                               <DropdownMenuItem onClick={() => setLectureMode(lecture.id, 'pinned')}>Épinglé</DropdownMenuItem>
                                             </DropdownMenuContent>
                                           </DropdownMenu>
+                                          <Button
+                                            variant="outline"
+                                            size="icon"
+                                            onClick={() => openResetConfirmation(lecture.id, lecture.title)}
+                                            className="h-9 w-9 rounded-md bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800 text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-900/40 transition-colors"
+                                            title="Réinitialiser la progression"
+                                          >
+                                            <RotateCcw className="w-4 h-4" />
+                                          </Button>
                                         </div>
                                       </div>
                                     </div>
@@ -1137,6 +1198,15 @@ export default function SpecialtyPageRoute() {
                                       <DropdownMenuItem onClick={() => setLectureMode(lecture.id, 'pinned')}>Épinglé</DropdownMenuItem>
                                     </DropdownMenuContent>
                                   </DropdownMenu>
+                                  <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={() => openResetConfirmation(lecture.id, lecture.title)}
+                                    className="h-8 w-8 rounded-md bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800 text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-900/40 transition-colors"
+                                    title="Réinitialiser la progression"
+                                  >
+                                    <RotateCcw className="w-3 h-3 sm:w-4 sm:h-4" />
+                                  </Button>
                                 </div>
                               </TableCell>
                             </TableRow>
@@ -1308,6 +1378,15 @@ export default function SpecialtyPageRoute() {
                       <DropdownMenuItem onClick={() => setLectureMode(lecture.id, 'pinned')}>Épinglé</DropdownMenuItem>
                                     </DropdownMenuContent>
                                   </DropdownMenu>
+                                  <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={() => openResetConfirmation(lecture.id, lecture.title)}
+                                    className="h-8 w-8 rounded-md bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800 text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-900/40 transition-colors"
+                                    title="Réinitialiser la progression"
+                                  >
+                                    <RotateCcw className="w-3 h-3 sm:w-4 sm:h-4" />
+                                  </Button>
                                 </div>
                               </TableCell>
                             </TableRow>
@@ -1331,6 +1410,41 @@ export default function SpecialtyPageRoute() {
                 {commentsLectureId && (
                   <LectureComments lectureId={commentsLectureId} />
                 )}
+              </DialogContent>
+            </Dialog>
+
+            {/* Reset Progress Confirmation Dialog */}
+            <Dialog open={resetConfirmOpen} onOpenChange={setResetConfirmOpen}>
+              <DialogContent className="max-w-md bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
+                <DialogHeader>
+                  <DialogTitle className="text-xl font-semibold flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5 text-orange-600" />
+                    Réinitialiser la progression
+                  </DialogTitle>
+                  <DialogDescription className="text-base pt-2">
+                    Êtes-vous sûr de vouloir réinitialiser toute votre progression pour le cours{' '}
+                    <span className="font-semibold text-gray-900 dark:text-gray-100">
+                      "{lectureToReset?.title}"
+                    </span>{' '}
+                    ? Cette action est irréversible.
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter className="gap-2 sm:gap-0">
+                  <Button
+                    variant="outline"
+                    onClick={() => setResetConfirmOpen(false)}
+                    className="bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-white hover:bg-gray-200 dark:hover:bg-gray-700"
+                  >
+                    Annuler
+                  </Button>
+                  <Button
+                    onClick={resetLectureProgress}
+                    className="bg-orange-600 hover:bg-orange-700 text-white"
+                  >
+                    <RotateCcw className="w-4 h-4 mr-2" />
+                    Réinitialiser
+                  </Button>
+                </DialogFooter>
               </DialogContent>
             </Dialog>
           </SidebarInset>

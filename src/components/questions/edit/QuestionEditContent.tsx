@@ -20,9 +20,10 @@ interface QuestionEditContentProps {
   setQuestionNumber: (number: number | undefined) => void;
   session: string;
   setSession: (session: string) => void;
-  options: { id: string; text: string; explanation?: string }[];
+  options: { id: string; text: string; explanation?: string; isAI?: boolean }[];
   updateOptionText: (id: string, text: string) => void;
   updateOptionExplanation: (id: string, explanation: string) => void;
+  updateOptionIsAI: (id: string, isAI: boolean) => void;
   correctAnswers: string[];
   toggleCorrectAnswer: (id: string) => void;
   setCorrectAnswers: (answers: string[]) => void;
@@ -53,6 +54,7 @@ export function QuestionEditContent({
   options,
   updateOptionText,
   updateOptionExplanation,
+  updateOptionIsAI,
   correctAnswers,
   toggleCorrectAnswer,
   setCorrectAnswers,
@@ -216,6 +218,7 @@ export function QuestionEditContent({
             correctAnswers={correctAnswers}
             updateOptionText={updateOptionText}
             updateOptionExplanation={updateOptionExplanation}
+            updateOptionIsAI={updateOptionIsAI}
             toggleCorrectAnswer={toggleCorrectAnswer}
           />
         </div>

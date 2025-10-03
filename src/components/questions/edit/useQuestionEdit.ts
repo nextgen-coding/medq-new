@@ -35,12 +35,13 @@ export function useQuestionEdit({
   const [options, setOptions] = useState(
     propQuestion?.options?.map((opt: any, index: number) => {
       if (typeof opt === 'string') {
-        return { id: index.toString(), text: opt, explanation: '' };
+        return { id: index.toString(), text: opt, explanation: '', isAI: false };
       }
       return {
         id: opt.id || index.toString(),
         text: opt.text || '',
-        explanation: opt.explanation || ''
+        explanation: opt.explanation || '',
+        isAI: opt.isAI || false
       };
     }) || []
   );
@@ -176,12 +177,13 @@ export function useQuestionEdit({
       setOptions(
         extractResult.convertedOptions.map((opt: any, index: number) => {
           if (typeof opt === 'string') {
-            return { id: index.toString(), text: opt, explanation: '' };
+            return { id: index.toString(), text: opt, explanation: '', isAI: false };
           }
           return {
             id: opt.id || index.toString(),
             text: opt.text || '',
-            explanation: opt.explanation || ''
+            explanation: opt.explanation || '',
+            isAI: opt.isAI || false
           };
         })
       );
@@ -225,12 +227,13 @@ export function useQuestionEdit({
       setOptions(
         extractResult.convertedOptions.map((opt: any, index: number) => {
           if (typeof opt === 'string') {
-            return { id: index.toString(), text: opt, explanation: '' };
+            return { id: index.toString(), text: opt, explanation: '', isAI: false };
           }
           return {
             id: opt.id || index.toString(),
             text: opt.text || '',
-            explanation: opt.explanation || ''
+            explanation: opt.explanation || '',
+            isAI: opt.isAI || false
           };
         })
       );
@@ -319,6 +322,10 @@ export function useQuestionEdit({
     setOptions(prev => prev.map(opt => opt.id === id ? { ...opt, explanation } : opt));
   };
 
+  const updateOptionIsAI = (id: string, isAI: boolean) => {
+    setOptions(prev => prev.map(opt => opt.id === id ? { ...opt, isAI } : opt));
+  };
+
   const toggleCorrectAnswer = (id: string) => {
     setCorrectAnswers(prev => 
       prev.includes(id) 
@@ -364,10 +371,11 @@ export function useQuestionEdit({
       mediaType: mediaType,
       courseReminderMediaUrl: reminderMediaUrl,
       courseReminderMediaType: reminderMediaType,
-      options: question.type === 'mcq' ? options.map(opt => ({
+      options: (question.type === 'mcq' || question.type === 'clinic_mcq') ? options.map(opt => ({
         id: opt.id,
         text: toLegacy(opt.text),
-        explanation: opt.explanation ? toLegacy(opt.explanation) : undefined
+        explanation: opt.explanation ? toLegacy(opt.explanation) : undefined,
+        isAI: opt.isAI || false
       })) : undefined,
       // Use camelCase to match API route
       correctAnswers: (question.type === 'mcq' || question.type === 'clinic_mcq' || question.type === 'qroc' || question.type === 'clinic_croq') ? correctAnswers : undefined
@@ -398,6 +406,7 @@ export function useQuestionEdit({
   handleReminderMediaChange,
     updateOptionText,
     updateOptionExplanation,
+    updateOptionIsAI,
     toggleCorrectAnswer,
     handleSubmit,
     saveQuestion,

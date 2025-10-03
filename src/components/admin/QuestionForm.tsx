@@ -56,7 +56,7 @@ export function QuestionForm({ lectureId, editQuestionId, onComplete }: Question
     <Card className={onComplete ? "w-full border-0 shadow-none" : "w-full max-w-3xl mx-auto"}>
       {!onComplete && (
         <CardHeader>
-          <CardTitle>{editQuestionId ? 'Edit Question' : 'Create New Question'}</CardTitle>
+          <CardTitle>{editQuestionId ? 'Modifier la question' : 'Créer une nouvelle question'}</CardTitle>
         </CardHeader>
       )}
       <CardContent>
@@ -65,7 +65,7 @@ export function QuestionForm({ lectureId, editQuestionId, onComplete }: Question
 
           const validation = validateForm();
           if (!validation.isValid) {
-            toast({ title: 'Validation Error', description: validation.error, variant: 'destructive' });
+            toast({ title: 'Erreur de validation', description: validation.error, variant: 'destructive' });
             return;
           }
 
@@ -106,12 +106,12 @@ export function QuestionForm({ lectureId, editQuestionId, onComplete }: Question
 
             if (!response.ok) {
               const data = await response.json().catch(()=>({}));
-              throw new Error(data.error || (isEdit ? 'Failed to update question' : 'Failed to create question'));
+              throw new Error(data.error || (isEdit ? 'Échec de la mise à jour de la question' : 'Échec de la création de la question'));
             }
-            toast({ title: 'Success', description: isEdit ? 'Question updated' : 'Question created successfully' });
+            toast({ title: 'Succès', description: isEdit ? 'Question mise à jour' : 'Question créée avec succès' });
             onComplete?.();
           } catch (err: any) {
-            toast({ title: 'Error', description: err?.message || 'Operation failed', variant: 'destructive' });
+            toast({ title: 'Erreur', description: err?.message || 'Opération échouée', variant: 'destructive' });
           } finally {
             setIsLoading(false);
           }

@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Question, Option } from '@/types';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Sparkles } from 'lucide-react';
 
 interface GroupedMcqEditDialogProps {
   caseNumber: number;
@@ -35,7 +35,7 @@ export function GroupedMcqEditDialog({ caseNumber, questions, isOpen, onOpenChan
         .map(q=>({
           id: q.id,
           text: q.text || '',
-          options: (q.options || []).map(o => ({ id: o.id, text: o.text, explanation: o.explanation })),
+          options: (q.options || []).map(o => ({ id: o.id, text: o.text, explanation: o.explanation, isAI: o.isAI || false })),
           correctAnswers: (q.correctAnswers || q.correct_answers || [])
         }));
       setSubs(mapped);
@@ -56,7 +56,7 @@ export function GroupedMcqEditDialog({ caseNumber, questions, isOpen, onOpenChan
   };
 
   const addOption = (sid: string) => {
-    setSubs(prev => prev.map(s => s.id === sid ? { ...s, options: [...s.options, { id: `opt_${Math.random().toString(36).slice(2)}`, text: '', explanation: '' }] } : s));
+    setSubs(prev => prev.map(s => s.id === sid ? { ...s, options: [...s.options, { id: `opt_${Math.random().toString(36).slice(2)}`, text: '', explanation: '', isAI: false }] } : s));
   };
 
   const removeOption = (sid: string, oid: string) => {
@@ -152,7 +152,7 @@ export function GroupedMcqEditDialog({ caseNumber, questions, isOpen, onOpenChan
         const s = subs[order];
         const body: any = {
           text: s.text.trim(),
-          options: s.options.filter(o=> (o.text||'').trim()).map(o=> ({ id: o.id, text: o.text.trim(), explanation: (o.explanation||'').trim() })),
+          options: s.options.filter(o=> (o.text||'').trim()).map(o=> ({ id: o.id, text: o.text.trim(), explanation: (o.explanation||'').trim(), isAI: o.isAI || false })),
           correctAnswers: s.correctAnswers,
           caseText: (commonText || '').trim() || null,
           caseQuestionNumber: order + 1
@@ -208,12 +208,26 @@ export function GroupedMcqEditDialog({ caseNumber, questions, isOpen, onOpenChan
                     <div className="pt-2 text-xs w-5 text-center">{String.fromCharCode(65+oIdx)}</div>
                     <div className="flex-1 space-y-2">
                       <Input placeholder={`Option ${oIdx+1}`} value={o.text} onChange={e=> updateOption(s.id,o.id,{ text: e.target.value })} />
-                      <Textarea
-                        placeholder="Explication (optionnel)"
-                        value={o.explanation||''}
-                        onChange={(e) => updateOption(s.id, o.id, { explanation: e.target.value })}
-                        rows={2}
-                      />
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <Label className="text-xs flex items-center gap-1">
+                            <Sparkles className="h-3 w-3 text-blue-500" />
+                            AI
+                          </Label>
+                          <input 
+                            type="checkbox" 
+                            checked={o.isAI || false} 
+                            onChange={(e) => updateOption(s.id, o.id, { isAI: e.target.checked })}
+                            className="h-3 w-3"
+                          />
+                        </div>
+                        <Textarea
+                          placeholder="Explication (optionnel)"
+                          value={o.explanation||''}
+                          onChange={(e) => updateOption(s.id, o.id, { explanation: e.target.value })}
+                          rows={2}
+                        />
+                      </div>
                     </div>
                     <div className="flex flex-col gap-2 items-center">
                       <label className="text-xs flex items-center gap-1 cursor-pointer"><input type="checkbox" checked={s.correctAnswers.includes(o.id)} onChange={()=> toggleCorrect(s.id,o.id)} />Bonne</label>

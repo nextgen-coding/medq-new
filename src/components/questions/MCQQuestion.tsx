@@ -275,17 +275,8 @@ export function MCQQuestion({
       if (!hideImmediateResults) {
         setSubmitted(true);
         setIsCorrect(answerResult === true);
-        // Auto-expand only missed correct options and wrong selections
-        const correct = question.correctAnswers || question.correct_answers || [];
-        const ua = Array.isArray(userAnswer) ? userAnswer : [];
-        if (answerResult === true) {
-          setExpandedExplanations([]);
-        } else {
-          const wrongSelected = ua.filter((id) => !correct.includes(id));
-          const missedCorrect = correct.filter((id: string) => !ua.includes(id));
-          const autoExpandIds = Array.from(new Set([...wrongSelected, ...missedCorrect]));
-          setExpandedExplanations(autoExpandIds);
-        }
+        // Don't auto-expand explanations - keep them collapsed by default
+        setExpandedExplanations([]);
       } else {
         // For clinical case questions with hidden results, keep UI in answering mode
         setSubmitted(false);
@@ -337,19 +328,21 @@ export function MCQQuestion({
           return {
             id: index.toString(),
             text: option,
-            explanation: undefined
+            explanation: undefined,
+            isAI: false
           };
         } else if (option && typeof option === 'object') {
           // Ensure object option has required properties
           return {
             id: option.id || index.toString(),
             text: option.text || '',
-            explanation: option.explanation
+            explanation: option.explanation,
+            isAI: option.isAI || false
           };
         }
         return null;
       })
-      .filter(Boolean) as Array<{ id: string; text: string; explanation?: string }>;
+      .filter(Boolean) as Array<{ id: string; text: string; explanation?: string; isAI?: boolean }>;
   }, [question.options]);
 
   // Get correct answers array from question
@@ -431,27 +424,9 @@ export function MCQQuestion({
     const qualitative: boolean | 'partial' = isAnswerCorrect ? true : (rawScore > 0 ? 'partial' : false);
     setIsCorrect(qualitative); // Use qualitative result for UI display
     
-    // Auto-expand explanations for incorrect answers and correct answers that weren't selected
-    // Only do this if results are not hidden
+    // Don't auto-expand explanations - let users manually expand them
+    // Keep explanations collapsed by default after submission
     if (!hideImmediateResults) {
-      const autoExpandIds: string[] = [];
-      
-      // Add incorrect selections to auto-expand
-      selectedOptionIds.forEach(id => {
-        if (!correctAnswers.includes(id)) {
-          autoExpandIds.push(id);
-        }
-      });
-      
-      // Add correct answers that weren't selected to auto-expand
-      correctAnswers.forEach(id => {
-        if (!selectedOptionIds.includes(id)) {
-          autoExpandIds.push(id);
-        }
-      });
-      
-      setExpandedExplanations(autoExpandIds);
-      
       // Auto-scroll to question top after submission to see the full question and results
       setTimeout(() => {
         if (questionRef.current) {

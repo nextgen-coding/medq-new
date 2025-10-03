@@ -123,22 +123,22 @@ export function QuestionItem({ question, onEdit, onDelete, isClinicalCase = fals
               <AlertDialogContent>
                 <AlertDialogHeader>
                   <AlertDialogTitle>
-                    {isClinicalCase ? 'Delete Clinical Case' : 'Delete Question'}
+                    {isClinicalCase ? 'Supprimer le cas clinique' : 'Supprimer la question'}
                   </AlertDialogTitle>
                   <AlertDialogDescription>
                     {isClinicalCase 
-                      ? 'Are you sure you want to delete this clinical case and all its questions? This action cannot be undone.'
-                      : 'Are you sure you want to delete this question? This action cannot be undone.'
+                      ? 'Êtes-vous sûr de vouloir supprimer ce cas clinique et toutes ses questions ? Cette action ne peut pas être annulée.'
+                      : 'Êtes-vous sûr de vouloir supprimer cette question ? Cette action ne peut pas être annulée.'
                     }
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogCancel>Annuler</AlertDialogCancel>
                   <AlertDialogAction 
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                     onClick={() => onDelete(question.id)}
                   >
-                    Delete
+                    Supprimer
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>

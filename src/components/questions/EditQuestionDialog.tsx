@@ -190,8 +190,8 @@ export function EditQuestionDialog({ question, isOpen, onOpenChange, onQuestionU
   const removeOption = (index: number) => {
     if (options.length <= 2) {
       toast({
-        title: "Cannot remove option",
-        description: "A question must have at least 2 options.",
+        title: "Impossible de supprimer l'option",
+        description: "Une question doit avoir au moins 2 options.",
         variant: "destructive",
       });
       return;
@@ -215,11 +215,11 @@ export function EditQuestionDialog({ question, isOpen, onOpenChange, onQuestionU
   // Bulk parser (MCQ) with explanations
   const parseBulkInput = () => {
     if (!bulkInput.trim()) {
-      toast({ title: 'Empty', description: 'Paste question + options first.' });
+      toast({ title: 'Vide', description: 'Collez d\'abord la question et les options.' });
       return;
     }
     if (formData.type !== 'mcq') {
-      toast({ title: 'Wrong type', description: 'Bulk analyse is only for MCQ.', variant: 'destructive' });
+      toast({ title: 'Mauvais type', description: 'L\'analyse groupée est uniquement pour les QCM.', variant: 'destructive' });
       return;
     }
 
@@ -277,8 +277,8 @@ export function EditQuestionDialog({ question, isOpen, onOpenChange, onQuestionU
   const handleSubmit = async () => {
     if (!formData.text.trim()) {
       toast({
-        title: "Validation Error",
-        description: "Question text is required.",
+        title: "Erreur de validation",
+        description: "Le texte de la question est requis.",
         variant: "destructive",
       });
       return;
@@ -288,8 +288,8 @@ export function EditQuestionDialog({ question, isOpen, onOpenChange, onQuestionU
       const validOptions = options.filter(opt => opt.text.trim());
       if (validOptions.length < 2) {
         toast({
-          title: "Validation Error",
-          description: "At least 2 options are required for MCQ questions.",
+          title: "Erreur de validation",
+          description: "Au moins 2 options sont requises pour les questions QCM.",
           variant: "destructive",
         });
         return;
@@ -297,8 +297,8 @@ export function EditQuestionDialog({ question, isOpen, onOpenChange, onQuestionU
 
       if (correctAnswers.length === 0) {
         toast({
-          title: "Validation Error",
-          description: "At least one correct answer must be selected.",
+          title: "Erreur de validation",
+          description: "Au moins une bonne réponse doit être sélectionnée.",
           variant: "destructive",
         });
         return;
@@ -351,8 +351,8 @@ export function EditQuestionDialog({ question, isOpen, onOpenChange, onQuestionU
       }
 
       toast({
-        title: "Question updated",
-        description: "The question has been successfully updated.",
+        title: "Question mise à jour",
+        description: "La question a été mise à jour avec succès.",
       });
 
       onQuestionUpdated();
@@ -360,8 +360,8 @@ export function EditQuestionDialog({ question, isOpen, onOpenChange, onQuestionU
     } catch (error) {
       console.error('Error updating question:', error);
       toast({
-        title: "Error",
-        description: "Failed to update question. Please try again.",
+        title: "Erreur",
+        description: "Échec de la mise à jour de la question. Veuillez réessayer.",
         variant: "destructive",
       });
     } finally {
@@ -373,7 +373,7 @@ export function EditQuestionDialog({ question, isOpen, onOpenChange, onQuestionU
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[95vh] overflow-hidden flex flex-col p-0 border-blue-200/60 dark:border-blue-900/40">
         <DialogHeader className="flex-shrink-0 p-6 pb-4 border-b border-blue-100/80 dark:border-blue-900/40 bg-gradient-to-b from-blue-50/60 to-transparent dark:from-blue-950/30">
-          <DialogTitle className="text-blue-700 dark:text-blue-400">Edit Question</DialogTitle>
+          <DialogTitle className="text-blue-700 dark:text-blue-400">Modifier la question</DialogTitle>
         </DialogHeader>
         
         <div className="flex-1 overflow-y-auto px-6 pb-4 space-y-6 min-h-0" style={{ maxHeight: 'calc(95vh - 180px)' }}>
