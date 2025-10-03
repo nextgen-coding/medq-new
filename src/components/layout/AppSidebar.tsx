@@ -44,7 +44,6 @@ export function AppSidebar() {
   const isMaintainer = user?.role === 'maintainer';
   const maintainerItems = isMaintainer
     ? [
-        { label: t('sidebar.sessions', { defaultValue: 'Sessions' }), icon: FileText, href: '/maintainer/sessions' },
         { label: t('admin.reports', { defaultValue: 'Rapports' }), icon: AlertTriangle, href: '/maintainer/reports' },
       ]
     : [];

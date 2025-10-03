@@ -11,6 +11,7 @@ import { Specialty, Semester } from '@/types';
 import { toast } from '@/hooks/use-toast';
 import { CreateSpecialtyDialog } from '@/components/specialties/CreateSpecialtyDialog';
 import { EditSpecialtyDialog } from '@/components/specialties/EditSpecialtyDialog';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import { UpsellBanner } from '@/components/subscription/UpsellBanner';
 import { UpgradeDialog } from '@/components/subscription/UpgradeDialog';
 import { useTranslation } from 'react-i18next';
@@ -41,6 +42,8 @@ export default function MatieresPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedSpecialty, setSelectedSpecialty] = useState<Specialty | null>(null);
+  const [specialtyToDelete, setSpecialtyToDelete] = useState<Specialty | null>(null);
+  const [isDeletingSpecialty, setIsDeletingSpecialty] = useState(false);
   const [isUpgradeDialogOpen, setIsUpgradeDialogOpen] = useState(false);
   const [isUpsellDismissed, setIsUpsellDismissed] = useState(false);
   const [pinnedSpecialties, setPinnedSpecialties] = useState<Set<string>>(new Set());
@@ -270,11 +273,16 @@ export default function MatieresPage() {
     setIsEditDialogOpen(true);
   }, []);
 
-  const handleDeleteSpecialty = useCallback(async (specialty: Specialty) => {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer cette matière ?')) return;
+  const handleDeleteSpecialty = useCallback((specialty: Specialty) => {
+    setSpecialtyToDelete(specialty);
+  }, []);
+
+  const confirmDeleteSpecialty = useCallback(async () => {
+    if (!specialtyToDelete) return;
     
+    setIsDeletingSpecialty(true);
     try {
-      const response = await fetch(`/api/specialties/${specialty.id}`, {
+      const response = await fetch(`/api/specialties/${specialtyToDelete.id}`, {
         method: 'DELETE',
       });
 
@@ -282,7 +290,7 @@ export default function MatieresPage() {
         throw new Error('Impossible de supprimer la matière');
       }
 
-      setSpecialties(prev => prev.filter(s => s.id !== specialty.id));
+      setSpecialties(prev => prev.filter(s => s.id !== specialtyToDelete.id));
       
       // Invalidate cache
       specialtiesCache = null;
@@ -298,8 +306,11 @@ export default function MatieresPage() {
         description: "Une erreur s'est produite. Veuillez réessayer.",
         variant: "destructive",
       });
+    } finally {
+      setIsDeletingSpecialty(false);
+      setSpecialtyToDelete(null);
     }
-  }, [t]);
+  }, [specialtyToDelete]);
 
   const handleSpecialtyCreated = useCallback(() => {
     fetchSpecialties(true);
@@ -545,6 +556,18 @@ export default function MatieresPage() {
               onOpenChange={setIsEditDialogOpen}
               specialty={selectedSpecialty}
               onSpecialtyUpdated={handleSpecialtyUpdated}
+            />
+
+            <ConfirmationDialog
+              isOpen={!!specialtyToDelete}
+              onOpenChange={(open) => !open && !isDeletingSpecialty && setSpecialtyToDelete(null)}
+              title="Supprimer la matière"
+              description={`Êtes-vous sûr de vouloir supprimer la matière "${specialtyToDelete?.name}" ? Cette action est irréversible et supprimera également toutes les données associées.`}
+              confirmText={isDeletingSpecialty ? "Suppression..." : "Supprimer"}
+              cancelText="Annuler"
+              variant="destructive"
+              onConfirm={confirmDeleteSpecialty}
+              disabled={isDeletingSpecialty}
             />
 
             <UpgradeDialog

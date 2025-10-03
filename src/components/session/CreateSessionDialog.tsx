@@ -7,44 +7,41 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
-import { Semester, Niveau } from '@/types';
+import { Checkbox } from '@/components/ui/checkbox';
 
-type Session = {
-  id: string;
-  name: string;
-  pdfUrl?: string;
-  correctionUrl?: string;
-  niveauId?: string;
-  semesterId?: string;
-  specialtyId?: string;
-  specialty?: { id: string; name: string };
-  niveau?: { id: string; name: string };
-  semester?: { id: string; name: string; order: number };
-};
-
-type Specialty = {
+interface Specialty {
   id: string;
   name: string;
   niveauId?: string;
   semesterId?: string;
-};
-
-interface EditSessionDialogProps {
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  sessionId?: string;
-  onSessionUpdated: () => void;
 }
 
-export function EditSessionDialog({ 
+interface Niveau {
+  id: string;
+  name: string;
+}
+
+interface Semester {
+  id: string;
+  name: string;
+  order: number;
+  niveauId: string;
+}
+
+interface CreateSessionDialogProps {
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  specialtyId?: string;
+  onSessionCreated: () => void;
+}
+
+export function CreateSessionDialog({ 
   isOpen, 
   onOpenChange, 
-  sessionId,
-  onSessionUpdated 
-}: EditSessionDialogProps) {
+  specialtyId,
+  onSessionCreated 
+}: CreateSessionDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const [isLoadingData, setIsLoadingData] = useState(false);
-  const [session, setSession] = useState<Session | null>(null);
   const [specialties, setSpecialties] = useState<Specialty[]>([]);
   const [niveaux, setNiveaux] = useState<Niveau[]>([]);
   const [semesters, setSemesters] = useState<Semester[]>([]);
@@ -55,52 +52,26 @@ export function EditSessionDialog({
     correctionUrl: '',
     niveauId: '',
     semesterId: '',
-    specialtyId: '',
+    specialtyId: specialtyId || '',
+    isFree: false,
   });
 
-  // Load session data when dialog opens
+  // Load filter data when dialog opens
   useEffect(() => {
-    if (isOpen && sessionId) {
-      loadSessionData();
+    if (isOpen) {
       loadFilterData();
-    }
-  }, [isOpen, sessionId]);
-
-  const loadSessionData = async () => {
-    if (!sessionId) return;
-    
-    setIsLoadingData(true);
-    try {
-      const response = await fetch(`/api/sessions/${sessionId}`);
-      if (response.ok) {
-        const sessionData = await response.json();
-        setSession(sessionData);
-        setFormData({
-          name: sessionData.name || '',
-          pdfUrl: sessionData.pdfUrl || '',
-          correctionUrl: sessionData.correctionUrl || '',
-          niveauId: sessionData.niveauId || '',
-          semesterId: sessionData.semesterId || '',
-          specialtyId: sessionData.specialtyId || '',
-        });
-      } else {
-        toast({
-          title: "Erreur",
-          description: "Impossible de charger les données de la session.",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      console.error('Error loading session:', error);
-      toast({
-        title: "Erreur",
-        description: "Une erreur s'est produite lors du chargement.",
-        variant: "destructive",
+      // Reset form when dialog opens
+      setFormData({
+        name: '',
+        pdfUrl: '',
+        correctionUrl: '',
+        niveauId: '',
+        semesterId: '',
+        specialtyId: specialtyId || '',
+        isFree: false,
       });
-    } finally {
-      setIsLoadingData(false);
     }
-  };
+  }, [isOpen, specialtyId]);
 
   const loadFilterData = async () => {
     try {
@@ -131,12 +102,20 @@ export function EditSessionDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!sessionId) return;
+
+    if (!formData.name.trim()) {
+      toast({
+        title: "Erreur",
+        description: "Le nom de la session est requis.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/sessions/${sessionId}`, {
-        method: 'PATCH',
+      const response = await fetch('/api/sessions', {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -147,34 +126,30 @@ export function EditSessionDialog({
           niveauId: formData.niveauId || null,
           semesterId: formData.semesterId || null,
           specialtyId: formData.specialtyId || null,
+          isFree: formData.isFree,
         }),
       });
 
       if (response.ok) {
-        const updatedSession = await response.json();
-        
-        // Update the session data locally
-        setSession(updatedSession);
-        
         toast({
           title: "Succès",
-          description: "Session mise à jour avec succès.",
+          description: "Session créée avec succès.",
         });
-        onSessionUpdated();
+        onSessionCreated();
         onOpenChange(false);
       } else {
         const errorData = await response.json();
         toast({
           title: "Erreur",
-          description: errorData.error || "Impossible de mettre à jour la session.",
+          description: errorData.error || "Impossible de créer la session.",
           variant: "destructive",
         });
       }
     } catch (error) {
-      console.error('Error updating session:', error);
+      console.error('Error creating session:', error);
       toast({
         title: "Erreur",
-        description: "Une erreur s'est produite lors de la mise à jour.",
+        description: "Une erreur s'est produite lors de la création.",
         variant: "destructive",
       });
     } finally {
@@ -182,14 +157,14 @@ export function EditSessionDialog({
     }
   };
 
-  const handleInputChange = (field: string, value: string) => {
+  const handleInputChange = (field: string, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   // Filter semesters based on selected niveau
-  const filteredSemesters = semesters.filter(semester => 
-    !formData.niveauId || semester.niveauId === formData.niveauId
-  );
+  const filteredSemesters = formData.niveauId
+    ? semesters.filter(s => s.niveauId === formData.niveauId)
+    : semesters;
 
   // Filter specialties based on selected niveau and semester
   // Show all specialties if no filters, otherwise filter by available criteria
@@ -197,10 +172,10 @@ export function EditSessionDialog({
     // If no niveau selected, show all specialties
     if (!formData.niveauId) return true;
     
-    // If niveau selected, filter by niveau
+    // If niveau selected, filter by niveau (if specialty has niveauId)
     if (specialty.niveauId && specialty.niveauId !== formData.niveauId) return false;
     
-    // If semester also selected, filter by semester
+    // If semester also selected, filter by semester (if specialty has semesterId)
     if (formData.semesterId && specialty.semesterId && specialty.semesterId !== formData.semesterId) return false;
     
     return true;
@@ -208,25 +183,43 @@ export function EditSessionDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Modifier la session</DialogTitle>
+          <DialogTitle>Créer une nouvelle session</DialogTitle>
         </DialogHeader>
 
-        {isLoadingData ? (
-          <div className="flex items-center justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name">Nom de la session *</Label>
               <Input
                 id="name"
                 value={formData.name}
                 onChange={(e) => handleInputChange('name', e.target.value)}
-                placeholder="Nom de la session"
+                placeholder="Ex: Session 2024"
                 required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="pdfUrl">URL du PDF</Label>
+              <Input
+                id="pdfUrl"
+                type="url"
+                value={formData.pdfUrl}
+                onChange={(e) => handleInputChange('pdfUrl', e.target.value)}
+                placeholder="https://example.com/session.pdf"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="correctionUrl">URL de correction</Label>
+              <Input
+                id="correctionUrl"
+                type="url"
+                value={formData.correctionUrl}
+                onChange={(e) => handleInputChange('correctionUrl', e.target.value)}
+                placeholder="https://example.com/correction.pdf"
               />
             </div>
 
@@ -296,50 +289,35 @@ export function EditSessionDialog({
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="pdfUrl">URL du PDF</Label>
-              <Input
-                id="pdfUrl"
-                value={formData.pdfUrl}
-                onChange={(e) => handleInputChange('pdfUrl', e.target.value)}
-                placeholder="https://example.com/session.pdf"
-                type="url"
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="isFree"
+                checked={formData.isFree}
+                onCheckedChange={(checked) => handleInputChange('isFree', checked as boolean)}
               />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="correctionUrl">URL de la correction</Label>
-              <Input
-                id="correctionUrl"
-                value={formData.correctionUrl}
-                onChange={(e) => handleInputChange('correctionUrl', e.target.value)}
-                placeholder="https://example.com/correction.pdf"
-                type="url"
-              />
-            </div>
-
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                disabled={isLoading}
+              <Label
+                htmlFor="isFree"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
               >
-                Annuler
-              </Button>
-              <Button type="submit" disabled={isLoading || !formData.name.trim()}>
-                {isLoading ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Mise à jour...
-                  </>
-                ) : (
-                  'Mettre à jour'
-                )}
-              </Button>
-            </DialogFooter>
-          </form>
-        )}
+                Session gratuite pour tous les utilisateurs
+              </Label>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => onOpenChange(false)}
+              disabled={isLoading}
+            >
+              Annuler
+            </Button>
+            <Button type="submit" disabled={isLoading || !formData.name.trim()}>
+              {isLoading ? "Création..." : "Créer"}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

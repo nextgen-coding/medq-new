@@ -9,6 +9,7 @@ import { SidebarInset } from '@/components/ui/sidebar';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { SessionSpecialtyCard } from '@/components/session/SessionSpecialtyCard';
 import { ManageSessionsDialog } from '@/components/session/ManageSessionsDialog';
+import { CreateSessionDialog } from '@/components/session/CreateSessionDialog';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
@@ -33,6 +34,8 @@ type Specialty = {
 
 export default function SessionsPage() {
   const { user, isAdmin } = useAuth();
+  const isMaintainer = user?.role === 'maintainer';
+  const canManageSessions = isAdmin || isMaintainer;
   const { hasActiveSubscription } = useSubscription();
   const [specialties, setSpecialties] = useState<Specialty[]>([]);
   const [filteredSpecialties, setFilteredSpecialties] = useState<Specialty[]>([]);
@@ -43,12 +46,13 @@ export default function SessionsPage() {
   const [niveauFilter, setNiveauFilter] = useState<string>('all');
   const [semesterFilter, setSemesterFilter] = useState<string>('all');
   const [isManageDialogOpen, setIsManageDialogOpen] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [selectedSpecialty, setSelectedSpecialty] = useState<Specialty | null>(null);
   const [updatingSpecialtyId, setUpdatingSpecialtyId] = useState<string | null>(null);
   const [isUpgradeDialogOpen, setIsUpgradeDialogOpen] = useState(false);
   const [isUpsellDismissed, setIsUpsellDismissed] = useState(false);
 
-  const shouldShowUpsell = !hasActiveSubscription && !isAdmin && !isUpsellDismissed;
+  const shouldShowUpsell = !hasActiveSubscription && !canManageSessions && !isUpsellDismissed;
 
   // Filter and sort specialties when data changes
   useEffect(() => {
@@ -69,10 +73,10 @@ export default function SessionsPage() {
     setFilteredSpecialties(sorted);
   }, [specialties, searchQuery]);
 
-  // Load semesters and niveaux for admin filtering
+  // Load semesters and niveaux for admin/maintainer filtering
   useEffect(() => {
     const loadFilters = async () => {
-      if (!isAdmin) return;
+      if (!canManageSessions) return;
       
       try {
         // Load semesters
@@ -94,14 +98,14 @@ export default function SessionsPage() {
     };
     
     loadFilters();
-  }, [isAdmin]);
+  }, [canManageSessions]);
 
   const fetchSpecialties = useCallback(async (forceRefresh = false) => {
     try {
       setIsLoading(true);
       const params = new URLSearchParams();
       
-      if (isAdmin) {
+      if (canManageSessions) {
         if (niveauFilter && niveauFilter !== 'all') params.set('niveau', niveauFilter);
         if (semesterFilter && semesterFilter !== 'all') params.set('semester', semesterFilter);
       }
@@ -129,7 +133,7 @@ export default function SessionsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [isAdmin, niveauFilter, semesterFilter]);
+  }, [canManageSessions, niveauFilter, semesterFilter]);
 
   useEffect(() => {
     if (user) {
@@ -138,11 +142,7 @@ export default function SessionsPage() {
   }, [user, fetchSpecialties]);
 
   const handleAddSession = useCallback(() => {
-    // TODO: Implement add session dialog
-    toast({
-      title: "Fonctionnalité à venir",
-      description: "L'ajout de sessions sera disponible prochainement.",
-    });
+    setIsCreateDialogOpen(true);
   }, []);
 
   const handleEditSession = useCallback((specialty: Specialty) => {
@@ -151,6 +151,11 @@ export default function SessionsPage() {
   }, []);
 
   const handleSessionsChanged = useCallback(async () => {
+    // Refresh the entire specialty list to update session counts
+    await fetchSpecialties(true);
+  }, [fetchSpecialties]);
+
+  const handleSessionCreated = useCallback(async () => {
     // Refresh the entire specialty list to update session counts
     await fetchSpecialties(true);
   }, [fetchSpecialties]);
@@ -228,8 +233,8 @@ export default function SessionsPage() {
             {/* Main Content */}
             <div className="flex-1 bg-gray-50 dark:bg-gray-900 overflow-y-auto">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                {/* Admin Filters and Controls - Not Sticky */}
-                {isAdmin && (
+                {/* Admin/Maintainer Filters and Controls - Not Sticky */}
+                {canManageSessions && (
                   <div className="flex items-center justify-end gap-3 mb-8">
                     {/* Niveau Filter */}
                     {niveaux.length > 0 && (
@@ -339,8 +344,8 @@ export default function SessionsPage() {
                       <SessionSpecialtyCard
                         key={specialty.id}
                         specialty={specialty}
-                        onEdit={isAdmin ? () => handleEditSession(specialty) : undefined}
-                        onDelete={isAdmin ? () => handleDeleteSession(specialty) : undefined}
+                        onEdit={canManageSessions ? () => handleEditSession(specialty) : undefined}
+                        onDelete={canManageSessions ? () => handleDeleteSession(specialty) : undefined}
                         isUpdating={updatingSpecialtyId === specialty.id}
                       />
                     ))}
@@ -357,6 +362,12 @@ export default function SessionsPage() {
         onOpenChange={setIsManageDialogOpen}
         specialty={selectedSpecialty}
         onSessionsChanged={handleSessionsChanged}
+      />
+
+      <CreateSessionDialog
+        isOpen={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+        onSessionCreated={handleSessionCreated}
       />
 
       <UpgradeDialog

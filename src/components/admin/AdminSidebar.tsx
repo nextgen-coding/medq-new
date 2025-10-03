@@ -167,7 +167,6 @@ export function AdminSidebar() {
   ], [t]);
 
   const maintainerMenuItems = React.useMemo(() => [
-    { label: 'Gestion Sessions', icon: FileText, href: '/maintainer/sessions', description: 'Créer des sessions' },
     { label: t('admin.reports', { defaultValue: 'Signalements' }), icon: AlertTriangle, href: '/maintainer/reports', description: 'Rapports par niveau' },
     studentPanelItem
   ], [t, studentPanelItem]);
