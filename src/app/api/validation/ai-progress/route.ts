@@ -239,7 +239,7 @@ function cleanSource(raw?: string | null): string {
   return s;
 }
 
-async function runAiSession(file: File, instructions: string | undefined, aiId: string) {
+async function runAiSession(file: File, instructions: string | undefined, aiId: string, fastMode: boolean = true) {
   try {
     updateSession(aiId, { phase: 'running', message: 'Lecture du fichier…', progress: 5 }, '📖 Lecture du fichier…');
     const buffer = await file.arrayBuffer();
@@ -1025,14 +1025,13 @@ SORTIE JSON STRICTE:
 
   // Optional FAST mode: skip enhancement stage to maximize throughput
   // Default to FAST (skip enhancement) to avoid Vercel 300s timeout
-  const FAST_MODE = String(process.env.AI_FAST_MODE || '1').trim() === '1';
-  if (FAST_MODE) {
+  if (fastMode) {
     console.log('[AI] ⚡ FAST_MODE enabled: Skipping enhancement pass to avoid timeout');
     updateSession(aiId, {}, '⚡ Mode rapide: pas d\'amélioration supplémentaire');
   } else {
     console.log('[AI] 🔧 Enhancement mode: Processing short explanations');
   }
-  const enhanced = FAST_MODE ? new Map<string, any>() : await enhanceMcqRows(enhanceTargets);
+  const enhanced = fastMode ? new Map<string, any>() : await enhanceMcqRows(enhanceTargets);
     // Apply enhanced content where available
     for (const t of enhanceTargets) {
       const res = enhanced.get(t.id);
@@ -1134,6 +1133,9 @@ async function postHandler(request: AuthenticatedRequest) {
   const form = await request.formData();
   const file = form.get('file') as File | null;
   const instructions = typeof form.get('instructions') === 'string' ? String(form.get('instructions')) : undefined;
+  // Read fastMode from form data (defaults to true for safety/performance)
+  const fastModeValue = form.get('fastMode');
+  const fastMode = fastModeValue === null ? true : fastModeValue === 'true' || fastModeValue === '1';
   if (!file) return NextResponse.json({ error: 'file required' }, { status: 400 });
 
   // Create DB job first using existing AiValidationJob model
@@ -1169,8 +1171,8 @@ async function postHandler(request: AuthenticatedRequest) {
   };
   activeAiSessions.set(aiId, sess);
   void persistSessionToDb(aiId, sess);
-  // Start background job
-  runAiSession(file, instructions, aiId).catch(() => {});
+  // Start background job with fastMode parameter
+  runAiSession(file, instructions, aiId, fastMode).catch(() => {});
   return NextResponse.json({ aiId });
 }
 
