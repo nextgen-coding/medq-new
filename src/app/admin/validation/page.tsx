@@ -23,7 +23,10 @@ import {
   Info,
   Trash2,
   Activity,
-  Terminal
+  Terminal,
+  Pause,
+  Play,
+  RefreshCw
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -90,6 +93,7 @@ export default function AdminValidationPage() {
   const itemsPerPage = 4;
 
   // Auto-refresh interval (ref-based to avoid state update loops)
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true);
   const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Load jobs from API
@@ -136,10 +140,10 @@ export default function AdminValidationPage() {
     }
   }, []);
 
-  // Auto-refresh when there are active jobs
+  // Auto-refresh when there are active jobs AND auto-refresh is enabled
   useEffect(() => {
-    // Only auto-refresh if there are active jobs (processing or queued)
-    if (statsData.activeJobs > 0) {
+    // Only auto-refresh if enabled AND there are active jobs (processing or queued)
+    if (autoRefreshEnabled && statsData.activeJobs > 0) {
       if (!refreshIntervalRef.current) {
         console.log(`🔄 Auto-refresh activated: ${statsData.activeJobs} active jobs`);
         refreshIntervalRef.current = setInterval(() => {
@@ -148,16 +152,22 @@ export default function AdminValidationPage() {
       }
     } else {
       if (refreshIntervalRef.current) {
-        console.log('⏸️ Auto-refresh deactivated: no active jobs');
+        console.log('⏸️ Auto-refresh deactivated');
         clearInterval(refreshIntervalRef.current);
         refreshIntervalRef.current = null;
+      }
+      // When auto-refresh is disabled, close active details SSE connection
+      if (!autoRefreshEnabled && detailsEventRef.current) {
+        console.log('🔌 Closing details EventSource: auto-refresh disabled');
+        detailsEventRef.current.close();
+        detailsEventRef.current = null;
       }
     }
 
     return () => {
       // no-op here; explicit unmount cleanup below
     };
-  }, [statsData.activeJobs, loadJobs]);
+  }, [statsData.activeJobs, loadJobs, autoRefreshEnabled]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -394,9 +404,29 @@ export default function AdminValidationPage() {
                 <h1 className="text-2xl font-bold">Validation des Questions</h1>
                 <p className="text-muted-foreground">Système de validation classique et IA</p>
               </div>
-              <Button onClick={loadJobs} disabled={jobsLoading}>
-                {jobsLoading ? 'Actualisation...' : 'Actualiser'}
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant={autoRefreshEnabled ? "default" : "outline"}
+                  onClick={() => setAutoRefreshEnabled(!autoRefreshEnabled)}
+                  title={autoRefreshEnabled ? "Désactiver le rafraîchissement automatique" : "Activer le rafraîchissement automatique"}
+                >
+                  {autoRefreshEnabled ? (
+                    <>
+                      <Pause className="h-4 w-4 mr-2" />
+                      Auto-refresh ON
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-4 w-4 mr-2" />
+                      Auto-refresh OFF
+                    </>
+                  )}
+                </Button>
+                <Button onClick={loadJobs} disabled={jobsLoading} variant="outline">
+                  <RefreshCw className={`h-4 w-4 mr-2 ${jobsLoading ? 'animate-spin' : ''}`} />
+                  {jobsLoading ? 'Actualisation...' : 'Actualiser'}
+                </Button>
+              </div>
             </div>
 
             {/* Statistics */}
