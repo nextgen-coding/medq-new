@@ -768,9 +768,20 @@ export function ClinicalCaseQuestion({
         return;
       }
 
-      // Results phase: Enter advances to next case when evaluation complete
+      // Results phase: Enter advances to next case when evaluation complete OR skips current evaluation
       if (showResults) {
-        if (evaluationComplete || evaluationOrder.length === 0) {
+        // Check if we're in the middle of evaluating QROC questions
+        if (!evaluationComplete && evaluationOrder.length > 0 && evaluationIndex < evaluationOrder.length) {
+          // Skip if Enter is pressed while not in textarea (avoid conflicting with textarea input)
+          if (!isTextarea) {
+            e.preventDefault();
+            // Skip current QROC evaluation by submitting with 'partial' result
+            const currentQrocId = evaluationOrder[evaluationIndex];
+            if (currentQrocId && !questionResults[currentQrocId]) {
+              handleSelfAssessmentUpdate(currentQrocId, 'partial');
+            }
+          }
+        } else if (evaluationComplete || evaluationOrder.length === 0) {
           e.preventDefault();
           onNext();
         }
