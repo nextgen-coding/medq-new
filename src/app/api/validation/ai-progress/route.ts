@@ -643,6 +643,11 @@ Format:
     const processQROC = async (): Promise<Map<string, QrocOK>> => {
       if (qrocItems.length === 0) {
         console.log('[AI] 🔷 QROC: No items to process');
+        // Update progress to 90% even when there are no QROC items
+        updateSession(aiId, { 
+          progress: 90,
+          message: '🔷 QROC: Aucune question QROC'
+        }, '🔷 QROC: Aucune question à traiter');
         return new Map();
       }
       

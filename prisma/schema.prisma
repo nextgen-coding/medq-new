@@ -107,6 +107,8 @@ model User {
   reviewedLevelChangeRequests  LevelChangeRequest[] @relation("ReviewedBy")
   // Password change verification codes
   passwordChangeVerifications  PasswordChangeVerification[]
+  // Bulk import sessions
+  bulkImportSessions           BulkImportSession[]
 
   @@map("profiles")
 }
@@ -787,5 +789,25 @@ model PasswordChangeVerification {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("password_change_verifications")
+}
+
+// Bulk import session for persisting state across serverless invocations
+model BulkImportSession {
+  id          String   @id // e.g., "import_1234567890_abc123xyz"
+  userId      String   @map("user_id") @db.Uuid
+  progress    Int      @default(0)
+  phase       String   // 'validating', 'processing', 'complete', 'error'
+  message     String
+  logs        Json     @default("[]")  // Array of log messages
+  stats       Json                     // { total, imported, failed, createdSpecialties, createdLectures, etc. }
+  cancelled   Boolean  @default(false)
+  lastUpdated DateTime @default(now()) @map("last_updated") @db.Timestamptz(6)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([lastUpdated])
+  @@map("bulk_import_sessions")
 }
 
