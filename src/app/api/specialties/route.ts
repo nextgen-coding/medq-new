@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireAuth, requireAdmin, AuthenticatedRequest } from '@/lib/auth-middleware';
+import { requireAuth, requireAdmin, requireMaintainerOrAdmin, AuthenticatedRequest } from '@/lib/auth-middleware';
 import { prisma } from '@/lib/prisma';
 
 async function getHandler(request: AuthenticatedRequest) {
@@ -262,6 +262,6 @@ async function deleteHandler(request: AuthenticatedRequest) {
 }
 
 export const GET = requireAuth(getHandler);
-export const POST = requireAdmin(postHandler);
-export const PUT = requireAdmin(putHandler);
-export const DELETE = requireAdmin(deleteHandler);
+export const POST = requireMaintainerOrAdmin(postHandler);
+export const PUT = requireMaintainerOrAdmin(putHandler);
+export const DELETE = requireMaintainerOrAdmin(deleteHandler);

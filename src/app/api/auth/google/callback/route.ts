@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     
     if (!code) {
       return NextResponse.json(
-        { error: 'Authorization code is required' },
+        { error: 'Le code d\'autorisation est requis' },
         { status: 400 }
       );
     }
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
       console.error('Google OAuth credentials not configured');
       return NextResponse.json(
-        { error: 'Google OAuth is not configured' },
+        { error: 'Google OAuth n\'est pas configuré' },
         { status: 500 }
       );
     }
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     if (!tokenResponse.ok) {
       console.error('Token exchange failed:', await tokenResponse.text());
       return NextResponse.json(
-        { error: 'Failed to exchange authorization code' },
+        { error: 'Échec de l\'échange du code d\'autorisation' },
         { status: 400 }
       );
     }
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
     if (!userInfoResponse.ok) {
       console.error('Failed to get user info:', await userInfoResponse.text());
       return NextResponse.json(
-        { error: 'Failed to get user information' },
+        { error: 'Échec de la récupération des informations de l\'utilisateur' },
         { status: 400 }
       );
     }
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
 
     if (!email) {
       return NextResponse.json(
-        { error: 'Email is required from Google' },
+        { error: 'L\'e-mail est requis de Google' },
         { status: 400 }
       );
     }
@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
     const response = NextResponse.json({
       user: userWithoutPassword,
       token,
-      message: 'Google sign-in successful'
+      message: 'Connexion Google réussie'
     });
 
     // Set HTTP-only cookie
@@ -152,7 +152,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Google callback error:', error);
     return NextResponse.json(
-      { error: 'Google sign-in failed' },
+      { error: 'Échec de la connexion Google' },
       { status: 500 }
     );
   }

@@ -49,7 +49,7 @@ async function getHandler(request: AuthenticatedRequest, { params }: { params: P
     profile: {
       specialty: null, // This isn't directly available in this schema
       niveau: user.niveau?.name || null,
-      university: null, // This field doesn't exist in current schema
+      faculte: user.faculty || null,
     },
     subscription: {
       type: user.hasActiveSubscription ? 'active' : 'inactive',

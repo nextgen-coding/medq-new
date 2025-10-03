@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
     
     if (!token) {
       return NextResponse.json(
-        { error: 'Verification token is required' },
+        { error: 'Le jeton de vérification est requis' },
         { status: 400 }
       );
     }
@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     
     if (!user) {
       return NextResponse.json(
-        { error: 'Invalid or expired verification token' },
+        { error: 'Jeton de vérification invalide ou expiré' },
         { status: 400 }
       );
     }
@@ -39,13 +39,13 @@ export async function GET(request: NextRequest) {
     });
     
     return NextResponse.json({
-      message: 'Email verified successfully! You can now log in to your account.'
+      message: 'E-mail vérifié avec succès ! Vous pouvez maintenant vous connecter à votre compte.'
     });
     
   } catch (error) {
     console.error('Error verifying email:', error);
     return NextResponse.json(
-      { error: 'Failed to verify email' },
+      { error: 'Échec de la vérification de l\'e-mail' },
       { status: 500 }
     );
   }

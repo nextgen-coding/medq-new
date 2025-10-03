@@ -40,6 +40,7 @@ export function QuestionEditDialog({
   handleReminderMediaChange,
     updateOptionText,
     updateOptionExplanation,
+    updateOptionIsAI,
     toggleCorrectAnswer,
   setCorrectAnswers,
   handleSubmit,
@@ -74,6 +75,7 @@ export function QuestionEditDialog({
             options={options}
             updateOptionText={updateOptionText}
             updateOptionExplanation={updateOptionExplanation}
+            updateOptionIsAI={updateOptionIsAI}
             correctAnswers={correctAnswers}
             toggleCorrectAnswer={toggleCorrectAnswer}
             setCorrectAnswers={setCorrectAnswers}

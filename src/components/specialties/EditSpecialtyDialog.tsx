@@ -132,8 +132,8 @@ export function EditSpecialtyDialog({
       }
 
       toast({
-        title: t('common.success'),
-        description: t('specialties.updatedSuccessfully'),
+        title: "Succès",
+        description: "Matière modifiée avec succès",
       });
 
       onSpecialtyUpdated();
@@ -141,8 +141,8 @@ export function EditSpecialtyDialog({
     } catch (error) {
       console.error('Error updating specialty:', error);
       toast({
-        title: t('common.error'),
-        description: t('common.tryAgain'),
+        title: "Erreur",
+        description: "Une erreur s'est produite. Veuillez réessayer.",
         variant: "destructive",
       });
     } finally {
@@ -155,12 +155,12 @@ export function EditSpecialtyDialog({
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto backdrop-blur-sm bg-white/95 dark:bg-gray-900/95 border-blue-200 dark:border-blue-800">
         <DialogHeader className="border-b border-blue-100/80 dark:border-blue-900/40 bg-gradient-to-b from-blue-50/60 to-transparent dark:from-blue-950/30">
           <DialogTitle className="text-2xl font-bold text-blue-700 dark:text-blue-400">
-            {t('specialties.editSpecialty')}
+            Modifier la matière
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="name">{t('common.name')}</Label>
+            <Label htmlFor="name">Nom</Label>
             <Input
               id="name"
               value={name}
@@ -171,7 +171,7 @@ export function EditSpecialtyDialog({
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="description">{t('common.description')}</Label>
+            <Label htmlFor="description">Description</Label>
             <Textarea
               id="description"
               value={description}
@@ -184,17 +184,17 @@ export function EditSpecialtyDialog({
           <SpecialtyIconCustomizer
             value={iconData}
             onChange={setIconData}
-            label={t('specialties.icon')}
+            label="Icône"
           />
 
           <div className="space-y-2">
-            <Label htmlFor="niveau">{t('common.niveau')}</Label>
+            <Label htmlFor="niveau">Niveau</Label>
             <Select value={niveauId || "none"} onValueChange={(value) => setNiveauId(value === "none" ? "" : value)}>
               <SelectTrigger className="border-blue-200 dark:border-blue-800 focus:border-blue-500 focus:ring-blue-500">
-                <SelectValue placeholder={t('common.selectNiveau')} />
+                <SelectValue placeholder="Sélectionner un niveau" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">{t('common.noNiveau')}</SelectItem>
+                <SelectItem value="none">Aucun niveau</SelectItem>
                 {niveaux.map((niveau) => (
                   <SelectItem key={niveau.id} value={niveau.id}>
                     {niveau.name}
@@ -205,13 +205,13 @@ export function EditSpecialtyDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="semester">Semester</Label>
+            <Label htmlFor="semester">Semestre</Label>
             <Select value={semesterId || "none"} onValueChange={(value) => setSemesterId(value === "none" ? "" : value)}>
               <SelectTrigger className="border-blue-200 dark:border-blue-800 focus:border-blue-500 focus:ring-blue-500">
-                <SelectValue placeholder="Select semester" />
+                <SelectValue placeholder="Sélectionner un semestre" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">No semester</SelectItem>
+                <SelectItem value="none">Aucun semestre</SelectItem>
                 {semesters.map((s) => (
                   <SelectItem key={s.id} value={s.id}>
                     {s.name} (#{s.order})
@@ -227,7 +227,7 @@ export function EditSpecialtyDialog({
               checked={isFree}
               onCheckedChange={setIsFree}
             />
-            <Label htmlFor="isFree">{t('specialties.isFree')}</Label>
+            <Label htmlFor="isFree">Gratuit</Label>
           </div>
 
           <div className="flex justify-end space-x-2 pt-4">
@@ -238,14 +238,14 @@ export function EditSpecialtyDialog({
               disabled={isLoading}
               className="border-blue-300 dark:border-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
             >
-              {t('common.cancel')}
+              Annuler
             </Button>
             <Button 
               type="submit" 
               disabled={isLoading}
               className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
             >
-              {isLoading ? t('common.saving') : t('common.save')}
+              {isLoading ? 'Enregistrement...' : 'Enregistrer'}
             </Button>
           </div>
         </form>

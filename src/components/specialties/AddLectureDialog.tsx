@@ -5,7 +5,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { useTranslation } from 'react-i18next';
 
 interface AddLectureDialogProps {
   isOpen: boolean;
@@ -25,7 +24,6 @@ export function AddLectureDialog({
     description: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { t } = useTranslation();
 
   const handleAddLecture = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,8 +32,8 @@ export function AddLectureDialog({
     
     if (!newLecture.title.trim()) {
       toast({
-        title: t('specialties.validationError'),
-        description: t('specialties.nameRequired'),
+        title: 'Erreur de validation',
+        description: 'Le titre du cours est requis.',
         variant: "destructive",
       });
       return;
@@ -62,8 +60,8 @@ export function AddLectureDialog({
       }
       
       toast({
-        title: t('specialties.success'),
-        description: t('specialties.specialtyCreated'),
+        title: 'Succès',
+        description: 'Le cours a été créé avec succès.',
       });
       
       // Reset form and close dialog
@@ -78,14 +76,14 @@ export function AddLectureDialog({
       
     } catch (error: unknown) {
       console.error('Error creating lecture:', error);
-      let errorMessage = t('common.tryAgain');
+      let errorMessage = 'Veuillez réessayer.';
       
       if (error instanceof Error) {
         errorMessage = error.message;
       }
       
       toast({
-        title: t('common.error'),
+        title: 'Erreur',
         description: errorMessage,
         variant: "destructive",
       });
@@ -98,34 +96,34 @@ export function AddLectureDialog({
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{t('lectures.addLecture')}</DialogTitle>
+          <DialogTitle>Ajouter un cours</DialogTitle>
         </DialogHeader>
         
         <form onSubmit={handleAddLecture} className="space-y-4 mt-4">
           <div className="space-y-2">
-            <Label htmlFor="title">{t('specialties.name')}</Label>
+            <Label htmlFor="title">Titre du cours *</Label>
             <Input 
               id="title"
               value={newLecture.title}
               onChange={(e) => setNewLecture({...newLecture, title: e.target.value})}
-              placeholder={t('specialties.name')}
+              placeholder="Entrer le titre du cours"
               required
             />
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="description">{t('specialties.description')}</Label>
+            <Label htmlFor="description">Description (optionnel)</Label>
             <Input 
               id="description"
               value={newLecture.description}
               onChange={(e) => setNewLecture({...newLecture, description: e.target.value})}
-              placeholder={t('specialties.description')}
+              placeholder="Entrer une description du cours"
             />
           </div>
           
           <div className="flex justify-end">
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? t('lectures.creating') : t('lectures.createLecture')}
+              {isSubmitting ? 'Création...' : 'Créer le cours'}
             </Button>
           </div>
         </form>

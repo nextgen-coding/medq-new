@@ -3,12 +3,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
+import { Sparkles } from 'lucide-react';
 
 interface AnswersExplanationsTabProps {
-  options: { id: string; text: string; explanation?: string }[];
+  options: { id: string; text: string; explanation?: string; isAI?: boolean }[];
   correctAnswers: string[];
   updateOptionText: (id: string, text: string) => void;
   updateOptionExplanation: (id: string, explanation: string) => void;
+  updateOptionIsAI: (id: string, isAI: boolean) => void;
   toggleCorrectAnswer: (id: string) => void;
 }
 
@@ -17,6 +19,7 @@ export function AnswersExplanationsTab({
   correctAnswers,
   updateOptionText,
   updateOptionExplanation,
+  updateOptionIsAI,
   toggleCorrectAnswer
 }: AnswersExplanationsTabProps) {
   return (
@@ -42,6 +45,18 @@ export function AnswersExplanationsTab({
               </div>
               
               <div className="space-y-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <Label htmlFor={`option-explanation-${option.id}`} className="flex items-center gap-1">
+                    <Sparkles className="h-3 w-3 text-blue-500" />
+                    AI
+                  </Label>
+                  <input 
+                    type="checkbox" 
+                    checked={option.isAI || false} 
+                    onChange={(e) => updateOptionIsAI(option.id, e.target.checked)}
+                    className="h-3 w-3"
+                  />
+                </div>
                 <Label htmlFor={`option-explanation-${option.id}`}>Explication</Label>
                 <Textarea
                   id={`option-explanation-${option.id}`}

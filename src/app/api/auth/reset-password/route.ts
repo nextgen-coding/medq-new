@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
     
     if (!token || !password) {
       return NextResponse.json(
-        { error: 'Token and new password are required' },
+        { error: 'Le jeton et le nouveau mot de passe sont requis' },
         { status: 400 }
       );
     }
@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     
     if (!user) {
       return NextResponse.json(
-        { error: 'Invalid or expired reset token' },
+        { error: 'Jeton de réinitialisation invalide ou expiré' },
         { status: 400 }
       );
     }
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     // Check if token is expired
     if (user.passwordResetExpires && isTokenExpired(user.passwordResetExpires)) {
       return NextResponse.json(
-        { error: 'Reset token has expired' },
+        { error: 'Le jeton de réinitialisation a expiré' },
         { status: 400 }
       );
     }
@@ -64,13 +64,13 @@ export async function POST(request: NextRequest) {
     });
     
     return NextResponse.json({
-      message: 'Password reset successfully! You can now log in with your new password.'
+      message: 'Mot de passe réinitialisé avec succès ! Vous pouvez maintenant vous connecter avec votre nouveau mot de passe.'
     });
     
   } catch (error) {
     console.error('Error resetting password:', error);
     return NextResponse.json(
-      { error: 'Failed to reset password' },
+      { error: 'Échec de la réinitialisation du mot de passe' },
       { status: 500 }
     );
   }

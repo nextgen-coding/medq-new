@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireAdmin, AuthenticatedRequest } from '@/lib/auth-middleware'
+import { requireAdmin, requireMaintainerOrAdmin, AuthenticatedRequest } from '@/lib/auth-middleware'
 
 // GET /api/sessions/[id] - Get a single session by ID
 export async function GET(
@@ -55,8 +55,8 @@ export async function GET(
   }
 }
 
-// DELETE /api/sessions/[id] - Delete a single session (admin only)
-export const DELETE = requireAdmin(async (
+// DELETE /api/sessions/[id] - Delete a single session (admin and maintainer)
+export const DELETE = requireMaintainerOrAdmin(async (
   request: AuthenticatedRequest,
   { params }: { params: Promise<{ id: string }> }
 ) => {
@@ -95,8 +95,8 @@ export const DELETE = requireAdmin(async (
   }
 })
 
-// PUT /api/sessions/[id] - Update a session (admin only)
-export const PUT = requireAdmin(async (
+// PUT /api/sessions/[id] - Update a session (admin and maintainer)
+export const PUT = requireMaintainerOrAdmin(async (
   request: AuthenticatedRequest,
   { params }: { params: Promise<{ id: string }> }
 ) => {

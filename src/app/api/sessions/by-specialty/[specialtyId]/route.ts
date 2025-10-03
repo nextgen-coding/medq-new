@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireAdmin, AuthenticatedRequest } from '@/lib/auth-middleware';
+import { requireMaintainerOrAdmin, AuthenticatedRequest } from '@/lib/auth-middleware';
 
-export const DELETE = requireAdmin(async (
+export const DELETE = requireMaintainerOrAdmin(async (
   request: AuthenticatedRequest,
   { params }: { params: Promise<{ specialtyId: string }> }
 ) => {

@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { RichTextInput, ImageData } from '@/components/ui/rich-text-input';
 import { Question, Option } from '@/types';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Sparkles } from 'lucide-react';
 // QuickParseQroc removed from individual sub-questions; we now use only global parser
 
 interface ClinicalCaseEditDialogProps {
@@ -50,9 +50,9 @@ export function ClinicalCaseEditDialog({ caseNumber, questions, isOpen, onOpenCh
         text: q.text || '',
         explanation: q.explanation || '',
         answer: q.type === 'clinic_croq' ? (q.correctAnswers || q.correct_answers || [])[0] || '' : '',
-        options: q.options?.map(o=> ({ id: o.id, text: o.text, explanation: o.explanation || '' })) || [
-          { id: `opt_${Math.random().toString(36).slice(2)}`, text: '', explanation: '' },
-          { id: `opt_${Math.random().toString(36).slice(2)}`, text: '', explanation: '' },
+        options: q.options?.map(o=> ({ id: o.id, text: o.text, explanation: o.explanation || '', isAI: o.isAI || false })) || [
+          { id: `opt_${Math.random().toString(36).slice(2)}`, text: '', explanation: '', isAI: false },
+          { id: `opt_${Math.random().toString(36).slice(2)}`, text: '', explanation: '', isAI: false },
         ],
         correctAnswers: (q.correctAnswers || q.correct_answers || []),
         images: [], // Initialize empty - images will be parsed from text
@@ -76,8 +76,8 @@ export function ClinicalCaseEditDialog({ caseNumber, questions, isOpen, onOpenCh
         explanation: '',
         answer: '',
         options: [
-          { id: `opt_${Math.random().toString(36).slice(2)}`, text: '', explanation: '' },
-          { id: `opt_${Math.random().toString(36).slice(2)}`, text: '', explanation: '' }
+          { id: `opt_${Math.random().toString(36).slice(2)}`, text: '', explanation: '', isAI: false },
+          { id: `opt_${Math.random().toString(36).slice(2)}`, text: '', explanation: '', isAI: false }
         ],
         correctAnswers: [],
         images: [],
@@ -90,7 +90,7 @@ export function ClinicalCaseEditDialog({ caseNumber, questions, isOpen, onOpenCh
     setSubs(prev => prev.length > 1 ? prev.filter(s => s.id !== id) : prev);
   };
   const updateOption = (sid: string, oid: string, patch: Partial<Option>) => { setSubs(prev => prev.map(s=> s.id===sid ? { ...s, options: s.options.map(o=> o.id===oid? { ...o, ...patch } : o) } : s)); };
-  const addOption = (sid: string) => { setSubs(prev => prev.map(s=> s.id===sid ? { ...s, options: [...s.options, { id: `opt_${Math.random().toString(36).slice(2)}`, text: '', explanation: '' }] } : s)); };
+  const addOption = (sid: string) => { setSubs(prev => prev.map(s=> s.id===sid ? { ...s, options: [...s.options, { id: `opt_${Math.random().toString(36).slice(2)}`, text: '', explanation: '', isAI: false }] } : s)); };
   const removeOption = (sid: string, oid: string) => { setSubs(prev => prev.map(s=> s.id===sid ? { ...s, options: s.options.filter(o=> o.id!==oid), correctAnswers: s.correctAnswers.filter(c=> c!==oid) } : s)); };
   const toggleCorrect = (sid: string, oid: string) => { setSubs(prev => prev.map(s=> s.id===sid ? { ...s, correctAnswers: s.correctAnswers.includes(oid) ? s.correctAnswers.filter(c=> c!==oid) : [...s.correctAnswers, oid] } : s)); };
 
@@ -132,7 +132,7 @@ export function ClinicalCaseEditDialog({ caseNumber, questions, isOpen, onOpenCh
         const processedExplanation = s.explanation.trim() ? convertNewToLegacy(s.explanation.trim(), s.explanationImages) : null;
         const processedAnswer = s.type === 'clinic_croq' ? convertNewToLegacy(s.answer.trim(), s.answerImages) : '';
         const base: any = { text: processedText, explanation: processedExplanation, caseText: legacyCaseText, caseQuestionNumber: order + 1 };
-        if (s.type === 'clinic_mcq') { base.type='clinic_mcq'; base.options = s.options.filter(o=> o.text.trim()).map(o=> ({ id:o.id, text:o.text.trim(), explanation:o.explanation?.trim()||'' })); base.correctAnswers = s.correctAnswers; }
+        if (s.type === 'clinic_mcq') { base.type='clinic_mcq'; base.options = s.options.filter(o=> o.text.trim()).map(o=> ({ id:o.id, text:o.text.trim(), explanation:o.explanation?.trim()||'', isAI: o.isAI || false })); base.correctAnswers = s.correctAnswers; }
         else { base.type='clinic_croq'; base.correctAnswers = [processedAnswer]; base.options = []; }
         // If this is a new sub-question (temporary id), create it instead of updating
         const isNew = s.id.startsWith('new_');
@@ -188,7 +188,7 @@ export function ClinicalCaseEditDialog({ caseNumber, questions, isOpen, onOpenCh
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="space-y-2">
                   <Label>Type</Label>
-                  <Select value={s.type} onValueChange={(v:any)=> updateSub(s.id,{ type:v, answer:'', correctAnswers:[], options: v==='clinic_mcq' ? (s.options.length? s.options : [ {id:`opt_${Math.random().toString(36).slice(2)}`, text:'', explanation:''}, {id:`opt_${Math.random().toString(36).slice(2)}`, text:'', explanation:''} ]) : [] })}>
+                  <Select value={s.type} onValueChange={(v:any)=> updateSub(s.id,{ type:v, answer:'', correctAnswers:[], options: v==='clinic_mcq' ? (s.options.length? s.options : [ {id:`opt_${Math.random().toString(36).slice(2)}`, text:'', explanation:'', isAI: false}, {id:`opt_${Math.random().toString(36).slice(2)}`, text:'', explanation:'', isAI: false} ]) : [] })}>
                     <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="clinic_mcq">CAS QCM</SelectItem>
@@ -215,12 +215,26 @@ export function ClinicalCaseEditDialog({ caseNumber, questions, isOpen, onOpenCh
                       <div className="pt-2 text-xs w-5 text-center">{String.fromCharCode(65+oIdx)}</div>
                       <div className="flex-1 space-y-2">
                         <Input placeholder={`Option ${oIdx+1}`} value={o.text} onChange={e=> updateOption(s.id,o.id,{ text: e.target.value })} />
-                        <Textarea
-                          placeholder="Explication (optionnel)"
-                          value={o.explanation||''}
-                          onChange={(e) => updateOption(s.id, o.id, { explanation: e.target.value })}
-                          rows={2}
-                        />
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <Label className="text-xs flex items-center gap-1">
+                              <Sparkles className="h-3 w-3 text-blue-500" />
+                              AI
+                            </Label>
+                            <input 
+                              type="checkbox" 
+                              checked={o.isAI || false} 
+                              onChange={(e) => updateOption(s.id, o.id, { isAI: e.target.checked })}
+                              className="h-3 w-3"
+                            />
+                          </div>
+                          <Textarea
+                            placeholder="Explication (optionnel)"
+                            value={o.explanation||''}
+                            onChange={(e) => updateOption(s.id, o.id, { explanation: e.target.value })}
+                            rows={2}
+                          />
+                        </div>
                       </div>
                       <div className="flex flex-col gap-2 items-center">
                         <label className="text-xs flex items-center gap-1 cursor-pointer"><input type="checkbox" checked={s.correctAnswers.includes(o.id)} onChange={()=> toggleCorrect(s.id,o.id)} />Bonne</label>

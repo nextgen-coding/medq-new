@@ -35,12 +35,13 @@ export function useQuestionEdit({
   const [options, setOptions] = useState(
     propQuestion?.options?.map((opt: any, index: number) => {
       if (typeof opt === 'string') {
-        return { id: index.toString(), text: opt, explanation: '' };
+        return { id: index.toString(), text: opt, explanation: '', isAI: false };
       }
       return {
         id: opt.id || index.toString(),
         text: opt.text || '',
-        explanation: opt.explanation || ''
+        explanation: opt.explanation || '',
+        isAI: opt.isAI || false
       };
     }) || []
   );
@@ -176,12 +177,13 @@ export function useQuestionEdit({
       setOptions(
         extractResult.convertedOptions.map((opt: any, index: number) => {
           if (typeof opt === 'string') {
-            return { id: index.toString(), text: opt, explanation: '' };
+            return { id: index.toString(), text: opt, explanation: '', isAI: false };
           }
           return {
             id: opt.id || index.toString(),
             text: opt.text || '',
-            explanation: opt.explanation || ''
+            explanation: opt.explanation || '',
+            isAI: opt.isAI || false
           };
         })
       );
@@ -225,20 +227,21 @@ export function useQuestionEdit({
       setOptions(
         extractResult.convertedOptions.map((opt: any, index: number) => {
           if (typeof opt === 'string') {
-            return { id: index.toString(), text: opt, explanation: '' };
+            return { id: index.toString(), text: opt, explanation: '', isAI: false };
           }
           return {
             id: opt.id || index.toString(),
             text: opt.text || '',
-            explanation: opt.explanation || ''
+            explanation: opt.explanation || '',
+            isAI: opt.isAI || false
           };
         })
       );
     } catch (error) {
       console.error('Error fetching question:', error);
       toast({
-        title: t('common.error'),
-        description: t('common.tryAgain'),
+        title: 'Erreur',
+        description: 'Veuillez réessayer.',
         variant: "destructive",
       });
     } finally {
@@ -249,8 +252,8 @@ export function useQuestionEdit({
   const saveQuestion = async (updatedQuestion: Partial<Question>) => {
     if (!user) {
       toast({
-        title: t('auth.notAuthenticated'),
-        description: t('auth.pleaseSignIn'),
+        title: 'Non authentifié',
+        description: 'Veuillez vous connecter.',
         variant: "destructive",
       });
       return;
@@ -259,8 +262,8 @@ export function useQuestionEdit({
     const questionIdToUse = questionId || question?.id;
     if (!questionIdToUse) {
       toast({
-        title: t('common.error'),
-        description: 'No question ID available',
+        title: 'Erreur',
+        description: 'Identifiant de question manquant.',
         variant: "destructive",
       });
       return;
@@ -286,8 +289,8 @@ export function useQuestionEdit({
       setQuestion(data);
       
       toast({
-        title: t('common.success'),
-        description: t('questions.updatedSuccessfully'),
+        title: 'Succès',
+        description: 'Question mise à jour avec succès.',
       });
       
       onSave?.();
@@ -295,14 +298,14 @@ export function useQuestionEdit({
       onOpenChange?.(false);
     } catch (error: any) {
       console.error('Error updating question:', error);
-      let errorMessage = t('common.tryAgain');
+      let errorMessage = 'Veuillez réessayer.';
       
       if (error instanceof Error && error.message) {
         errorMessage = error.message;
       }
       
       toast({
-        title: t('common.error'),
+        title: 'Erreur',
         description: errorMessage,
         variant: "destructive",
       });
@@ -317,6 +320,10 @@ export function useQuestionEdit({
 
   const updateOptionExplanation = (id: string, explanation: string) => {
     setOptions(prev => prev.map(opt => opt.id === id ? { ...opt, explanation } : opt));
+  };
+
+  const updateOptionIsAI = (id: string, isAI: boolean) => {
+    setOptions(prev => prev.map(opt => opt.id === id ? { ...opt, isAI } : opt));
   };
 
   const toggleCorrectAnswer = (id: string) => {
@@ -364,10 +371,11 @@ export function useQuestionEdit({
       mediaType: mediaType,
       courseReminderMediaUrl: reminderMediaUrl,
       courseReminderMediaType: reminderMediaType,
-      options: question.type === 'mcq' ? options.map(opt => ({
+      options: (question.type === 'mcq' || question.type === 'clinic_mcq') ? options.map(opt => ({
         id: opt.id,
         text: toLegacy(opt.text),
-        explanation: opt.explanation ? toLegacy(opt.explanation) : undefined
+        explanation: opt.explanation ? toLegacy(opt.explanation) : undefined,
+        isAI: opt.isAI || false
       })) : undefined,
       // Use camelCase to match API route
       correctAnswers: (question.type === 'mcq' || question.type === 'clinic_mcq' || question.type === 'qroc' || question.type === 'clinic_croq') ? correctAnswers : undefined
@@ -398,6 +406,7 @@ export function useQuestionEdit({
   handleReminderMediaChange,
     updateOptionText,
     updateOptionExplanation,
+    updateOptionIsAI,
     toggleCorrectAnswer,
     handleSubmit,
     saveQuestion,

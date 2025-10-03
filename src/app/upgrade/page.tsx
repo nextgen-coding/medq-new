@@ -389,16 +389,16 @@ export default function UpgradePage() {
           } else {
             if (state.method === 'voucher_code') {
               title = '🎉 Code de bon validé !'
-              enhancedDescription = `Votre code de bon a été appliqué avec succès ! ${data.message}`
+              enhancedDescription = data.message || 'Votre code de bon a été appliqué avec succès !'
             } else if (state.method === 'activation_key') {
               title = '🎉 Clé d\'activation validée !'
-              enhancedDescription = `Votre clé d'activation a été appliquée avec succès ! ${data.message}`
+              enhancedDescription = data.message || 'Votre clé d\'activation a été appliquée avec succès !'
             } else if (state.method === 'custom_payment') {
               title = '🎉 Paiement enregistré !'
-              enhancedDescription = `Votre demande de paiement personnalisé a été enregistrée. ${data.message}`
+              enhancedDescription = data.message || 'Votre demande de paiement personnalisé a été enregistrée.'
             } else if (state.method === 'autre_payment') {
               title = '🎉 Paiement enregistré !'
-              enhancedDescription = `Votre demande de paiement a été enregistrée. ${data.message}`
+              enhancedDescription = data.message || 'Votre demande de paiement a été enregistrée.'
             }
           }
           

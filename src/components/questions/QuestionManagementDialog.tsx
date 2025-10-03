@@ -146,8 +146,8 @@ export function QuestionManagementDialog({ lecture, isOpen, onOpenChange, initia
     } catch (error) {
       console.error('Error fetching questions:', error);
       toast({
-        title: "Error",
-        description: "Failed to load questions. Please try again.",
+        title: "Erreur",
+        description: "Échec du chargement des questions. Veuillez réessayer.",
         variant: "destructive",
       });
     } finally {
@@ -164,8 +164,8 @@ export function QuestionManagementDialog({ lecture, isOpen, onOpenChange, initia
       if (response.ok) {
         setQuestions(prev => prev.filter(q => q.id !== questionId));
         toast({
-          title: "Question deleted",
-          description: "The question has been successfully removed",
+          title: "Question supprimée",
+          description: "La question a été supprimée avec succès",
         });
       } else {
         throw new Error('Failed to delete question');
@@ -173,8 +173,8 @@ export function QuestionManagementDialog({ lecture, isOpen, onOpenChange, initia
     } catch (error) {
       console.error('Error deleting question:', error);
       toast({
-        title: "Error",
-        description: "Failed to delete question. Please try again.",
+        title: "Erreur",
+        description: "Échec de la suppression de la question. Veuillez réessayer.",
         variant: "destructive",
       });
     }

@@ -228,16 +228,28 @@ export function OpenQuestion({
   useEffect(() => {
     if (disableEnterHandlers) return;
     const handleKeyDown = (event: KeyboardEvent) => {
-      // Enter for next question (only when assessment is completed)
-      if (event.key === 'Enter' && assessmentCompleted && !event.altKey && !event.shiftKey && !event.ctrlKey) {
-        event.preventDefault();
-        onNext();
+      // Skip if user is typing in a textarea or input
+      const target = event.target as HTMLElement;
+      if (target?.tagName === 'TEXTAREA' || target?.tagName === 'INPUT') {
+        return;
+      }
+      
+      // Enter for next question (when assessment is completed OR when self-assessment is shown after empty answer)
+      if (event.key === 'Enter' && !event.altKey && !event.shiftKey && !event.ctrlKey) {
+        if (assessmentCompleted) {
+          event.preventDefault();
+          onNext();
+        } else if (showSelfAssessment && !selfAssessmentCompletedRef.current) {
+          // Skip self-assessment and go to next when Enter is pressed
+          event.preventDefault();
+          handleSelfAssessment('partial');
+        }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [assessmentCompleted, onNext, disableEnterHandlers]);
+  }, [assessmentCompleted, showSelfAssessment, onNext, disableEnterHandlers]);
 
   // Pin/Unpin handlers for questions
   const handlePinQuestion = useCallback(async () => {
@@ -444,20 +456,21 @@ export function OpenQuestion({
       // Check user's self-assessment preference
       const shouldShowSelfAssessment = (user as any)?.showSelfAssessment ?? true;
       
-      if (isEmpty) {
+      if (!shouldShowSelfAssessment) {
+        // Skip self-assessment if user disabled it, auto-submit with partial result
+        setAssessmentCompleted(true);
+        selfAssessmentCompletedRef.current = true;
+        onSubmit(answer, 'partial'); // Default to partial when self-assessment is disabled
+      } else if (isEmpty) {
         // For empty answers, show self-assessment to encourage evaluation
         setAssessmentCompleted(false);
         selfAssessmentCompletedRef.current = false;
         setShowSelfAssessment(true);
-      } else if (shouldShowSelfAssessment) {
+      } else {
         // For non-empty answers, show self-assessment if user prefers it
         setAssessmentCompleted(false); // Reset assessment state for new evaluation
         selfAssessmentCompletedRef.current = false;
         setShowSelfAssessment(true);
-      } else {
-        // Skip self-assessment if user disabled it, auto-submit with partial result
-        setAssessmentCompleted(true);
-        onSubmit(answer, 'partial'); // Default to partial when self-assessment is disabled
       }
       // Intentionally no scroll to "Rappel du cours"; keep the question and its answer visible in place
     }
@@ -623,16 +636,16 @@ export function OpenQuestion({
         setLocalHidden(undefined);
         onQuestionUpdate(question.id, { hidden: question.hidden });
         toast({
-          title: "Error",
-          description: "Failed to update question visibility",
+          title: "Erreur",
+          description: "Échec de la mise à jour de la visibilité",
           variant: "destructive",
         });
       } else {
         toast({
-          title: newHiddenStatus ? 'Question hidden' : 'Question unhidden',
+          title: newHiddenStatus ? 'Question masquée' : 'Question visible',
           description: newHiddenStatus
-            ? 'The question is now hidden from students.'
-            : 'The question is now visible to students.',
+            ? 'La question est maintenant masquée des étudiants.'
+            : 'La question est maintenant visible aux étudiants.',
         });
       }
     } catch (error) {
@@ -640,8 +653,8 @@ export function OpenQuestion({
       setLocalHidden(undefined);
       onQuestionUpdate(question.id, { hidden: question.hidden });
       toast({
-        title: "Error",
-        description: "Failed to update question visibility",
+        title: "Erreur",
+        description: "Échec de la mise à jour de la visibilité",
         variant: "destructive",
       });
     } finally {

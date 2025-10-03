@@ -254,6 +254,67 @@ export default function CoursPageRoute() {
     );
   }
 
+  // General empty state - no questions in course
+  if (!isLoading && (!questions || questions.length === 0) && !mode) {
+    const isAdminOrMaintainer = user?.role === 'admin' || user?.role === 'maintainer';
+    
+    return (
+      <ProtectedRoute>
+        <div className="min-h-screen bg-gradient-to-br from-blue-50/50 via-white to-blue-50/50 dark:from-blue-950/20 dark:via-gray-900 dark:to-blue-950/20">
+          <div className="container mx-auto px-4 py-12">
+            <div className="flex items-center justify-center min-h-[50vh]">
+              <div className="text-center max-w-md mx-auto">
+                <div className="backdrop-blur-sm bg-white/90 dark:bg-gray-800/90 border border-gray-200/60 dark:border-gray-700/60 rounded-2xl p-8 shadow-lg">
+                  <div className="mb-6">
+                    <div className="mx-auto w-16 h-16 rounded-full bg-gray-100 dark:bg-gray-700 flex items-center justify-center mb-4">
+                      <FileText className="w-8 h-8 text-gray-400" />
+                    </div>
+                    <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">Aucune question disponible</h1>
+                    <p className="text-gray-600 dark:text-gray-400 mb-6">
+                      {isAdminOrMaintainer 
+                        ? "Ce cours ne contient pas encore de questions. Créez des questions pour commencer."
+                        : "Ce cours ne contient pas encore de questions."}
+                    </p>
+                  </div>
+                  
+                  <div className="flex flex-col gap-3">
+                    {isAdminOrMaintainer && (
+                      <Button 
+                        onClick={() => setOpenQuestionsDialog(true)} 
+                        className="bg-green-600 hover:bg-green-700 text-white w-full"
+                      >
+                        <PlusCircle className="w-4 h-4 mr-2" />
+                        Créer des questions
+                      </Button>
+                    )}
+                    <Button 
+                      onClick={() => router.push(`/matieres/${specialtyId}`)} 
+                      variant="outline"
+                      className="w-full"
+                    >
+                      <ArrowLeft className="w-4 h-4 mr-2" />
+                      Retour à la matière
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Question Management Dialog */}
+          {isAdminOrMaintainer && lecture && (
+            <QuestionManagementDialog
+              lecture={lecture}
+              isOpen={openQuestionsDialog}
+              onOpenChange={setOpenQuestionsDialog}
+              initialCreateOpen={false}
+            />
+          )}
+        </div>
+      </ProtectedRoute>
+    );
+  }
+
   const handleQuestionSelect = (index: number) => {
     setCurrentQuestionIndex(index);
   };

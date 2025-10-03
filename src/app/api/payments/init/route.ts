@@ -118,17 +118,17 @@ async function handler(request: AuthenticatedRequest) {
     // Validate input
     if (!method || !subscriptionType) {
       return NextResponse.json(
-        { error: 'Method and subscription type are required' },
+        { error: 'La méthode et le type d\'abonnement sont requis' },
         { status: 400 }
       )
     }
 
     if (!Object.values(PaymentMethod).includes(method)) {
-      return NextResponse.json({ error: 'Invalid payment method' }, { status: 400 })
+      return NextResponse.json({ error: 'Méthode de paiement invalide' }, { status: 400 })
     }
 
     if (!Object.values(SubscriptionType).includes(subscriptionType)) {
-      return NextResponse.json({ error: 'Invalid subscription type' }, { status: 400 })
+      return NextResponse.json({ error: 'Type d\'abonnement invalide' }, { status: 400 })
     }
 
     // 🔒 SECURITY: Always fetch and calculate pricing server-side
@@ -202,7 +202,7 @@ async function handler(request: AuthenticatedRequest) {
     // Handle voucher code method
     if (method === PaymentMethod.voucher_code) {
       if (!voucherCode) {
-        return NextResponse.json({ error: 'Voucher code is required' }, { status: 400 })
+        return NextResponse.json({ error: 'Le code voucher est requis' }, { status: 400 })
       }
 
       // Check if voucher code exists and is valid
@@ -211,15 +211,15 @@ async function handler(request: AuthenticatedRequest) {
       })
 
       if (!voucher) {
-        return NextResponse.json({ error: 'Invalid voucher code' }, { status: 400 })
+        return NextResponse.json({ error: 'Code voucher invalide' }, { status: 400 })
       }
 
       if (voucher.isUsed) {
-        return NextResponse.json({ error: 'Voucher code already used' }, { status: 400 })
+        return NextResponse.json({ error: 'Ce code voucher a déjà été utilisé' }, { status: 400 })
       }
 
       if (voucher.expiresAt && voucher.expiresAt < new Date()) {
-        return NextResponse.json({ error: 'Voucher code expired' }, { status: 400 })
+        return NextResponse.json({ error: 'Ce code voucher a expiré' }, { status: 400 })
       }
 
       // Check if user already used this voucher
@@ -232,7 +232,7 @@ async function handler(request: AuthenticatedRequest) {
 
       if (existingUsage) {
         return NextResponse.json(
-          { error: 'You have already used this voucher code' },
+          { error: 'Vous avez déjà utilisé ce code voucher' },
           { status: 400 }
         )
       }
@@ -288,7 +288,7 @@ async function handler(request: AuthenticatedRequest) {
       return NextResponse.json({
         success: true,
         paymentId: payment.id,
-        message: 'Subscription activated successfully!'
+        message: 'Abonnement activé avec succès !'
       })
     }
 
@@ -297,7 +297,7 @@ async function handler(request: AuthenticatedRequest) {
       const { activationKey } = body
       
       if (!activationKey) {
-        return NextResponse.json({ error: 'Activation key is required' }, { status: 400 })
+        return NextResponse.json({ error: 'La clé d\'activation est requise' }, { status: 400 })
       }
 
       // Find the voucher code
@@ -309,7 +309,7 @@ async function handler(request: AuthenticatedRequest) {
       })
 
       if (!voucherCode) {
-        return NextResponse.json({ error: 'Invalid or already used activation key' }, { status: 400 })
+        return NextResponse.json({ error: 'Clé d\'activation invalide ou déjà utilisée' }, { status: 400 })
       }
 
       // Check if user already has an active subscription
@@ -319,7 +319,7 @@ async function handler(request: AuthenticatedRequest) {
       })
 
       if (user?.hasActiveSubscription && user.subscriptionExpiresAt && user.subscriptionExpiresAt > new Date()) {
-        return NextResponse.json({ error: 'You already have an active subscription' }, { status: 400 })
+        return NextResponse.json({ error: 'Vous avez déjà un abonnement actif' }, { status: 400 })
       }
 
       // Complete the activation and update subscription (no payment record for activation keys)
@@ -359,7 +359,7 @@ async function handler(request: AuthenticatedRequest) {
 
       return NextResponse.json({
         success: true,
-        message: 'Subscription activated successfully with activation key!'
+        message: 'Votre clé d\'activation a été appliquée avec succès !'
       })
     }
 
@@ -372,14 +372,14 @@ async function handler(request: AuthenticatedRequest) {
         // For regular custom payments, require both details and proof
         if (!customPaymentDetails) {
           return NextResponse.json(
-            { error: 'Payment details are required for custom payment' },
+            { error: 'Les détails de paiement sont requis pour un paiement personnalisé' },
             { status: 400 }
           )
         }
 
         if (!proofFileUrl) {
           return NextResponse.json(
-            { error: 'Proof of payment is required for custom payment' },
+            { error: 'La preuve de paiement est requise pour un paiement personnalisé' },
             { status: 400 }
           )
         }
@@ -401,7 +401,7 @@ async function handler(request: AuthenticatedRequest) {
       return NextResponse.json({
         success: true,
         paymentId: payment.id,
-        message: isBuyingKey ? 'Cash payment submitted - team will contact you' : 'Payment submitted for verification',
+        message: isBuyingKey ? 'Paiement en espèces soumis - l\'équipe vous contactera' : 'Paiement soumis pour vérification',
         requiresProof: !isBuyingKey
       })
     }
@@ -415,14 +415,14 @@ async function handler(request: AuthenticatedRequest) {
         // For regular autre payments, require both details and proof
         if (!customPaymentDetails) {
           return NextResponse.json(
-            { error: 'Payment details are required for other payment methods' },
+            { error: 'Les détails de paiement sont requis pour les autres méthodes de paiement' },
             { status: 400 }
           )
         }
 
         if (!proofFileUrl) {
           return NextResponse.json(
-            { error: 'Proof of payment is required for other payment methods' },
+            { error: 'La preuve de paiement est requise pour les autres méthodes de paiement' },
             { status: 400 }
           )
         }
@@ -444,7 +444,7 @@ async function handler(request: AuthenticatedRequest) {
       return NextResponse.json({
         success: true,
         paymentId: payment.id,
-        message: isBuyingKey ? 'Payment request submitted - team will contact you' : 'Payment submitted for verification',
+        message: isBuyingKey ? 'Demande de paiement soumise - l\'équipe vous contactera' : 'Paiement soumis pour vérification',
         requiresProof: !isBuyingKey
       })
     }
@@ -522,7 +522,7 @@ async function handler(request: AuthenticatedRequest) {
 
         return NextResponse.json(
           { 
-            error: 'Failed to initialize payment gateway',
+            error: 'Échec de l\'initialisation de la passerelle de paiement',
             details: konnectError
           },
           { status: 500 }
@@ -548,12 +548,12 @@ async function handler(request: AuthenticatedRequest) {
       })
     }
 
-    return NextResponse.json({ error: 'Invalid payment method' }, { status: 400 })
+    return NextResponse.json({ error: 'Méthode de paiement invalide' }, { status: 400 })
 
   } catch (error) {
     console.error('Payment initialization error:', error)
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Erreur interne du serveur' },
       { status: 500 }
     )
   }

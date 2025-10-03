@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Loader2, Edit, Trash2, Plus } from "lucide-react";
 import { toast } from '@/hooks/use-toast';
 import { EditSessionDialog } from './EditSessionDialog';
+import { CreateSessionDialog } from './CreateSessionDialog';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 
 type Session = {
   id: string;
@@ -41,8 +43,10 @@ export function ManageSessionsDialog({
   const [sessions, setSessions] = useState<Session[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState<string | undefined>();
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
+  const [sessionToDelete, setSessionToDelete] = useState<Session | null>(null);
 
   // Load sessions when dialog opens
   useEffect(() => {
@@ -85,17 +89,21 @@ export function ManageSessionsDialog({
   };
 
   const handleDeleteSession = async (session: Session) => {
-    if (!confirm(`Êtes-vous sûr de vouloir supprimer la session "${session.name}" ?`)) return;
+    setSessionToDelete(session);
+  };
+
+  const confirmDeleteSession = async () => {
+    if (!sessionToDelete) return;
     
-    setDeletingSessionId(session.id);
+    setDeletingSessionId(sessionToDelete.id);
     
     try {
       // Optimistically update the UI first
       const originalSessions = [...sessions];
-      const updatedSessions = sessions.filter(s => s.id !== session.id);
+      const updatedSessions = sessions.filter(s => s.id !== sessionToDelete.id);
       setSessions(updatedSessions);
       
-      const response = await fetch(`/api/sessions/${session.id}`, {
+      const response = await fetch(`/api/sessions/${sessionToDelete.id}`, {
         method: 'DELETE',
       });
 
@@ -108,7 +116,7 @@ export function ManageSessionsDialog({
 
       toast({
         title: "Succès",
-        description: `Session "${session.name}" supprimée avec succès.`,
+        description: `Session "${sessionToDelete.name}" supprimée avec succès.`,
       });
       
       // Notify parent to refresh session counts
@@ -122,6 +130,7 @@ export function ManageSessionsDialog({
       });
     } finally {
       setDeletingSessionId(null);
+      setSessionToDelete(null);
     }
   };
 
@@ -132,12 +141,15 @@ export function ManageSessionsDialog({
     onSessionsChanged();
   };
 
+  const handleSessionCreated = async () => {
+    // Refresh the sessions list immediately
+    await loadSessions();
+    // Notify parent to refresh session counts
+    onSessionsChanged();
+  };
+
   const handleAddSession = () => {
-    // TODO: Implement add session functionality
-    toast({
-      title: "Fonctionnalité à venir",
-      description: "L'ajout de sessions sera disponible prochainement.",
-    });
+    setIsCreateDialogOpen(true);
   };
 
   return (
@@ -238,6 +250,25 @@ export function ManageSessionsDialog({
         onOpenChange={setIsEditDialogOpen}
         sessionId={selectedSessionId}
         onSessionUpdated={handleSessionUpdated}
+      />
+
+      <CreateSessionDialog
+        isOpen={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+        specialtyId={specialty?.id}
+        onSessionCreated={handleSessionCreated}
+      />
+
+      <ConfirmationDialog
+        isOpen={!!sessionToDelete}
+        onOpenChange={(open) => !open && !deletingSessionId && setSessionToDelete(null)}
+        title="Supprimer la session"
+        description={`Êtes-vous sûr de vouloir supprimer la session "${sessionToDelete?.name}" ? Cette action est irréversible.`}
+        confirmText={deletingSessionId ? "Suppression..." : "Supprimer"}
+        cancelText="Annuler"
+        variant="destructive"
+        onConfirm={confirmDeleteSession}
+        disabled={!!deletingSessionId}
       />
     </>
   );

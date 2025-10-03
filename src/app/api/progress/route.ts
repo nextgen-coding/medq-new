@@ -143,4 +143,46 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+// DELETE - Reset progress for a lecture
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const lectureId = searchParams.get('lectureId');
+    const userId = searchParams.get('userId');
+
+    if (!lectureId || !userId) {
+      return NextResponse.json(
+        { error: 'Lecture ID and user ID are required' },
+        { status: 400 }
+      );
+    }
+
+    // Delete all progress records for this user and lecture
+    await prisma.userProgress.deleteMany({
+      where: {
+        userId,
+        lectureId
+      }
+    });
+
+    // Also delete any question-specific data for this lecture
+    await prisma.questionUserData.deleteMany({
+      where: {
+        userId,
+        question: {
+          lectureId
+        }
+      }
+    });
+
+    return NextResponse.json({ success: true, message: 'Progress reset successfully' });
+  } catch (error) {
+    console.error('Error resetting progress:', error);
+    return NextResponse.json(
+      { error: 'Failed to reset progress' },
+      { status: 500 }
+    );
+  }
 } 

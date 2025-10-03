@@ -59,6 +59,8 @@ interface User {
   id: string;
   name: string | null;
   email: string;
+  phone?: string | null;
+  image?: string | null;
   role: 'student' | 'maintainer' | 'admin';
   status: 'active' | 'inactive' | 'banned' | 'pending' | string;
   createdAt: string;
@@ -73,13 +75,13 @@ interface User {
   profile?: {
     specialty?: string;
     niveau?: string;
-    university?: string;
+    faculte?: string;
   };
   paymentHistory?: Array<{
     id: string;
     amount: number;
     currency: string;
-    method: 'konnect_gateway' | 'voucher_code' | 'custom_payment';
+    method: 'konnect_gateway' | 'voucher_code' | 'custom_payment' | 'autre_payment';
     status: 'pending' | 'completed' | 'failed' | 'cancelled' | 'awaiting_verification' | 'verified' | 'rejected';
     subscriptionType: 'semester' | 'annual';
     customPaymentDetails?: string;
@@ -411,7 +413,7 @@ export default function UserDetailPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-4">
           <Avatar className="h-14 w-14 sm:h-16 sm:w-16 ring-2 ring-medblue-100 dark:ring-medblue-900/30">
-            <AvatarImage src={''} alt={user?.name || user?.email || 'user'} />
+            <AvatarImage src={user?.image || ''} alt={user?.name || user?.email || 'user'} />
             <AvatarFallback className="bg-medblue-50 text-medblue-700">
               {(user?.name || user?.email || '?').slice(0, 2).toUpperCase()}
             </AvatarFallback>
@@ -516,6 +518,12 @@ export default function UserDetailPage() {
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">
+                    {t('admin.phone', { defaultValue: 'Téléphone' })}
+                  </Label>
+                  <p className="text-lg font-medium">{user?.phone || 'Non renseigné'}</p>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-muted-foreground">
                     {t('admin.role', { defaultValue: 'Rôle' })}
                   </Label>
                   <div className="mt-1">
@@ -610,9 +618,9 @@ export default function UserDetailPage() {
                   </div>
                   <div>
                     <Label className="text-sm font-medium text-muted-foreground">
-                      {t('admin.university', { defaultValue: 'Université' })}
+                      {t('admin.faculty', { defaultValue: 'Faculté' })}
                     </Label>
-                    <p className="text-lg font-medium">{user.profile?.university || 'N/A'}</p>
+                    <p className="text-lg font-medium">{user.profile?.faculte || 'N/A'}</p>
                   </div>
                 </div>
               </CardContent>
@@ -911,6 +919,7 @@ export default function UserDetailPage() {
                             {payment.method === 'konnect_gateway' && <CreditCard className="h-4 w-4" />}
                             {payment.method === 'voucher_code' && <Gift className="h-4 w-4" />}
                             {payment.method === 'custom_payment' && <Upload className="h-4 w-4" />}
+                            {payment.method === 'autre_payment' && <Upload className="h-4 w-4" />}
                           </div>
                           <div>
                             <div className="font-medium">
@@ -920,6 +929,7 @@ export default function UserDetailPage() {
                               {payment.method === 'konnect_gateway' && 'Paiement en ligne'}
                               {payment.method === 'voucher_code' && `Code: ${payment.voucherCode?.code}`}
                               {payment.method === 'custom_payment' && 'Paiement personnalisé'}
+                              {payment.method === 'autre_payment' && 'Autre méthode de paiement'}
                             </div>
                             <div className="text-xs text-gray-400">
                               {new Date(payment.createdAt).toLocaleString()}
@@ -938,7 +948,7 @@ export default function UserDetailPage() {
                           }>
                             {payment.status}
                           </Badge>
-                          {payment.method === 'custom_payment' && payment.proofImageUrl && (
+                          {(payment.method === 'custom_payment' || payment.method === 'autre_payment') && payment.proofImageUrl && (
                             <Dialog>
                               <DialogTrigger asChild>
                                 <Button variant="outline" size="sm">

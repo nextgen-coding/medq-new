@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
     
     if (!email) {
       return NextResponse.json(
-        { error: 'Email is required' },
+        { error: 'L\'e-mail est requis' },
         { status: 400 }
       );
     }
@@ -22,14 +22,14 @@ export async function POST(request: NextRequest) {
     if (!user) {
       // Don't reveal if user exists or not for security
       return NextResponse.json({
-        message: 'If an account with that email exists, a verification email has been sent.'
+        message: 'Si un compte avec cet e-mail existe, un e-mail de vérification a été envoyé.'
       });
     }
     
     // Check if user is already verified
     if (user.status === 'verified') {
       return NextResponse.json({
-        message: 'This email is already verified. You can log in normally.'
+        message: 'Cet e-mail est déjà vérifié. Vous pouvez vous connecter normalement.'
       });
     }
     
@@ -50,19 +50,19 @@ export async function POST(request: NextRequest) {
     } catch (emailError) {
       console.error('Error sending verification email:', emailError);
       return NextResponse.json(
-        { error: 'Failed to send verification email' },
+        { error: 'Échec de l\'envoi de l\'e-mail de vérification' },
         { status: 500 }
       );
     }
     
     return NextResponse.json({
-      message: 'If an account with that email exists, a verification email has been sent.'
+      message: 'Si un compte avec cet e-mail existe, un e-mail de vérification a été envoyé.'
     });
     
   } catch (error) {
     console.error('Error processing resend verification request:', error);
     return NextResponse.json(
-      { error: 'Failed to process request' },
+      { error: 'Échec du traitement de la demande' },
       { status: 500 }
     );
   }

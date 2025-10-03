@@ -10,6 +10,7 @@ interface MCQOptionItemProps {
     id: string;
     text: string;
     explanation?: string;
+    isAI?: boolean; // Whether the explanation is AI-generated
   };
   index: number;
   isSelected: boolean;
@@ -126,14 +127,14 @@ export function MCQOptionItem({
                   {isExpanded ? (
                     <>
                       <ChevronUp className="h-4 w-4 mr-1" />
-                      <span>Masquer l'explication IA</span>
-                      <Sparkles className="h-4 w-4 ml-1 text-blue-500" />
+                      <span>Masquer {option.isAI ? "l'explication IA" : "l'explication"}</span>
+                      {option.isAI && <Sparkles className="h-4 w-4 ml-1 text-blue-500" />}
                     </>
                   ) : (
                     <>
                       <ChevronDown className="h-4 w-4 mr-1" />
-                      <span>Voir explication par IA</span>
-                      <Sparkles className="h-4 w-4 ml-1 text-blue-500" />
+                      <span>Voir explication{option.isAI ? " par IA" : ""}</span>
+                      {option.isAI && <Sparkles className="h-4 w-4 ml-1 text-blue-500" />}
                     </>
                   )}
                 </button>

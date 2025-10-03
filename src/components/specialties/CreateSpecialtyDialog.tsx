@@ -100,8 +100,8 @@ export function CreateSpecialtyDialog({
     
     if (!name.trim()) {
       toast({
-        title: t('common.error'),
-        description: t('common.nameRequired'),
+        title: "Erreur",
+        description: "Le nom est requis",
         variant: "destructive",
       });
       return;
@@ -143,8 +143,8 @@ export function CreateSpecialtyDialog({
       }
 
       toast({
-        title: t('common.success'),
-        description: t('specialties.createdSuccessfully'),
+        title: "Succès",
+        description: "Matière créée avec succès",
       });
 
       onSpecialtyCreated();
@@ -152,8 +152,8 @@ export function CreateSpecialtyDialog({
     } catch (error) {
       console.error('Error creating specialty:', error);
       toast({
-        title: t('common.error'),
-        description: error instanceof Error ? error.message : t('common.tryAgain'),
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Une erreur s'est produite. Veuillez réessayer.",
         variant: "destructive",
       });
     } finally {
@@ -171,24 +171,24 @@ export function CreateSpecialtyDialog({
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="name">{t('common.name')} *</Label>
+            <Label htmlFor="name">Nom *</Label>
             <Input
               id="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder={t('specialties.enterName')}
+              placeholder="Entrez le nom de la matière"
               className="border-blue-200 dark:border-blue-800 focus:border-blue-500 focus:ring-blue-500"
               required
             />
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="description">{t('common.description')}</Label>
+            <Label htmlFor="description">Description</Label>
             <Textarea
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder={t('specialties.enterDescription')}
+              placeholder="Entrez une description"
               rows={3}
               className="border-blue-200 dark:border-blue-800 focus:border-blue-500 focus:ring-blue-500"
             />
@@ -197,17 +197,17 @@ export function CreateSpecialtyDialog({
           <SpecialtyIconCustomizer
             value={iconData}
             onChange={setIconData}
-            label={t('specialties.icon')}
+            label="Icône"
           />
 
           <div className="space-y-2">
-            <Label htmlFor="niveau">{t('common.niveau')}</Label>
+            <Label htmlFor="niveau">Niveau</Label>
             <Select value={niveauId || "none"} onValueChange={(value) => setNiveauId(value === "none" ? "" : value)}>
               <SelectTrigger className="border-blue-200 dark:border-blue-800 focus:border-blue-500 focus:ring-blue-500">
-                <SelectValue placeholder={t('common.selectNiveau')} />
+                <SelectValue placeholder="Sélectionner un niveau" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">{t('common.noNiveau')}</SelectItem>
+                <SelectItem value="none">Aucun niveau</SelectItem>
                 {niveaux.map((niveau) => (
                   <SelectItem key={niveau.id} value={niveau.id}>
                     {niveau.name}
@@ -218,13 +218,13 @@ export function CreateSpecialtyDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="semester">Semester</Label>
+            <Label htmlFor="semester">Semestre</Label>
             <Select value={semesterId || "none"} onValueChange={(value) => setSemesterId(value === "none" ? "" : value)}>
               <SelectTrigger className="border-blue-200 dark:border-blue-800 focus:border-blue-500 focus:ring-blue-500">
-                <SelectValue placeholder="Select semester" />
+                <SelectValue placeholder="Sélectionner un semestre" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">No semester</SelectItem>
+                <SelectItem value="none">Aucun semestre</SelectItem>
                 {semesters.map((s) => (
                   <SelectItem key={s.id} value={s.id}>
                     {s.name} (#{s.order})
@@ -240,7 +240,7 @@ export function CreateSpecialtyDialog({
               checked={isFree}
               onCheckedChange={setIsFree}
             />
-            <Label htmlFor="isFree">{t('specialties.isFree')}</Label>
+            <Label htmlFor="isFree">Gratuit</Label>
           </div>
 
           <div className="flex justify-end space-x-2 pt-4">
@@ -251,14 +251,14 @@ export function CreateSpecialtyDialog({
               disabled={isLoading}
               className="border-blue-300 dark:border-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20"
             >
-              {t('common.cancel')}
+              Annuler
             </Button>
             <Button 
               type="submit" 
               disabled={isLoading}
               className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
             >
-              {isLoading ? t('common.creating') : t('common.create')}
+              {isLoading ? 'Création...' : 'Créer'}
             </Button>
           </div>
         </form>

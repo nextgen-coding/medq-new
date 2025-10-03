@@ -80,7 +80,7 @@ export function ManagementTab({ initialSpecialtyId }: { initialSpecialtyId?: str
       setSpecialties(data);
     } catch (e) {
       console.error(e);
-      toast({ title: 'Error', description: 'Failed to load specialties', variant: 'destructive' });
+      toast({ title: 'Erreur', description: 'Échec du chargement des matières', variant: 'destructive' });
     } finally {
       setIsLoadingSpecialties(false);
     }
@@ -112,7 +112,7 @@ export function ManagementTab({ initialSpecialtyId }: { initialSpecialtyId?: str
       setLectures(data);
     } catch (e) {
       console.error(e);
-      toast({ title: 'Error', description: 'Failed to load lectures', variant: 'destructive' });
+      toast({ title: 'Erreur', description: 'Échec du chargement des cours', variant: 'destructive' });
     } finally {
       setIsLoadingLectures(false);
     }
@@ -130,14 +130,14 @@ export function ManagementTab({ initialSpecialtyId }: { initialSpecialtyId?: str
   const handleDeleteSpecialty = async (specialty: Specialty) => {
     setConfirmDialog({
       isOpen: true,
-      title: 'Delete Specialty',
-      description: `Are you sure you want to delete "${specialty.name}"? This will permanently delete all its courses and questions. This action cannot be undone.`,
+      title: 'Supprimer la matière',
+      description: `Êtes-vous sûr de vouloir supprimer "${specialty.name}" ? Cela supprimera définitivement tous ses cours et questions. Cette action est irréversible.`,
       onConfirm: async () => {
         try {
           const res = await fetch(`/api/specialties/${specialty.id}`, { method: 'DELETE' });
           if (!res.ok) throw new Error('Failed to delete specialty');
           
-          toast({ title: 'Success', description: 'Specialty deleted successfully' });
+          toast({ title: 'Succès', description: 'Matière supprimée avec succès' });
           await fetchSpecialties();
           
           // If the deleted specialty was selected, clear selection
@@ -147,7 +147,7 @@ export function ManagementTab({ initialSpecialtyId }: { initialSpecialtyId?: str
           }
         } catch (e) {
           console.error(e);
-          toast({ title: 'Error', description: 'Failed to delete specialty', variant: 'destructive' });
+          toast({ title: 'Erreur', description: 'Échec de la suppression de la matière', variant: 'destructive' });
         }
       }
     });
@@ -156,20 +156,20 @@ export function ManagementTab({ initialSpecialtyId }: { initialSpecialtyId?: str
   const handleDeleteLecture = async (lecture: Lecture) => {
     setConfirmDialog({
       isOpen: true,
-      title: 'Delete Course',
-      description: `Are you sure you want to delete "${lecture.title}"? This will permanently delete all its questions. This action cannot be undone.`,
+      title: 'Supprimer le cours',
+      description: `Êtes-vous sûr de vouloir supprimer "${lecture.title}" ? Cela supprimera définitivement toutes ses questions. Cette action est irréversible.`,
       onConfirm: async () => {
         try {
           const res = await fetch(`/api/lectures/${lecture.id}`, { method: 'DELETE' });
           if (!res.ok) throw new Error('Failed to delete lecture');
           
-          toast({ title: 'Success', description: 'Course deleted successfully' });
+          toast({ title: 'Succès', description: 'Cours supprimé avec succès' });
           if (selectedSpecialty) {
             await fetchLectures(selectedSpecialty.id);
           }
         } catch (e) {
           console.error(e);
-          toast({ title: 'Error', description: 'Failed to delete course', variant: 'destructive' });
+          toast({ title: 'Erreur', description: 'Échec de la suppression du cours', variant: 'destructive' });
         }
       }
     });
