@@ -1024,7 +1024,14 @@ SORTIE JSON STRICTE:
     }
 
   // Optional FAST mode: skip enhancement stage to maximize throughput
-  const FAST_MODE = String(process.env.AI_FAST_MODE || '').trim() === '1';
+  // Default to FAST (skip enhancement) to avoid Vercel 300s timeout
+  const FAST_MODE = String(process.env.AI_FAST_MODE || '1').trim() === '1';
+  if (FAST_MODE) {
+    console.log('[AI] ⚡ FAST_MODE enabled: Skipping enhancement pass to avoid timeout');
+    updateSession(aiId, {}, '⚡ Mode rapide: pas d\'amélioration supplémentaire');
+  } else {
+    console.log('[AI] 🔧 Enhancement mode: Processing short explanations');
+  }
   const enhanced = FAST_MODE ? new Map<string, any>() : await enhanceMcqRows(enhanceTargets);
     // Apply enhanced content where available
     for (const t of enhanceTargets) {
