@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     // Validate input
     if (!email || !password) {
       return NextResponse.json(
-        { error: 'Email and password are required' },
+        { error: 'L\'e-mail et le mot de passe sont requis' },
         { status: 400 }
       );
     }
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
     const response = NextResponse.json({
       user: userWithoutPassword,
       token,
-      message: 'Login successful'
+      message: 'Connexion réussie'
     });
     
     // Set HTTP-only cookie
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Login error:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Erreur interne du serveur' },
       { status: 500 }
     );
   }

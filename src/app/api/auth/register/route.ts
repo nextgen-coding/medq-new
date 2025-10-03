@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     // Validate input
     if (!email || !password || !phone) {
       return NextResponse.json(
-        { error: 'Email, password, and phone are required' },
+        { error: 'L\'e-mail, le mot de passe et le téléphone sont requis' },
         { status: 400 }
       );
     }
@@ -87,8 +87,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       user: userWithoutSensitiveData,
       message: emailSent 
-        ? 'User registered successfully. Please check your email to verify your account.'
-        : 'User registered successfully, but there was an issue sending the verification email. Please contact support.',
+        ? 'Utilisateur enregistré avec succès. Veuillez vérifier votre e-mail pour vérifier votre compte.'
+        : 'Utilisateur enregistré avec succès, mais il y a eu un problème lors de l\'envoi de l\'e-mail de vérification. Veuillez contacter le support.',
       emailSent,
       emailError: emailError ? emailError.message : null
     }, { status: 201 });
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error registering user:', error);
     return NextResponse.json(
-      { error: 'Failed to register user' },
+      { error: 'Échec de l\'enregistrement de l\'utilisateur' },
       { status: 500 }
     );
   }

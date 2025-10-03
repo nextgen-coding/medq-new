@@ -79,7 +79,7 @@ interface User {
     id: string;
     amount: number;
     currency: string;
-    method: 'konnect_gateway' | 'voucher_code' | 'custom_payment';
+    method: 'konnect_gateway' | 'voucher_code' | 'custom_payment' | 'autre_payment';
     status: 'pending' | 'completed' | 'failed' | 'cancelled' | 'awaiting_verification' | 'verified' | 'rejected';
     subscriptionType: 'semester' | 'annual';
     customPaymentDetails?: string;
@@ -911,6 +911,7 @@ export default function UserDetailPage() {
                             {payment.method === 'konnect_gateway' && <CreditCard className="h-4 w-4" />}
                             {payment.method === 'voucher_code' && <Gift className="h-4 w-4" />}
                             {payment.method === 'custom_payment' && <Upload className="h-4 w-4" />}
+                            {payment.method === 'autre_payment' && <Upload className="h-4 w-4" />}
                           </div>
                           <div>
                             <div className="font-medium">
@@ -920,6 +921,7 @@ export default function UserDetailPage() {
                               {payment.method === 'konnect_gateway' && 'Paiement en ligne'}
                               {payment.method === 'voucher_code' && `Code: ${payment.voucherCode?.code}`}
                               {payment.method === 'custom_payment' && 'Paiement personnalisé'}
+                              {payment.method === 'autre_payment' && 'Autre méthode de paiement'}
                             </div>
                             <div className="text-xs text-gray-400">
                               {new Date(payment.createdAt).toLocaleString()}
@@ -938,7 +940,7 @@ export default function UserDetailPage() {
                           }>
                             {payment.status}
                           </Badge>
-                          {payment.method === 'custom_payment' && payment.proofImageUrl && (
+                          {(payment.method === 'custom_payment' || payment.method === 'autre_payment') && payment.proofImageUrl && (
                             <Dialog>
                               <DialogTrigger asChild>
                                 <Button variant="outline" size="sm">

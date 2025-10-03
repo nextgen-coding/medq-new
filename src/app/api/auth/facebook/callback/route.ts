@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     
     if (!code) {
       return NextResponse.json(
-        { error: 'Authorization code is required' },
+        { error: 'Le code d\'autorisation est requis' },
         { status: 400 }
       );
     }
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     if (!FACEBOOK_APP_ID || !FACEBOOK_APP_SECRET) {
       console.error('Facebook OAuth credentials not configured');
       return NextResponse.json(
-        { error: 'Facebook OAuth is not configured' },
+        { error: 'Facebook OAuth n\'est pas configuré' },
         { status: 500 }
       );
     }
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     if (!tokenResponse.ok) {
       console.error('Token exchange failed:', await tokenResponse.text());
       return NextResponse.json(
-        { error: 'Failed to exchange authorization code' },
+        { error: 'Échec de l\'échange du code d\'autorisation' },
         { status: 400 }
       );
     }
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     if (!userInfoResponse.ok) {
       console.error('Failed to get user info:', await userInfoResponse.text());
       return NextResponse.json(
-        { error: 'Failed to get user information' },
+        { error: 'Échec de la récupération des informations de l\'utilisateur' },
         { status: 400 }
       );
     }
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
 
     if (!email) {
       return NextResponse.json(
-        { error: 'Email is required from Facebook' },
+        { error: 'L\'e-mail est requis de Facebook' },
         { status: 400 }
       );
     }
@@ -132,7 +132,7 @@ export async function POST(request: NextRequest) {
     const response = NextResponse.json({
       user: userWithoutPassword,
       token,
-      message: 'Facebook sign-in successful'
+      message: 'Connexion Facebook réussie'
     });
 
     // Set HTTP-only cookie
@@ -148,7 +148,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Facebook callback error:', error);
     return NextResponse.json(
-      { error: 'Facebook sign-in failed' },
+      { error: 'Échec de la connexion Facebook' },
       { status: 500 }
     );
   }
