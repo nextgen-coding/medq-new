@@ -10,12 +10,15 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 
-interface Specialty { id: string; name: string; description?: string | null; icon?: string | null; isFree?: boolean; }
+interface Specialty { id: string; name: string; description?: string | null; icon?: string | null; isFree?: boolean; niveauId?: string | null; }
+interface Niveau { id: string; name: string; order: number; }
 
 export default function AdminManagementPage() {
   const [specialties, setSpecialties] = useState<Specialty[]>([]);
+  const [niveaux, setNiveaux] = useState<Niveau[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showCreate, setShowCreate] = useState(false);
@@ -24,12 +27,14 @@ export default function AdminManagementPage() {
   const [newDescription, setNewDescription] = useState('');
   const [newIsFree, setNewIsFree] = useState(false);
   const [newIcon, setNewIcon] = useState<string | null>(null);
+  const [newNiveauId, setNewNiveauId] = useState<string | null>(null);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editIsFree, setEditIsFree] = useState(false);
   const [editIcon, setEditIcon] = useState<string | null>(null);
+  const [editNiveauId, setEditNiveauId] = useState<string | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -37,13 +42,19 @@ export default function AdminManagementPage() {
   const load = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/specialties?t=' + Date.now(), { cache: 'no-store' as RequestCache });
-      if (!res.ok) throw new Error('load');
-      const data = await res.json();
-      setSpecialties(data || []);
+      const [specialtiesRes, niveauxRes] = await Promise.all([
+        fetch('/api/specialties?t=' + Date.now(), { cache: 'no-store' as RequestCache }),
+        fetch('/api/niveaux', { cache: 'no-store' as RequestCache })
+      ]);
+      if (!specialtiesRes.ok) throw new Error('load specialties');
+      if (!niveauxRes.ok) throw new Error('load niveaux');
+      const specialtiesData = await specialtiesRes.json();
+      const niveauxData = await niveauxRes.json();
+      setSpecialties(specialtiesData || []);
+      setNiveaux(niveauxData || []);
     } catch (e) {
       console.error(e);
-      toast({ title: 'Erreur', description: 'Impossible de charger les spécialités', variant: 'destructive' });
+      toast({ title: 'Erreur', description: 'Impossible de charger les données', variant: 'destructive' });
     } finally { setLoading(false); }
   }, []);
 
@@ -101,6 +112,22 @@ export default function AdminManagementPage() {
                       <SpecialtyIconPicker value={newIcon || undefined} onChange={v=>setNewIcon(v)} />
                     </div>
                     <div className="space-y-2 col-span-2">
+                      <label className="text-sm font-medium text-blue-700 dark:text-blue-300">Niveau</label>
+                      <Select value={newNiveauId || undefined} onValueChange={(value) => setNewNiveauId(value)}>
+                        <SelectTrigger className="border-blue-200 focus:border-blue-400 focus:ring-blue-400/20">
+                          <SelectValue placeholder="Sélectionner un niveau" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">Aucun niveau</SelectItem>
+                          {niveaux.map((niveau) => (
+                            <SelectItem key={niveau.id} value={niveau.id}>
+                              {niveau.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2 col-span-2">
                       <label className="text-sm font-medium text-blue-700 dark:text-blue-300">Description</label>
                       <textarea value={newDescription} onChange={e=>setNewDescription(e.target.value)} rows={3} className="w-full rounded-md border border-blue-200 bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/20 focus-visible:border-blue-400" placeholder="Description détaillée de la spécialité..." />
                     </div>
@@ -110,9 +137,9 @@ export default function AdminManagementPage() {
                     <label htmlFor="isFreeNew" className="text-sm font-medium text-blue-700 dark:text-blue-300">Contenu gratuit pour tous les utilisateurs</label>
                   </div>
                   <div className="flex flex-col xs:flex-row justify-end gap-2 xs:gap-3 pt-2 border-t border-blue-100">
-                    <Button variant="outline" size="sm" onClick={()=>{ setShowCreate(false); setNewName(''); setNewDescription(''); setNewIsFree(false); }} className="border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 order-2 xs:order-1">Annuler</Button>
+                    <Button variant="outline" size="sm" onClick={()=>{ setShowCreate(false); setNewName(''); setNewDescription(''); setNewIsFree(false); setNewIcon(null); setNewNiveauId(null); }} className="border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 order-2 xs:order-1">Annuler</Button>
                     <Button size="sm" disabled={creating || !newName.trim()} onClick={async()=>{
-                      if(!newName.trim()) return; setCreating(true); try { const res = await fetch('/api/specialties',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name:newName.trim(), description:newDescription.trim()||null, isFree:newIsFree, icon:newIcon })}); if(!res.ok) throw new Error('create'); toast({ title:'✅ Spécialité créée', description:'La nouvelle spécialité a été ajoutée avec succès' }); setNewName(''); setNewDescription(''); setNewIsFree(false); setNewIcon(null); setShowCreate(false); load(); } catch(e){ console.error(e); toast({ title:'Erreur', description:"Impossible de créer la spécialité", variant:'destructive'});} finally { setCreating(false);} }} className="bg-blue-600 hover:bg-blue-700 text-white shadow-md flex items-center justify-center gap-2 order-1 xs:order-2">{creating && <Loader2 className="h-4 w-4 animate-spin" />}<Save className="h-4 w-4" /><span className="hidden xs:inline">Créer la spécialité</span><span className="xs:hidden">Créer</span></Button>
+                      if(!newName.trim()) return; setCreating(true); try { const res = await fetch('/api/specialties',{ method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ name:newName.trim(), description:newDescription.trim()||null, isFree:newIsFree, icon:newIcon, niveauId: newNiveauId === 'none' ? null : newNiveauId })}); if(!res.ok) throw new Error('create'); toast({ title:'✅ Spécialité créée', description:'La nouvelle spécialité a été ajoutée avec succès' }); setNewName(''); setNewDescription(''); setNewIsFree(false); setNewIcon(null); setNewNiveauId(null); setShowCreate(false); load(); } catch(e){ console.error(e); toast({ title:'Erreur', description:"Impossible de créer la spécialité", variant:'destructive'});} finally { setCreating(false);} }} className="bg-blue-600 hover:bg-blue-700 text-white shadow-md flex items-center justify-center gap-2 order-1 xs:order-2">{creating && <Loader2 className="h-4 w-4 animate-spin" />}<Save className="h-4 w-4" /><span className="hidden xs:inline">Créer la spécialité</span><span className="xs:hidden">Créer</span></Button>
                   </div>
                 </CardContent>
               </Card>
@@ -180,7 +207,7 @@ export default function AdminManagementPage() {
                                 </div>
                               </Link>
                               <div className="absolute top-2 right-2 sm:top-3 sm:right-3 flex gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Button size="icon" variant="outline" className="h-7 w-7 sm:h-8 sm:w-8 border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30" onClick={()=>{ setEditingId(s.id); setEditName(s.name); setEditDescription(s.description||''); setEditIsFree(!!s.isFree); setEditIcon(s.icon||null); }}><Edit2 className="h-3 w-3 sm:h-4 sm:w-4" /></Button>
+                                <Button size="icon" variant="outline" className="h-7 w-7 sm:h-8 sm:w-8 border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30" onClick={()=>{ setEditingId(s.id); setEditName(s.name); setEditDescription(s.description||''); setEditIsFree(!!s.isFree); setEditIcon(s.icon||null); setEditNiveauId(s.niveauId||null); }}><Edit2 className="h-3 w-3 sm:h-4 sm:w-4" /></Button>
                                 <Button size="icon" variant="outline" className="h-7 w-7 sm:h-8 sm:w-8 text-red-600 dark:text-red-400 border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-950/30" disabled={deletingId===s.id} onClick={()=> setPendingDeleteId(s.id)}>
                                   {deletingId===s.id ? <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <Trash className="h-3 w-3 sm:h-4 sm:w-4" />}
                                 </Button>
@@ -204,9 +231,25 @@ export default function AdminManagementPage() {
                                 <input id={`free-${s.id}`} type="checkbox" className="h-4 w-4 text-blue-600 border-blue-300 rounded focus:ring-blue-500" checked={editIsFree} onChange={e=>setEditIsFree(e.target.checked)} />
                                 <label htmlFor={`free-${s.id}`} className="text-sm font-medium text-blue-700 dark:text-blue-300">Contenu gratuit</label>
                               </div>
+                              <div className="space-y-2">
+                                <label className="text-sm font-medium text-blue-700 dark:text-blue-300">Niveau</label>
+                                <Select value={editNiveauId || 'none'} onValueChange={(value) => setEditNiveauId(value === 'none' ? null : value)}>
+                                  <SelectTrigger className="border-blue-200 focus:border-blue-400 focus:ring-blue-400/20">
+                                    <SelectValue placeholder="Sélectionner un niveau" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="none">Aucun niveau</SelectItem>
+                                    {niveaux.map((niveau) => (
+                                      <SelectItem key={niveau.id} value={niveau.id}>
+                                        {niveau.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
                               <div className="flex flex-col xs:flex-row justify-end gap-2 pt-2 border-t border-blue-100">
                                 <Button size="sm" variant="outline" onClick={()=>{ setEditingId(null); }} className="border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/30 order-2 xs:order-1">Annuler</Button>
-                                <Button size="sm" disabled={savingEdit || !editName.trim()} onClick={async()=>{ if(!editName.trim()) return; setSavingEdit(true); try { const res = await fetch('/api/specialties',{ method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id:s.id, name:editName.trim(), description: editDescription.trim()||null, isFree: editIsFree, icon: editIcon })}); if(!res.ok) throw new Error('upd'); toast({ title:'✅ Spécialité modifiée', description:'Les modifications ont été sauvegardées'}); setEditingId(null); load(); } catch(e){ console.error(e); toast({ title:'Erreur', description:'Impossible de sauvegarder les modifications', variant:'destructive'});} finally { setSavingEdit(false);} }} className="bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-2 order-1 xs:order-2">{savingEdit && <Loader2 className="h-4 w-4 animate-spin" />}<Save className="h-4 w-4" /><span className="hidden xs:inline">Sauvegarder</span><span className="xs:hidden">Sauv.</span></Button>
+                                <Button size="sm" disabled={savingEdit || !editName.trim()} onClick={async()=>{ if(!editName.trim()) return; setSavingEdit(true); try { const res = await fetch('/api/specialties',{ method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id:s.id, name:editName.trim(), description: editDescription.trim()||null, isFree: editIsFree, icon: editIcon, niveauId: editNiveauId })}); if(!res.ok) throw new Error('upd'); toast({ title:'✅ Spécialité modifiée', description:'Les modifications ont été sauvegardées'}); setEditingId(null); load(); } catch(e){ console.error(e); toast({ title:'Erreur', description:'Impossible de sauvegarder les modifications', variant:'destructive'});} finally { setSavingEdit(false);} }} className="bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-2 order-1 xs:order-2">{savingEdit && <Loader2 className="h-4 w-4 animate-spin" />}<Save className="h-4 w-4" /><span className="hidden xs:inline">Sauvegarder</span><span className="xs:hidden">Sauv.</span></Button>
                               </div>
                             </div>
                           )}

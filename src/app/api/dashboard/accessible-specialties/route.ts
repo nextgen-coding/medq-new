@@ -12,7 +12,7 @@ async function getHandler(request: AuthenticatedRequest){
     if(!user){ return NextResponse.json({ error: 'User not found' }, { status:404 }); }
 
     const where: any = {};
-    if(user.role !== 'admin'){
+    if(user.role !== 'admin' && user.role !== 'maintainer'){
       if(user.niveauId) where.niveauId = user.niveauId;
       if(user.semesterId) where.semesterId = user.semesterId; // restrict to same semester when present
     }

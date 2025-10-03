@@ -33,7 +33,7 @@ const getHandler = async (request: AuthenticatedRequest) => {
       },
     });
 
-    const safeResults = user?.role !== 'admin'
+    const safeResults = user?.role !== 'admin' && user?.role !== 'maintainer'
       ? pinnedQuestions.filter((pq: any) => pq?.question && pq.question.hidden !== true)
       : pinnedQuestions;
 

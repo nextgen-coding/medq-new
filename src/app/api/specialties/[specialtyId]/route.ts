@@ -34,7 +34,7 @@ async function getHandler(
 
     // Get specialty with lectures and questions
     const whereClause: any = { id: specialtyId };
-    if (user.role !== 'admin') {
+    if (user.role !== 'admin' && user.role !== 'maintainer') {
       if (user.niveauId) whereClause.niveauId = user.niveauId;
       if (user.semesterId) {
         // Restrict to user's semester or common specialties (null)

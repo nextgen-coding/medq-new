@@ -394,8 +394,8 @@ export function LectureComments({ lectureId }: LectureCommentsProps) {
               <div className="bg-gray-100 dark:bg-gray-800 rounded-2xl px-4 py-3 max-w-[calc(100%-2rem)]">
                 <div className="font-semibold text-sm mb-1 flex items-center gap-2">
                   {displayName}
-                  {comment.user?.role === 'admin' && !comment.isAnonymous && (
-                    <span className="px-1.5 py-0.5 text-[10px] tracking-wide bg-blue-500/15 text-blue-500 rounded-full">ADMIN</span>
+                  {(comment.user?.role === 'admin' || comment.user?.role === 'maintainer') && !comment.isAnonymous && (
+                    <span className="px-1.5 py-0.5 text-[10px] tracking-wide bg-blue-500/15 text-blue-500 rounded-full">{comment.user?.role === 'admin' ? 'ADMIN' : 'MAINTAINER'}</span>
                   )}
                   {comment.isAnonymous && isAdmin && (
                     <span title="Posted anonymously">

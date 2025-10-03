@@ -148,14 +148,10 @@ export function ClinicalCaseQuestion({
   const [revealIndex, setRevealIndex] = useState<number>(clinicalCase.questions.length - 1);
   // Removed per-question submission; single global submit after all questions answered
 
-  // Auto-show notes when content is detected, but don't auto-hide when content is deleted
-  // Only auto-show if user hasn't manually controlled the notes area
+  // Sync local questionResults with prop changes
   useEffect(() => {
-    if (notesHasContent && !showNotesArea && !notesManuallyControlled) {
-      setShowNotesArea(true);
-    }
-    // Don't auto-hide when content becomes empty - let user manually close
-  }, [notesHasContent, showNotesArea, notesManuallyControlled]);
+    setQuestionResults(prev => ({ ...prev, ...answerResults }));
+  }, [answerResults]);
 
   // Auto-show notes area if clinical case has existing notes on mount
   // Only run if user hasn't manually controlled notes
@@ -339,7 +335,7 @@ export function ClinicalCaseQuestion({
   };
 
   const handleDeleteGroup = async () => {
-    if (!user?.role || user.role !== 'admin') return;
+    if (!user?.role || (user.role !== 'admin' && user.role !== 'maintainer')) return;
     if (!confirm('Supprimer tout le cas clinique (toutes les sous-questions) ?')) return;
     setIsDeleting(true);
     try {
@@ -592,12 +588,23 @@ export function ClinicalCaseQuestion({
     const updatedResults = { ...questionResults };
     
     clinicalCase.questions.forEach(question => {
-      if ((question.type as any) === 'clinic_mcq' && currentAnswers[question.id] === undefined) {
+      if ((question.type as any) === 'clinic_mcq' && (currentAnswers[question.id] === undefined || (Array.isArray(currentAnswers[question.id]) && currentAnswers[question.id].length === 0))) {
         // Auto-submit unanswered QCM as incorrect with empty selection
         updatedAnswers[question.id] = [];
         updatedResults[question.id] = false;
       }
     });
+    
+    // Auto-assign 'partial' results to QROC questions when self-assessment is disabled
+    const userShowsSelfAssessment = (user as any)?.showSelfAssessment ?? true;
+    if (!userShowsSelfAssessment) {
+      clinicalCase.questions.forEach(question => {
+        if ((question.type as any) === 'clinic_croq' && updatedAnswers[question.id] !== undefined && updatedResults[question.id] === undefined) {
+          // Auto-assign partial result to answered QROC questions when evaluation is disabled
+          updatedResults[question.id] = 'partial';
+        }
+      });
+    }
     
     // Update state with auto-submitted QCM results
     setAnswers(updatedAnswers);
@@ -620,6 +627,14 @@ export function ClinicalCaseQuestion({
     
     // Reset evaluation state
     setEvaluationComplete(false);
+    
+    // If self-assessment is disabled, mark evaluation as complete since all QROC questions already have results
+    if (!userShowsSelfAssessment) {
+      const allQrocHaveResults = openIds.every(id => updatedResults[id] !== undefined);
+      if (allQrocHaveResults) {
+        setEvaluationComplete(true);
+      }
+    }
     
     // For multi-QROC cases, start evaluation from the first unanswered QROC
     // For mixed clinical cases, start from current QROC if applicable
@@ -1319,11 +1334,6 @@ export function ClinicalCaseQuestion({
               <div className="text-base sm:text-lg leading-relaxed whitespace-pre-wrap text-foreground font-medium">
                 <HighlightableCaseText lectureId={lectureId} text={clinicalCase.caseText} className="break-words" />
               </div>
-              {!showResults && (
-                <div className="mt-3 text-sm text-gray-600 dark:text-gray-400 font-medium">
-                  📋 Lisez attentivement ce cas clinique puis répondez aux questions ci-dessous
-                </div>
-              )}
             </div>
           )}
           <div className="flex flex-wrap gap-2 mb-4">
@@ -1422,11 +1432,14 @@ export function ClinicalCaseQuestion({
                             } else {
                               // For cases with open questions, check if evaluation is complete
                               if (evaluationComplete) {
-                                const correctCount = Object.values(questionResults).filter(r => r === true).length;
-                                const totalCount = Object.keys(questionResults).length;
-                                if (correctCount === totalCount) return true;
-                                if (correctCount > 0) return 'partial';
-                                return false;
+                                const subResults = Object.values(questionResults);
+                                const allCorrect = subResults.every(r => r === true);
+                                const hasCorrect = subResults.some(r => r === true);
+                                const hasPartial = subResults.some(r => r === 'partial');
+                                
+                                if (allCorrect) return true;
+                                else if (hasCorrect) return 'partial';
+                                else return false;
                               }
                               return null;
                             }

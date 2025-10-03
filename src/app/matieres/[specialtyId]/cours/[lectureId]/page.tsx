@@ -534,7 +534,7 @@ export default function CoursPageRoute() {
   };
 
   const handleDeleteCurrentQuestion = async () => {
-    if (!currentQuestion || !user?.id || user.role !== 'admin') return;
+    if (!currentQuestion || !user?.id || (user.role !== 'admin' && user.role !== 'maintainer')) return;
     
     if (!confirm('Êtes-vous sûr de vouloir supprimer cette question ?')) return;
     
@@ -605,7 +605,7 @@ export default function CoursPageRoute() {
             const resVals = clinicalCase.questions.map((q: any) => answerResults[q.id]).filter((r: any) => r !== undefined);
             if (!resVals.length) return undefined;
             if (resVals.every((r: any) => r === true)) return true;
-            if (resVals.some((r: any) => r === true || r === 'partial')) return 'partial';
+            if (resVals.some((r: any) => r === true)) return 'partial';
             return false;
           })() as any}
           userAnswers={revisionUserAnswers}
@@ -947,7 +947,7 @@ export default function CoursPageRoute() {
                                       })()}
                                     </Button>
                                     
-                                    {user?.role === 'admin' && (
+                                    {(user?.role === 'admin' || user?.role === 'maintainer') && (
                                       <Button
                                         variant="outline"
                                         onClick={handleDeleteCurrentQuestion}
@@ -976,7 +976,7 @@ export default function CoursPageRoute() {
                                   <PlusCircle className="h-4 w-4 mr-2" />
                                   Créer une question
                                 </Button>
-                                {user?.role === 'admin' && (
+                                {(user?.role === 'admin' || user?.role === 'maintainer') && (
                                   <Button
                                     variant="outline"
                                     onClick={() => {
@@ -1056,7 +1056,7 @@ export default function CoursPageRoute() {
           lecture={lecture}
           isOpen={openQuestionsDialog}
       onOpenChange={(o)=>{ setOpenQuestionsDialog(o); if(!o) setOpenOrganizer(false); }}
-      initialOrganizerOpen={user?.role === 'admin' ? openOrganizer : false}
+      initialOrganizerOpen={(user?.role === 'admin' || user?.role === 'maintainer') ? openOrganizer : false}
           initialCreateOpen
         />
       )}

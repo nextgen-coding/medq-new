@@ -49,7 +49,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       if (response.ok) {
         const data = await response.json();
         setUser(data.user);
-        setIsAdmin(data.user.role === 'admin');
+        setIsAdmin(data.user.role === 'admin' || data.user.role === 'maintainer');
       } else {
         setUser(null);
         setIsAdmin(false);
@@ -78,7 +78,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       
       if (response.ok) {
         setUser(data.user);
-        setIsAdmin(data.user.role === 'admin');
+        setIsAdmin(data.user.role === 'admin' || data.user.role === 'maintainer');
         
         // Check if there's a redirect path stored
         const redirectPath = sessionStorage.getItem('redirectAfterLogin');
@@ -143,7 +143,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const updateUser = (userData: User) => {
     setUser(userData);
-    setIsAdmin(userData.role === 'admin');
+    setIsAdmin(userData.role === 'admin' || userData.role === 'maintainer');
   };
 
   useEffect(() => {

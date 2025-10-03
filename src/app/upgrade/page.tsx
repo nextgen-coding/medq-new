@@ -37,14 +37,15 @@ import { AppSidebar, AppSidebarProvider } from '@/components/layout/AppSidebar'
 import { SidebarInset } from '@/components/ui/sidebar'
 import { UniversalHeader } from '@/components/layout/UniversalHeader'
 
-type PaymentMethod = 'konnect_gateway' | 'voucher_code' | 'custom_payment'
-type SubscriptionType = 'semester' | 'annual'
-type WizardStep = 'plan' | 'method' | 'details' | 'confirmation'
+type PaymentMethod = 'konnect_gateway' | 'voucher_code' | 'custom_payment' | 'activation_key' | 'autre_payment'
+type SubscriptionType = 'semester'
+type WizardStep = 'plan' | 'activation_key' | 'method' | 'details' | 'confirmation'
 
 interface PaymentState {
   method: PaymentMethod | null
   subscriptionType: SubscriptionType
   voucherCode: string
+  activationKey: string
   couponCode: string
   couponDiscount: number
   couponError: string | null
@@ -57,6 +58,7 @@ interface PaymentState {
   paymentUrl: string | null
   requiresProof: boolean
   status: 'selecting' | 'processing' | 'awaiting_proof' | 'completed'
+  isBuyingKey: boolean
 }
 
 interface PricingData {
@@ -65,13 +67,6 @@ interface PricingData {
     finalPrice: number
     discountAmount: number
     duration: string
-  }
-  annual: {
-    originalPrice: number
-    finalPrice: number
-    discountAmount: number
-    duration: string
-    savings: number
   }
   currency: string
   isDiscountActive: boolean
@@ -85,6 +80,7 @@ interface PricingData {
 
 const steps = [
   { key: 'plan', title: 'Choisir un plan', icon: Target, description: 'Sélectionnez votre abonnement' },
+  { key: 'activation_key', title: 'Clé d\'activation', icon: Gift, description: 'Entrez ou achetez une clé' },
   { key: 'method', title: 'Méthode de paiement', icon: CreditCard, description: 'Comment souhaitez-vous payer ?' },
   { key: 'details', title: 'Détails', icon: FileText, description: 'Détails et justificatifs requis' },
   { key: 'confirmation', title: 'Confirmation', icon: CheckCircle, description: 'Finaliser votre commande' },
@@ -100,6 +96,7 @@ export default function UpgradePage() {
     method: null,
     subscriptionType: 'semester',
     voucherCode: '',
+    activationKey: '',
     couponCode: '',
     couponDiscount: 0,
     couponError: null,
@@ -111,7 +108,8 @@ export default function UpgradePage() {
     paymentId: null,
     paymentUrl: null,
     requiresProof: false,
-    status: 'selecting'
+    status: 'selecting',
+    isBuyingKey: false
   })
 
   const [countdown, setCountdown] = useState<number | null>(null)
@@ -130,7 +128,6 @@ export default function UpgradePage() {
         // Fallback to default pricing
         setPricing({
           semester: { originalPrice: 50, finalPrice: 50, discountAmount: 0, duration: '6 mois' },
-          annual: { originalPrice: 120, finalPrice: 120, discountAmount: 0, duration: '12 mois', savings: 20 },
           currency: 'TND',
           isDiscountActive: false,
           discountPercentage: null,
@@ -146,7 +143,6 @@ export default function UpgradePage() {
       // Fallback to default pricing
       setPricing({
         semester: { originalPrice: 50, finalPrice: 50, discountAmount: 0, duration: '6 mois' },
-        annual: { originalPrice: 120, finalPrice: 120, discountAmount: 0, duration: '12 mois', savings: 20 },
         currency: 'TND',
         isDiscountActive: false,
         discountPercentage: null,
@@ -176,14 +172,14 @@ export default function UpgradePage() {
       setState(prev => ({ ...prev, status: 'completed' }))
       
       let title = "🎉 Paiement réussi !"
-      let description = `Votre abonnement ${subscriptionType === 'annual' ? 'annuel' : 'semestriel'} a été activé avec succès. Profitez de tous les contenus premium !`
+      let description = `Votre abonnement semestriel a été activé avec succès. Profitez de tous les contenus premium !`
       
       if (paymentMethod === 'voucher_code') {
         title = "🎉 Code de bon validé !"
-        description = `Votre code de bon a été appliqué avec succès ! Votre abonnement ${subscriptionType === 'annual' ? 'annuel' : 'semestriel'} est maintenant actif.`
+        description = `Votre code de bon a été appliqué avec succès ! Votre abonnement semestriel est maintenant actif.`
       } else if (paymentMethod === 'custom_payment') {
         title = "🎉 Paiement personnalisé validé !"
-        description = `Votre paiement personnalisé a été validé par nos équipes. Votre abonnement ${subscriptionType === 'annual' ? 'annuel' : 'semestriel'} est maintenant actif.`
+        description = `Votre paiement personnalisé a été validé par nos équipes. Votre abonnement semestriel est maintenant actif.`
       }
       
       toast({
@@ -287,16 +283,16 @@ export default function UpgradePage() {
       return
     }
 
-    if (state.method === 'voucher_code' && !state.voucherCode.trim()) {
+    if (state.method === 'activation_key' && !state.activationKey.trim()) {
       toast({
         title: 'Erreur',
-        description: 'Veuillez entrer un code de bon',
+        description: 'Veuillez entrer une clé d\'activation',
         variant: 'destructive'
       })
       return
     }
 
-    if (state.method === 'custom_payment' && !state.customPaymentDetails.trim()) {
+    if (state.method === 'custom_payment' && !state.isBuyingKey && !state.customPaymentDetails.trim()) {
       toast({
         title: 'Erreur',
         description: 'Veuillez entrer les détails du paiement',
@@ -305,7 +301,25 @@ export default function UpgradePage() {
       return
     }
 
-    if (state.method === 'custom_payment' && !state.proofFileUrl) {
+    if (state.method === 'custom_payment' && !state.isBuyingKey && !state.proofFileUrl) {
+      toast({
+        title: 'Erreur',
+        description: 'Veuillez téléverser une preuve de paiement',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    if (state.method === 'autre_payment' && !state.isBuyingKey && !state.customPaymentDetails.trim()) {
+      toast({
+        title: 'Erreur',
+        description: 'Veuillez entrer les détails du paiement',
+        variant: 'destructive'
+      })
+      return
+    }
+
+    if (state.method === 'autre_payment' && !state.isBuyingKey && !state.proofFileUrl) {
       toast({
         title: 'Erreur',
         description: 'Veuillez téléverser une preuve de paiement',
@@ -326,10 +340,12 @@ export default function UpgradePage() {
           method: state.method,
           subscriptionType: state.subscriptionType,
           voucherCode: state.voucherCode,
+          activationKey: state.activationKey,
           couponCode: state.couponCode,
           couponDiscount: state.couponDiscount,
           customPaymentDetails: state.customPaymentDetails,
-          proofFileUrl: state.proofFileUrl
+          proofFileUrl: state.proofFileUrl,
+          isBuyingKey: state.isBuyingKey
         })
       })
 
@@ -342,12 +358,13 @@ export default function UpgradePage() {
       if (data.success) {
         setState(prev => ({
           ...prev,
-          paymentId: data.paymentId,
+          paymentId: data.paymentId || null,
           paymentUrl: data.paymentUrl,
           requiresProof: data.requiresProof || false
         }))
 
-        if (data.paymentUrl) {
+        if (data.paymentUrl && !state.isBuyingKey) {
+          // Only redirect for konnect when not buying key
           window.location.href = data.paymentUrl
         } else if (data.requiresProof) {
           setState(prev => ({ ...prev, status: 'awaiting_proof' }))
@@ -358,12 +375,31 @@ export default function UpgradePage() {
           let title = 'Succès'
           let enhancedDescription = data.message
           
-          if (state.method === 'voucher_code') {
-            title = '🎉 Code de bon validé !'
-            enhancedDescription = `Votre code de bon a été appliqué avec succès ! ${data.message}`
-          } else if (state.method === 'custom_payment') {
-            title = '🎉 Paiement enregistré !'
-            enhancedDescription = `Votre demande de paiement personnalisé a été enregistrée. ${data.message}`
+          if (state.isBuyingKey) {
+            if (state.method === 'konnect_gateway') {
+              title = '🎉 Demande de clé enregistrée !'
+              enhancedDescription = 'L\'équipe medQ vous contactera dans 24-48 heures pour confirmer votre paiement.'
+            } else if (state.method === 'custom_payment') {
+              title = '🎉 Demande de clé enregistrée !'
+              enhancedDescription = 'L\'équipe medQ vous contactera bientôt pour organiser le paiement en espèces.'
+            } else if (state.method === 'autre_payment') {
+              title = '🎉 Demande de clé enregistrée !'
+              enhancedDescription = 'L\'équipe medQ vous contactera bientôt pour organiser le paiement.'
+            }
+          } else {
+            if (state.method === 'voucher_code') {
+              title = '🎉 Code de bon validé !'
+              enhancedDescription = `Votre code de bon a été appliqué avec succès ! ${data.message}`
+            } else if (state.method === 'activation_key') {
+              title = '🎉 Clé d\'activation validée !'
+              enhancedDescription = `Votre clé d'activation a été appliquée avec succès ! ${data.message}`
+            } else if (state.method === 'custom_payment') {
+              title = '🎉 Paiement enregistré !'
+              enhancedDescription = `Votre demande de paiement personnalisé a été enregistrée. ${data.message}`
+            } else if (state.method === 'autre_payment') {
+              title = '🎉 Paiement enregistré !'
+              enhancedDescription = `Votre demande de paiement a été enregistrée. ${data.message}`
+            }
           }
           
           toast({
@@ -453,14 +489,24 @@ export default function UpgradePage() {
     switch (currentStep) {
       case 'plan':
         return true // Plan is always selected (default to semester)
+      case 'activation_key':
+        return state.activationKey.trim().length > 0
       case 'method':
         return state.method !== null
       case 'details':
+        if (state.isBuyingKey && state.method === 'autre_payment') {
+          // For autre payment when buying key, require details
+          return state.customPaymentDetails.trim().length > 0 && state.proofFileUrl !== null
+        }
         if (state.method === 'voucher_code') {
           return state.voucherCode.trim().length > 0
         }
         if (state.method === 'custom_payment') {
-          // Require both payment details and proof upload for custom payments
+          // For cash payments when buying key, no requirements - team will contact
+          if (state.isBuyingKey) {
+            return true
+          }
+          // For other custom payments, require both details and proof upload
           return state.customPaymentDetails.trim().length > 0 && state.proofFileUrl !== null
         }
         return true
@@ -470,7 +516,26 @@ export default function UpgradePage() {
   }
 
   const goNext = () => {
-    const stepOrder: WizardStep[] = ['plan', 'method', 'details', 'confirmation']
+    if (currentStep === 'activation_key' && state.activationKey.trim()) {
+      // If they have an activation key, set method and go to confirmation
+      setState(prev => ({ ...prev, method: 'activation_key' }))
+      setCurrentStep('confirmation')
+      return
+    }
+
+    if (currentStep === 'method' && state.isBuyingKey && state.method === 'custom_payment') {
+      // For cash payment when buying key, go directly to confirmation
+      setCurrentStep('confirmation')
+      return
+    }
+
+    if (currentStep === 'method' && state.isBuyingKey && state.method === 'autre_payment') {
+      // For autre payment when buying key, go to details
+      setCurrentStep('details')
+      return
+    }
+
+    const stepOrder: WizardStep[] = ['plan', 'activation_key', 'method', 'details', 'confirmation']
     const currentIndex = stepOrder.indexOf(currentStep)
     if (currentIndex < stepOrder.length - 1) {
       setCurrentStep(stepOrder[currentIndex + 1])
@@ -478,15 +543,53 @@ export default function UpgradePage() {
   }
 
   const goBack = () => {
-    const stepOrder: WizardStep[] = ['plan', 'method', 'details', 'confirmation']
+    if (currentStep === 'confirmation' && state.method === 'activation_key') {
+      // If they came from activation key, go back to activation_key
+      setCurrentStep('activation_key')
+      return
+    }
+
+    if (currentStep === 'confirmation' && state.isBuyingKey && (state.method === 'custom_payment' || state.method === 'autre_payment')) {
+      // If they came from buying key flow, go back appropriately
+      if (state.method === 'custom_payment') {
+        setCurrentStep('method')
+      } else if (state.method === 'autre_payment') {
+        setCurrentStep('details')
+      }
+      return
+    }
+
+    const stepOrder: WizardStep[] = ['plan', 'activation_key', 'method', 'details', 'confirmation']
     const currentIndex = stepOrder.indexOf(currentStep)
     if (currentIndex > 0) {
       setCurrentStep(stepOrder[currentIndex - 1])
     }
   }
 
+  const getActiveSteps = (): typeof steps => {
+    if (state.method === 'activation_key') {
+      // Activation key flow: plan -> activation_key -> confirmation
+      return steps.filter(s => ['plan', 'activation_key', 'confirmation'].includes(s.key))
+    } else if (state.isBuyingKey) {
+      if (state.method === 'custom_payment') {
+        // plan -> activation_key -> method -> confirmation
+        return steps.filter(s => ['plan', 'activation_key', 'method', 'confirmation'].includes(s.key))
+      } else if (state.method === 'autre_payment' || state.method === 'konnect_gateway') {
+        // All 5 steps
+        return steps
+      }
+    }
+    // Default: show all steps
+    return steps
+  }
+
+  const getTotalSteps = (): number => {
+    return getActiveSteps().length
+  }
+
   const getStepIndex = (step: WizardStep): number => {
-    return ['plan', 'method', 'details', 'confirmation'].indexOf(step)
+    const activeSteps = getActiveSteps()
+    return activeSteps.findIndex(s => s.key === step)
   }
 
   if (isPricingLoading || !pricing) {
@@ -569,53 +672,78 @@ export default function UpgradePage() {
                 
                 {/* Progress Steps */}
                 <div className="mb-6 sm:mb-8 lg:mb-12">
-                  <div className="flex items-center justify-center sm:justify-between relative px-1 sm:px-0 max-w-2xl mx-auto">
-                    {/* Progress line */}
-                    <div className="absolute top-1/2 left-8 right-8 sm:left-0 sm:right-0 h-1 bg-medblue-200 dark:bg-gray-700 rounded-full -translate-y-1/2 z-0">
-                      <div 
-                        className="h-full bg-gradient-to-r from-medblue-500 to-medblue-600 rounded-full transition-all duration-500 ease-out"
-                        style={{ width: `${(getStepIndex(currentStep) / (steps.length - 1)) * 100}%` }}
-                      />
-                    </div>
-                    
-                    {steps.map((step, index) => {
-                      const isCompleted = getStepIndex(currentStep) > index
-                      const isCurrent = step.key === currentStep
-                      const Icon = step.icon
-                      
-                      return (
-                        <div key={step.key} className="flex flex-col items-center group relative z-10 flex-1 sm:flex-initial">
-                          <div className={`
-                            relative w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-full border-2 sm:border-3 flex items-center justify-center transition-all duration-300 mb-2 sm:mb-3 bg-white dark:bg-gray-800
-                            ${isCompleted 
-                              ? 'border-medblue-500 bg-medblue-500 text-white shadow-lg' 
-                              : isCurrent 
-                                ? 'border-medblue-500 text-medblue-600 dark:text-medblue-400 shadow-lg ring-2 sm:ring-4 ring-medblue-500/20' 
-                                : 'border-medblue-200 dark:border-gray-600 text-gray-400 dark:text-gray-500'
-                            }
-                          `}>
-                            {isCompleted ? (
-                              <Check className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5" />
-                            ) : (
-                              <Icon className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5" />
+                  <div className="relative max-w-4xl mx-auto px-2 sm:px-4">
+                    {/* Progress line container */}
+                    <div className="relative flex items-start justify-between gap-1 sm:gap-2">
+                      {getActiveSteps().map((step, index) => {
+                        const isCompleted = getStepIndex(currentStep) > index
+                        const isCurrent = step.key === currentStep
+                        const Icon = step.icon
+                        const activeSteps = getActiveSteps()
+                        const isLast = index === activeSteps.length - 1
+                        
+                        return (
+                          <div key={step.key} className="flex items-center flex-1 last:flex-initial">
+                            {/* Step Circle */}
+                            <div className="relative z-10 flex flex-col items-center w-full">
+                              <div className={`
+                                relative w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 lg:w-14 lg:h-14 rounded-full flex items-center justify-center transition-all duration-300 shadow-md mx-auto
+                                ${isCompleted 
+                                  ? 'bg-gradient-to-br from-medblue-500 to-medblue-600 text-white shadow-medblue-500/50' 
+                                  : isCurrent 
+                                    ? 'bg-white dark:bg-gray-800 border-3 sm:border-4 border-medblue-500 text-medblue-600 dark:text-medblue-400 shadow-xl ring-2 sm:ring-4 ring-medblue-500/20 scale-105 sm:scale-110' 
+                                    : 'bg-gray-100 dark:bg-gray-700 border-2 border-gray-300 dark:border-gray-600 text-gray-400 dark:text-gray-500'
+                                }
+                              `}>
+                                {isCompleted ? (
+                                  <Check className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 lg:h-7 lg:w-7 stroke-[3] animate-in zoom-in duration-300" />
+                                ) : (
+                                  <Icon className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 lg:h-7 lg:w-7" />
+                                )}
+                                
+                                {/* Pulsing animation for current step */}
+                                {isCurrent && (
+                                  <span className="absolute inset-0 rounded-full bg-medblue-500 animate-ping opacity-20"></span>
+                                )}
+                              </div>
+                              
+                              {/* Step Label */}
+                              <div className="mt-2 sm:mt-3 text-center w-full px-0.5">
+                                <div className={`text-[10px] sm:text-xs md:text-sm font-semibold transition-all duration-300 leading-tight ${
+                                  isCompleted || isCurrent 
+                                    ? 'text-medblue-700 dark:text-medblue-400' 
+                                    : 'text-gray-500 dark:text-gray-400'
+                                }`}>
+                                  <span className="hidden lg:inline">{step.title}</span>
+                                  <span className="lg:hidden break-words">{step.title.length > 12 ? step.title.split(' ')[0] : step.title}</span>
+                                </div>
+                                <div className={`text-[9px] sm:text-[10px] md:text-xs mt-0.5 transition-colors duration-300 hidden xl:block ${
+                                  isCompleted || isCurrent
+                                    ? 'text-medblue-600/70 dark:text-medblue-400/70'
+                                    : 'text-gray-400 dark:text-gray-500'
+                                }`}>
+                                  {step.description}
+                                </div>
+                              </div>
+                            </div>
+                            
+                            {/* Connecting Line */}
+                            {!isLast && (
+                              <div className="flex-1 h-0.5 sm:h-1 mx-1 sm:mx-2 relative self-start mt-4 sm:mt-5 md:mt-6 lg:mt-7 min-w-[8px] sm:min-w-[16px]">
+                                <div className="absolute inset-0 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+                                <div 
+                                  className={`absolute inset-0 rounded-full transition-all duration-500 ease-out ${
+                                    isCompleted 
+                                      ? 'bg-gradient-to-r from-medblue-500 to-medblue-600 w-full shadow-sm' 
+                                      : 'w-0'
+                                  }`}
+                                />
+                              </div>
                             )}
                           </div>
-                          <div className="text-center px-1 min-w-0 w-full">
-                            <div className={`text-xs sm:text-sm font-medium transition-colors leading-tight ${
-                              isCompleted || isCurrent 
-                                ? 'text-medblue-700 dark:text-medblue-400' 
-                                : 'text-gray-500 dark:text-gray-400'
-                            }`}>
-                              <span className="hidden sm:inline whitespace-nowrap">{step.title}</span>
-                              <span className="sm:hidden text-center block truncate">{step.title.split(' ')[0]}</span>
-                            </div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 hidden lg:block">
-                              {step.description}
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })}
+                        )
+                      })}
+                    </div>
                   </div>
                 </div>
 
@@ -673,9 +801,9 @@ export default function UpgradePage() {
                       )}
 
                       {/* Plan Cards */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                      <div className="flex justify-center">
                         {/* Semester Plan */}
-                        <Card className={`relative cursor-pointer transition-all duration-300 hover:shadow-xl ${
+                        <Card className={`relative cursor-pointer transition-all duration-300 hover:shadow-xl max-w-md w-full ${
                           state.subscriptionType === 'semester' 
                             ? 'ring-2 ring-medblue-500 shadow-xl bg-gradient-to-br from-medblue-50 to-white dark:from-medblue-900/20 dark:to-gray-800/80' 
                             : 'hover:ring-1 hover:ring-medblue-200 bg-white dark:bg-gray-800'
@@ -733,79 +861,62 @@ export default function UpgradePage() {
                             </div>
                           )}
                         </Card>
+                      </div>
+                    </div>
+                  )}
 
-                        {/* Annual Plan */}
-                        <Card className={`relative cursor-pointer transition-all duration-300 hover:shadow-xl ${
-                          state.subscriptionType === 'annual' 
-                            ? 'ring-2 ring-medblue-500 shadow-xl bg-gradient-to-br from-medblue-50 to-white dark:from-medblue-900/20 dark:to-gray-800/80' 
-                            : 'hover:ring-1 hover:ring-medblue-200 bg-white dark:bg-gray-800'
-                        }`} onClick={() => setState(prev => ({ ...prev, subscriptionType: 'annual' }))}>
-                          <CardHeader className="text-center pb-3 sm:pb-4">
-                            <div className="flex items-center justify-center mb-3 sm:mb-4 flex-wrap gap-2">
-                              <CalendarDays className="h-6 w-6 sm:h-8 sm:w-8 text-medblue-600" />
-                              <Badge className="bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 border-green-200 dark:border-green-800 text-xs sm:text-sm">
-                                Populaire
-                              </Badge>
+                  {/* Step 2: Activation Key */}
+                  {currentStep === 'activation_key' && (
+                    <div className="space-y-6 sm:space-y-8">
+                      <div className="text-center px-4">
+                        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-3 sm:mb-4">
+                          Clé d'activation
+                        </h2>
+                        <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
+                          Si vous avez une clé d'activation, entrez-la ici
+                        </p>
+                      </div>
+
+                      <div className="max-w-md mx-auto px-3 sm:px-4">
+                        <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+                          <CardContent className="p-4 sm:p-6 space-y-4">
+                            <div className="p-3 sm:p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl text-center border dark:border-purple-800/30">
+                              <Gift className="h-6 w-6 sm:h-8 sm:w-8 text-purple-600 dark:text-purple-400 mx-auto mb-2" />
+                              <h3 className="font-semibold text-gray-900 dark:text-white text-base sm:text-lg">
+                                Clé d'activation
+                              </h3>
                             </div>
-                            <CardTitle className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
-                              Annuel
-                            </CardTitle>
-                            <CardDescription className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
-                              Le meilleur rapport qualité-prix
-                            </CardDescription>
-                          </CardHeader>
-                          <CardContent className="text-center px-4 sm:px-6">
-                            <div className="mb-4 sm:mb-6">
-                              {pricing.isDiscountActive && (
-                                <div className="text-base sm:text-lg text-gray-500 line-through mb-1">
-                                  {pricing.annual.originalPrice} {pricing.currency}
-                                </div>
-                              )}
-                              <div className="text-3xl sm:text-4xl font-bold text-medblue-600 mb-1">
-                                {pricing.annual.finalPrice} {pricing.currency}
-                              </div>
-                              <div className="text-sm sm:text-base text-gray-500 dark:text-gray-400">
-                                pour {pricing.annual.duration}
-                              </div>
-                              <div className="flex flex-col gap-2 mt-2">
-                                <div className="inline-block bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium">
-                                  Économisez {pricing.annual.savings} {pricing.currency} vs semestriel
-                                </div>
-                                {pricing.isDiscountActive && pricing.annual.discountAmount > 0 && (
-                                  <div className="inline-block bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium">
-                                    + {pricing.annual.discountAmount} {pricing.currency} de remise
-                                  </div>
-                                )}
-                              </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="activationKey" className="text-sm sm:text-base text-gray-900 dark:text-gray-100">Votre clé d'activation</Label>
+                              <Input
+                                id="activationKey"
+                                value={state.activationKey}
+                                onChange={(e) => setState(prev => ({ ...prev, activationKey: e.target.value }))}
+                                placeholder="Entrez votre clé ici"
+                                className="text-center text-base sm:text-lg font-mono tracking-wider py-3 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                              />
                             </div>
-                            <div className="space-y-2 sm:space-y-3 text-left">
-                              <div className="flex items-center gap-2 sm:gap-3">
-                                <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-500 flex-shrink-0" />
-                                <span className="text-sm sm:text-base text-gray-700 dark:text-gray-300">Tous les avantages semestriels</span>
-                              </div>
-                              <div className="flex items-center gap-2 sm:gap-3">
-                                <Crown className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-500 flex-shrink-0" />
-                                <span className="text-sm sm:text-base text-gray-700 dark:text-gray-300">Contenu exclusif annuel</span>
-                              </div>
-                              <div className="flex items-center gap-2 sm:gap-3">
-                                <Star className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-500 flex-shrink-0" />
-                                <span className="text-sm sm:text-base text-gray-700 dark:text-gray-300">Support prioritaire</span>
-                              </div>
+                            <div className="text-center space-y-3">
+                              <p className="text-sm text-gray-600 dark:text-gray-400">
+                                Si vous n'avez pas une clé d'activation
+                              </p>
+                              <Button
+                                onClick={() => {
+                                  setState(prev => ({ ...prev, isBuyingKey: true }))
+                                  setCurrentStep('method')
+                                }}
+                                className="w-full bg-medblue-500 hover:bg-medblue-600 text-white"
+                              >
+                                J'achète une clé
+                              </Button>
                             </div>
                           </CardContent>
-                          {state.subscriptionType === 'annual' && (
-                            <div className="absolute top-3 right-3 sm:top-4 sm:right-4">
-                              <div className="bg-medblue-500 text-white rounded-full p-1.5 sm:p-2">
-                                <Check className="h-3 w-3 sm:h-4 sm:w-4" />
-                              </div>
-                            </div>
-                          )}
                         </Card>
                       </div>
                     </div>
                   )}
 
-                  {/* Step 2: Payment Method */}
+                  {/* Step 3: Payment Method */}
                   {currentStep === 'method' && (
                     <div className="space-y-6 sm:space-y-8">
                       <div className="text-center px-4">
@@ -834,16 +945,16 @@ export default function UpgradePage() {
                               </div>
                               <div className="flex-1">
                                 <h3 className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base">
-                                  Paiement en ligne (Recommandé)
+                                  {state.isBuyingKey ? 'Paiement en ligne' : 'Paiement en ligne (Recommandé)'}
                                 </h3>
                                 <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
-                                  Carte bancaire via Konnect - Activation instantanée
+                                  {state.isBuyingKey ? 'Carte bancaire via Konnect' : 'Carte bancaire via Konnect - Activation instantanée'}
                                 </p>
                               </div>
                             </div>
                             <div className="flex items-center gap-2 justify-between sm:justify-end">
                               <Badge className="bg-green-100 text-green-600 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800 text-xs">
-                                Instantané
+                                {state.isBuyingKey ? '24-48h' : 'Instantané'}
                               </Badge>
                               {state.method === 'konnect_gateway' && (
                                 <Check className="h-4 w-4 sm:h-5 sm:w-5 text-medblue-500" />
@@ -852,41 +963,43 @@ export default function UpgradePage() {
                           </CardContent>
                         </Card>
 
-                        {/* Voucher Code */}
-                        <Card 
-                          className={`cursor-pointer transition-all duration-300 hover:shadow-lg ${
-                            state.method === 'voucher_code' 
-                              ? 'ring-2 ring-medblue-500 bg-gradient-to-r from-medblue-50 to-white dark:from-medblue-900/20 dark:to-gray-800/80' 
-                              : 'hover:ring-1 hover:ring-medblue-200'
-                          }`}
-                          onClick={() => setState(prev => ({ ...prev, method: 'voucher_code' }))}
-                        >
-                          <CardContent className="flex flex-col sm:flex-row sm:items-center p-4 sm:p-6 gap-3 sm:gap-4">
-                            <div className="flex items-center gap-3 sm:gap-4 flex-1">
-                              <div className="p-2.5 sm:p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg sm:rounded-xl">
-                                <Gift className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+                        {!state.isBuyingKey && (
+                          /* Voucher Code - only show when not buying key */
+                          <Card 
+                            className={`cursor-pointer transition-all duration-300 hover:shadow-lg ${
+                              state.method === 'voucher_code' 
+                                ? 'ring-2 ring-medblue-500 bg-gradient-to-r from-medblue-50 to-white dark:from-medblue-900/20 dark:to-gray-800/80' 
+                                : 'hover:ring-1 hover:ring-medblue-200'
+                            }`}
+                            onClick={() => setState(prev => ({ ...prev, method: 'voucher_code' }))}
+                          >
+                            <CardContent className="flex flex-col sm:flex-row sm:items-center p-4 sm:p-6 gap-3 sm:gap-4">
+                              <div className="flex items-center gap-3 sm:gap-4 flex-1">
+                                <div className="p-2.5 sm:p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg sm:rounded-xl">
+                                  <Gift className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+                                </div>
+                                <div className="flex-1">
+                                  <h3 className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base">
+                                    Code de bon
+                                  </h3>
+                                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                    J'ai un code promo ou un bon d'achat
+                                  </p>
+                                </div>
                               </div>
-                              <div className="flex-1">
-                                <h3 className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base">
-                                  Code de bon
-                                </h3>
-                                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
-                                  J'ai un code promo ou un bon d'achat
-                                </p>
+                              <div className="flex items-center gap-2 justify-between sm:justify-end">
+                                <Badge className="bg-purple-100 text-purple-600 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800 text-xs">
+                                  Instantané
+                                </Badge>
+                                {state.method === 'voucher_code' && (
+                                  <Check className="h-4 w-4 sm:h-5 sm:w-5 text-medblue-500" />
+                                )}
                               </div>
-                            </div>
-                            <div className="flex items-center gap-2 justify-between sm:justify-end">
-                              <Badge className="bg-purple-100 text-purple-600 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800 text-xs">
-                                Instantané
-                              </Badge>
-                              {state.method === 'voucher_code' && (
-                                <Check className="h-4 w-4 sm:h-5 sm:w-5 text-medblue-500" />
-                              )}
-                            </div>
-                          </CardContent>
-                        </Card>
+                            </CardContent>
+                          </Card>
+                        )}
 
-                        {/* Custom Payment */}
+                        {/* Cash or Custom Payment */}
                         <Card 
                           className={`cursor-pointer transition-all duration-300 hover:shadow-lg ${
                             state.method === 'custom_payment' 
@@ -902,16 +1015,16 @@ export default function UpgradePage() {
                               </div>
                               <div className="flex-1">
                                 <h3 className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base">
-                                  Autre méthode de paiement
+                                  {state.isBuyingKey ? 'Espèces' : 'Autre méthode de paiement'}
                                 </h3>
                                 <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
-                                  Virement, espèces, D17 - Validation manuelle
+                                  {state.isBuyingKey ? 'Paiement en espèces' : 'Virement, espèces, D17 - Validation manuelle'}
                                 </p>
                               </div>
                             </div>
                             <div className="flex items-center gap-2 justify-between sm:justify-end">
                               <Badge className="bg-orange-100 text-orange-600 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800 text-xs">
-                                24-48h
+                                {state.isBuyingKey ? 'Contact équipe' : '24-48h'}
                               </Badge>
                               {state.method === 'custom_payment' && (
                                 <Check className="h-4 w-4 sm:h-5 sm:w-5 text-medblue-500" />
@@ -919,6 +1032,42 @@ export default function UpgradePage() {
                             </div>
                           </CardContent>
                         </Card>
+
+                        {state.isBuyingKey && (
+                          /* Autre méthodes - only show when buying key */
+                          <Card 
+                            className={`cursor-pointer transition-all duration-300 hover:shadow-lg ${
+                              state.method === 'autre_payment' 
+                                ? 'ring-2 ring-medblue-500 bg-gradient-to-r from-medblue-50 to-white dark:from-medblue-900/20 dark:to-gray-800/80' 
+                                : 'hover:ring-1 hover:ring-medblue-200'
+                            }`}
+                            onClick={() => setState(prev => ({ ...prev, method: 'autre_payment' }))}
+                          >
+                            <CardContent className="flex flex-col sm:flex-row sm:items-center p-4 sm:p-6 gap-3 sm:gap-4">
+                              <div className="flex items-center gap-3 sm:gap-4 flex-1">
+                                <div className="p-2.5 sm:p-3 bg-gradient-to-br from-gray-500 to-gray-600 rounded-lg sm:rounded-xl">
+                                  <FileText className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
+                                </div>
+                                <div className="flex-1">
+                                  <h3 className="font-semibold text-gray-900 dark:text-white text-sm sm:text-base">
+                                    Autre méthodes
+                                  </h3>
+                                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                    Virement, D17, etc.
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 justify-between sm:justify-end">
+                                <Badge className="bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-900/30 dark:text-gray-400 dark:border-gray-800 text-xs">
+                                  Contact équipe
+                                </Badge>
+                                {state.method === 'autre_payment' && (
+                                  <Check className="h-4 w-4 sm:h-5 sm:w-5 text-medblue-500" />
+                                )}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        )}
                       </div>
                     </div>
                   )}
@@ -990,16 +1139,16 @@ export default function UpgradePage() {
 
                                 <div className="space-y-2 text-sm sm:text-base">
                                   <div className="flex justify-between items-center">
-                                    <span className="text-left text-gray-900 dark:text-gray-100">Abonnement {state.subscriptionType === 'annual' ? 'annuel' : 'semestriel'}</span>
+                                    <span className="text-left text-gray-900 dark:text-gray-100">Abonnement semestriel</span>
                                     <span className="font-semibold text-gray-900 dark:text-white">
-                                      {state.subscriptionType === 'annual' ? pricing.annual.finalPrice : pricing.semester.finalPrice} {pricing.currency}
+                                      {pricing.semester.finalPrice} {pricing.currency}
                                     </span>
                                   </div>
                                   {pricing.isDiscountActive && (
                                     <div className="flex justify-between items-center text-green-600 dark:text-green-400">
                                       <span className="text-left">Remise ({pricing.discountPercentage}%)</span>
                                       <span>
-                                        -{state.subscriptionType === 'annual' ? pricing.annual.discountAmount : pricing.semester.discountAmount} {pricing.currency}
+                                        -{pricing.semester.discountAmount} {pricing.currency}
                                       </span>
                                     </div>
                                   )}
@@ -1013,7 +1162,7 @@ export default function UpgradePage() {
                                     <div className="flex justify-between items-center font-bold text-lg">
                                       <span className="text-left text-gray-900 dark:text-gray-100">Total à payer</span>
                                       <span className="text-medblue-600 dark:text-medblue-400">
-                                        {Math.max(0, (state.subscriptionType === 'annual' ? pricing.annual.finalPrice : pricing.semester.finalPrice) - state.couponDiscount)} {pricing.currency}
+                                        {Math.max(0, pricing.semester.finalPrice - state.couponDiscount)} {pricing.currency}
                                       </span>
                                     </div>
                                   </div>
@@ -1070,7 +1219,106 @@ export default function UpgradePage() {
                                   <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-2 font-semibold pt-2 border-t border-orange-200 dark:border-orange-700">
                                     <span className="text-gray-900 dark:text-gray-100">Montant à payer:</span>
                                     <span className="text-medblue-600 dark:text-medblue-400 text-right sm:text-left text-lg">
-                                      {state.subscriptionType === 'annual' ? pricing.annual.finalPrice : pricing.semester.finalPrice} {pricing.currency}
+                                      {pricing.semester.finalPrice} {pricing.currency}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                              {!state.isBuyingKey && (
+                              <div className="space-y-2">
+                                <Label htmlFor="payment-details" className="text-sm sm:text-base text-gray-900 dark:text-gray-100">Détails du paiement</Label>
+                                <Textarea
+                                  id="payment-details"
+                                  value={state.customPaymentDetails}
+                                  onChange={(e) => setState(prev => ({ ...prev, customPaymentDetails: e.target.value }))}
+                                  placeholder="Ex: Virement effectué le DD/MM/YYYY, référence XXX"
+                                  rows={3}
+                                  className="text-sm sm:text-base bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 resize-none"
+                                />
+                                <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 leading-relaxed">
+                                  Précisez la méthode utilisée et toute information utile pour la vérification
+                                </p>
+                              </div>
+                              )}
+
+                              {!state.isBuyingKey && (
+                              <div className="space-y-4">
+                                <Label className="text-sm font-medium">
+                                  Justificatif de paiement <span className="text-red-500">*</span>
+                                </Label>
+                                <p className="text-xs text-gray-600 dark:text-gray-400">
+                                  Veuillez téléverser une preuve de paiement (capture d'écran, reçu, etc.) pour valider votre paiement.
+                                </p>
+                                <div className="border-2 border-dashed border-medblue-300 dark:border-medblue-700 rounded-lg p-3 sm:p-6">
+                                    <UploadDropzone
+                                      endpoint="imageUploader"
+                                      onClientUploadComplete={(res) => {
+                                        console.log('Upload complete:', res);
+                                        if (res?.[0]) {
+                                          setState(prev => ({
+                                            ...prev,
+                                            proofFileUrl: res[0].url,
+                                            proofFileName: res[0].name
+                                          }))
+                                          toast({
+                                            title: 'Succès',
+                                            description: 'Justificatif téléversé avec succès',
+                                            variant: 'default'
+                                          })
+                                        }
+                                      }}
+                                      onUploadError={(error) => {
+                                        console.error('Upload error:', error);
+                                        toast({
+                                          title: 'Erreur',
+                                          description: `Erreur lors du téléversement: ${error.message}`,
+                                          variant: 'destructive'
+                                        })
+                                      }}
+                                      onUploadBegin={() => {
+                                        console.log('Upload started');
+                                      }}
+                                    />
+                                  </div>
+                                  {state.proofFileName && (
+                                    <div className="flex items-center gap-2 p-3 bg-green-50 dark:bg-green-950/30 rounded-lg">
+                                      <CheckCircle className="h-5 w-5 text-green-500" />
+                                      <span className="text-sm text-green-700 dark:text-green-400">
+                                        Fichier téléversé: {state.proofFileName}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </CardContent>
+                          </Card>
+                        )}
+
+                        {state.method === 'autre_payment' && (
+                          <Card className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 mx-1 sm:mx-0">
+                            <CardContent className="p-3 sm:p-6 space-y-4 sm:space-y-6">
+                              <div className="p-3 sm:p-4 bg-gray-50 dark:bg-gray-900/20 rounded-xl border dark:border-gray-800/30">
+                                <h3 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2 text-base sm:text-lg">
+                                  <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-gray-600 dark:text-gray-400" />
+                                  Autre méthode de paiement
+                                </h3>
+                                <div className="space-y-3 text-xs sm:text-sm">
+                                  <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-2">
+                                    <span className="text-gray-600 dark:text-gray-300 font-medium">RIB:</span>
+                                    <span className="font-mono text-right sm:text-left break-all text-gray-900 dark:text-gray-100 text-xs leading-relaxed">
+                                      {pricing.paymentDetails.ribNumber}
+                                    </span>
+                                  </div>
+                                  <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-2">
+                                    <span className="text-gray-600 dark:text-gray-300 font-medium">D17:</span>
+                                    <span className="font-mono text-right sm:text-left text-gray-900 dark:text-gray-100">
+                                      {pricing.paymentDetails.d17PhoneNumber}
+                                    </span>
+                                  </div>
+                                  <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-2 font-semibold pt-2 border-t border-gray-200 dark:border-gray-700">
+                                    <span className="text-gray-900 dark:text-gray-100">Montant à payer:</span>
+                                    <span className="text-medblue-600 dark:text-medblue-400 text-right sm:text-left text-lg">
+                                      {pricing.semester.finalPrice} {pricing.currency}
                                     </span>
                                   </div>
                                 </div>
@@ -1081,7 +1329,7 @@ export default function UpgradePage() {
                                   id="payment-details"
                                   value={state.customPaymentDetails}
                                   onChange={(e) => setState(prev => ({ ...prev, customPaymentDetails: e.target.value }))}
-                                  placeholder="Ex: Virement effectué le DD/MM/YYYY, référence XXX"
+                                  placeholder="Précisez la méthode de paiement utilisée (virement, D17, etc.)"
                                   rows={3}
                                   className="text-sm sm:text-base bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 resize-none"
                                 />
@@ -1148,57 +1396,45 @@ export default function UpgradePage() {
                   {currentStep === 'confirmation' && (
                     <div className="space-y-8">
                       <div className="text-center">
-                        {state.status === 'completed' ? (
+                        {state.status === 'completed' && (state.method === 'activation_key' || state.method === 'voucher_code') ? (
                           <div className="space-y-6">
-                            {state.method === 'custom_payment' ? (
-                              <>
-                                <div className="relative inline-flex items-center justify-center">
-                                  <div className="absolute inset-0 bg-gradient-to-r from-orange-500/30 to-yellow-500/30 rounded-full blur-xl animate-pulse"></div>
-                                  <div className="relative p-6 bg-gradient-to-br from-orange-500 to-yellow-600 rounded-full shadow-2xl">
-                                    <Clock className="h-16 w-16 text-white" />
-                                  </div>
-                                </div>
-                                <div>
-                                  <h2 className="text-4xl font-bold text-orange-600 dark:text-orange-400 mb-4">
-                                    ⏳ Demande en attente
-                                  </h2>
-                                  <p className="text-xl text-gray-700 dark:text-gray-300 mb-6">
-                                    Votre demande d'abonnement est en cours de validation par nos équipes
-                                  </p>
-                                </div>
-                              </>
-                            ) : (
-                              <>
-                                <div className="relative inline-flex items-center justify-center">
-                                  <div className="absolute inset-0 bg-gradient-to-r from-green-500/30 to-emerald-500/30 rounded-full blur-xl animate-pulse"></div>
-                                  <div className="relative p-6 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full shadow-2xl">
-                                    <CheckCircle className="h-16 w-16 text-white" />
-                                  </div>
-                                </div>
-                                <div>
-                                  <h2 className="text-4xl font-bold text-green-600 dark:text-green-400 mb-4">
-                                    🎉 Félicitations !
-                                  </h2>
-                                  <p className="text-xl text-gray-700 dark:text-gray-300 mb-6">
-                                    Votre abonnement premium a été activé avec succès
-                                  </p>
-                                </div>
-                              </>
-                            )}
-                            {/* Show countdown only for non-custom payments */}
-                            {state.method !== 'custom_payment' && countdown && (
-                              <div className="bg-medblue-50 dark:bg-medblue-900/30 border border-medblue-200 dark:border-medblue-700 rounded-xl p-6">
-                                <p className="text-medblue-700 dark:text-medblue-300">
-                                  Redirection automatique vers le tableau de bord dans {countdown} secondes...
-                                </p>
-                                <Button
-                                  onClick={() => router.push('/dashboard')}
-                                  className="mt-4 bg-medblue-500 hover:bg-medblue-600 text-white"
-                                >
-                                  Aller au tableau de bord maintenant
-                                </Button>
+                            <div className="relative inline-flex items-center justify-center">
+                              <div className="absolute inset-0 bg-gradient-to-r from-green-500/30 to-emerald-500/30 rounded-full blur-xl animate-pulse"></div>
+                              <div className="relative p-6 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full shadow-2xl">
+                                <CheckCircle className="h-16 w-16 text-white" />
                               </div>
-                            )}
+                            </div>
+                            <div>
+                              <h2 className="text-4xl font-bold text-green-600 dark:text-green-400 mb-4">
+                                Abonnement activé !
+                              </h2>
+                              <p className="text-xl text-gray-700 dark:text-gray-300 mb-6">
+                                Votre abonnement semestriel a été activé avec succès
+                              </p>
+                              <div className="bg-green-50 dark:bg-green-950/30 rounded-lg p-4 max-w-md mx-auto">
+                                <p className="text-sm text-green-800 dark:text-green-200">
+                                  Vous pouvez maintenant accéder à toutes les fonctionnalités premium de MedQ
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ) : state.status === 'completed' ? (
+                          <div className="space-y-6">
+                            <div className="relative inline-flex items-center justify-center">
+                              <div className="absolute inset-0 bg-gradient-to-r from-orange-500/30 to-yellow-500/30 rounded-full blur-xl animate-pulse"></div>
+                              <div className="relative p-6 bg-gradient-to-br from-orange-500 to-yellow-600 rounded-full shadow-2xl">
+                                <Clock className="h-16 w-16 text-white" />
+                              </div>
+                            </div>
+                            <div>
+                              <h2 className="text-4xl font-bold text-orange-600 dark:text-orange-400 mb-4">
+                                En attente
+                              </h2>
+                              <p className="text-xl text-gray-700 dark:text-gray-300 mb-6">
+                                Notre équipe vous contactera dans un délai maximum de 48 heures
+                              </p>
+                            </div>
+
                           </div>
                         ) : state.status === 'awaiting_proof' ? (
                           <div className="space-y-6">
@@ -1259,15 +1495,17 @@ export default function UpgradePage() {
                                 <div className="flex justify-between items-center">
                                   <span className="text-gray-900 dark:text-gray-100">Plan:</span>
                                   <span className="font-semibold capitalize text-gray-900 dark:text-white">
-                                    {state.subscriptionType === 'annual' ? 'Annuel' : 'Semestriel'}
+                                    Semestriel
                                   </span>
                                 </div>
                                 <div className="flex justify-between items-center">
                                   <span className="text-gray-900 dark:text-gray-100">Méthode:</span>
                                   <span className="font-semibold text-right text-gray-900 dark:text-white">
-                                    {state.method === 'konnect_gateway' && 'Carte bancaire'}
+                                    {state.method === 'konnect_gateway' && (state.isBuyingKey ? 'Paiement en ligne' : 'Carte bancaire')}
                                     {state.method === 'voucher_code' && 'Code de bon'}
-                                    {state.method === 'custom_payment' && 'Paiement personnalisé'}
+                                    {state.method === 'activation_key' && 'Clé d\'activation'}
+                                    {state.method === 'custom_payment' && (state.isBuyingKey ? 'Espèces' : 'Paiement personnalisé')}
+                                    {state.method === 'autre_payment' && 'Autre méthodes'}
                                   </span>
                                 </div>
                                 {state.couponDiscount > 0 && (
@@ -1284,7 +1522,7 @@ export default function UpgradePage() {
                                 <div className="flex justify-between items-center text-base sm:text-lg font-bold">
                                   <span className="text-gray-900 dark:text-gray-100">Total:</span>
                                   <span className="text-medblue-600 dark:text-medblue-400">
-                                    {Math.max(0, (state.subscriptionType === 'annual' ? pricing.annual.finalPrice : pricing.semester.finalPrice) - state.couponDiscount)} {pricing.currency}
+                                    {Math.max(0, pricing.semester.finalPrice - state.couponDiscount)} {pricing.currency}
                                   </span>
                                 </div>
                               </CardContent>

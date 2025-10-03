@@ -33,7 +33,7 @@ async function getHandler(request: AuthenticatedRequest) {
     // Build where clause for user's niveau
     const whereClause: Record<string, unknown> = { userId };
 
-    if (user.role !== 'admin' && user.niveauId) {
+    if (user.role !== 'admin' && user.role !== 'maintainer' && user.niveauId) {
       whereClause.lecture = {
         specialty: {
           niveauId: user.niveauId
@@ -77,7 +77,7 @@ async function getHandler(request: AuthenticatedRequest) {
         where: {
           userId,
           updatedAt: { gte: startDate, lte: endDate },
-          ...(user.role !== 'admin' && user.niveauId ? {
+          ...(user.role !== 'admin' && user.role !== 'maintainer' && user.niveauId ? {
             question: { lecture: { specialty: { niveauId: user.niveauId } } }
           } : {})
         },

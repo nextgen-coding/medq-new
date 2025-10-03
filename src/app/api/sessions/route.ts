@@ -24,20 +24,62 @@ function normalizeDriveLink(raw?: string | null): string | undefined {
 async function getHandler(request: AuthenticatedRequest) {
   const url = new URL(request.url);
   const semesterParam = url.searchParams.get('semester'); // 'none' | <semesterId>
+  
+  // Get user with subscription status
+  const user = request.user?.userId 
+    ? await prisma.user.findUnique({ 
+        where: { id: request.user.userId }, 
+        select: { 
+          niveauId: true, 
+          role: true,
+          hasActiveSubscription: true,
+          subscriptionExpiresAt: true 
+        } 
+      })
+    : null;
+
+  // Check if user has active subscription
+  const hasActiveSubscription = user && user.hasActiveSubscription && 
+    (!user.subscriptionExpiresAt || new Date(user.subscriptionExpiresAt) > new Date());
+
+  // Build where clause
+  const where: any = {};
+
+  // Apply semester filter if provided
+  if (semesterParam) {
+    if (semesterParam === 'none') {
+      where.semesterId = null;
+    } else {
+      where.semesterId = semesterParam;
+    }
+  }
+
+  // Role-based filtering
+  if (request.user?.role === 'admin') {
+    // Admins can see all sessions
+  } else if (request.user?.role === 'maintainer') {
+    // Maintainers: restricted to their niveau only
+    if (user?.niveauId) {
+      where.niveauId = user.niveauId;
+    }
+  } else {
+    // Students: filter by niveau and free status
+    if (!hasActiveSubscription) {
+      // No subscription: only show free content from their niveau
+      where.isFree = true;
+      if (user?.niveauId) {
+        where.niveauId = user.niveauId;
+      }
+    } else {
+      // Has subscription: show all content from their niveau
+      if (user?.niveauId) {
+        where.niveauId = user.niveauId;
+      }
+    }
+  }
+
   const items = await (prisma as any).session.findMany({
-    where: {
-      ...(request.user?.role !== 'admin' && request.user?.userId
-        ? await (async () => {
-            const user = await prisma.user.findUnique({ where: { id: request.user!.userId }, select: { niveauId: true } });
-            return user?.niveauId ? { niveauId: user.niveauId } : {};
-          })()
-        : {}),
-      ...(semesterParam
-        ? semesterParam === 'none'
-          ? { semesterId: null }
-          : { semesterId: semesterParam }
-        : {}),
-    },
+    where,
     orderBy: [{ createdAt: 'desc' }],
     select: {
       id: true,

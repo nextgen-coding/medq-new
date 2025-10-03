@@ -100,8 +100,8 @@ export async function GET(request: NextRequest) {
       whereClause.lectureId = { in: lectures.map(l => l.id) };
     }
 
-    // If user is not admin and has a niveau, filter by specialty niveau
-    if (user.role !== 'admin' && user.niveauId) {
+    // If user is not admin/maintainer and has a niveau, filter by specialty niveau
+    if (user.role !== 'admin' && user.role !== 'maintainer' && user.niveauId) {
       whereClause.lecture = {
         specialty: {
           niveauId: user.niveauId

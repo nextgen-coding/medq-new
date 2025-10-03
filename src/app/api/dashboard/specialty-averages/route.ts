@@ -16,7 +16,7 @@ async function getHandler(request: AuthenticatedRequest) {
 
     // Build where clause for user progress tied to user's niveau (non-admin)
     const whereClause: any = { userId };
-    if (user.role !== 'admin' && user.niveauId) {
+    if (user.role !== 'admin' && user.role !== 'maintainer' && user.niveauId) {
       whereClause.lecture = { specialty: { niveauId: user.niveauId } };
     }
 

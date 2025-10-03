@@ -603,7 +603,7 @@ export default function QuestionsEpingleesTestPage() {
                                       Modifier la question
                                     </Button>
                                     
-                                    {user?.role === 'admin' && (
+                                    {(user?.role === 'admin' || user?.role === 'maintainer') && (
                                       <Button
                                         variant="outline"
                                         onClick={async () => {
@@ -703,7 +703,7 @@ export default function QuestionsEpingleesTestPage() {
                     <OpenQuestion
                       key={currentQuestion.id}
                       question={currentQuestion}
-                      onSubmit={(answer: string, resultValue: boolean | 'partial') => {
+                      onSubmit={(answer: string, resultValue?: boolean | 'partial') => {
                         // Handle the submission
                         if (!questionStartTime) return
                         

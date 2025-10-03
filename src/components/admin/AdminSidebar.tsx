@@ -147,7 +147,7 @@ export function AdminSidebar() {
 
   const paymentMenuItems = React.useMemo(() => [
     { label: 'Paiements', icon: CreditCard, href: '/admin/payments', description: 'Gérer les paiements et abonnements' },
-    { label: 'Codes de Bon', icon: Gift, href: '/admin/vouchers', description: 'Créer et gérer les codes de bon' },
+    { label: 'Clés d\'Activation', icon: Gift, href: '/admin/vouchers', description: 'Créer et gérer les clés d\'activation' },
     { label: 'Prix et Remises', icon: DollarSign, href: '/admin/pricing', description: 'Configurer les prix et remises' }
   ], []);
 
@@ -231,7 +231,7 @@ export function AdminSidebar() {
                     <span className="font-bold text-base sm:text-lg bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
                       MedQ
                     </span>
-                    <span className="text-[10px] sm:text-xs text-muted-foreground">Panneau Admin</span>
+                    <span className="text-[10px] sm:text-xs text-muted-foreground">{isAdmin ? 'Panneau Admin' : 'Panneau Mainteneur'}</span>
                   </div>
                 </div>
               ) : (

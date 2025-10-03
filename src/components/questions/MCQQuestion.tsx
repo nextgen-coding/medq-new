@@ -130,7 +130,7 @@ export function MCQQuestion({
   const { t } = useTranslation();
   const { user } = useAuth();
   const { trackQuestionProgress } = useProgress();
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'admin' || user?.role === 'maintainer';
   const isMaintainer = user?.role === 'maintainer';
   const [isTogglingVisibility, setIsTogglingVisibility] = useState(false);
   // Local override for hidden to ensure instant UI toggle regardless of parent update timing

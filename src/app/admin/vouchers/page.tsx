@@ -23,7 +23,8 @@ import {
   XCircle,
   Filter,
   Download,
-  Trash2
+  Trash2,
+  RefreshCw
 } from 'lucide-react';
 
 interface VoucherCode {
@@ -104,6 +105,7 @@ export default function AdminVouchersPage() {
 
   const fetchVouchers = async () => {
     try {
+      setLoading(true);
       const response = await fetch('/api/admin/vouchers');
       if (!response.ok) throw new Error('Failed to fetch vouchers');
       const data = await response.json();
@@ -112,7 +114,7 @@ export default function AdminVouchersPage() {
       console.error('Error fetching vouchers:', error);
       toast({
         title: 'Erreur',
-        description: 'Impossible de charger les codes de bon',
+        description: 'Impossible de charger les clés d\'activation',
         variant: 'destructive',
       });
     } finally {
@@ -122,6 +124,7 @@ export default function AdminVouchersPage() {
 
   const fetchReductionCoupons = async () => {
     try {
+      setLoading(true);
       const response = await fetch('/api/admin/reduction-coupons');
       if (!response.ok) throw new Error('Failed to fetch reduction coupons');
       const data = await response.json();
@@ -133,6 +136,8 @@ export default function AdminVouchersPage() {
         description: 'Impossible de charger les coupons de réduction',
         variant: 'destructive',
       });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -157,7 +162,7 @@ export default function AdminVouchersPage() {
 
       toast({
         title: 'Succès',
-        description: data.message || `${createForm.quantity} code(s) de bon créé(s) avec succès`,
+        description: data.message || `${createForm.quantity} clé(s) d'activation créée(s) avec succès`,
         variant: 'default',
       });
 
@@ -173,7 +178,7 @@ export default function AdminVouchersPage() {
       console.error('Error creating vouchers:', error);
       toast({
         title: 'Erreur',
-        description: error instanceof Error ? error.message : 'Impossible de créer les codes de bon',
+        description: error instanceof Error ? error.message : 'Impossible de créer les clés d\'activation',
         variant: 'destructive',
       });
     }
@@ -189,7 +194,7 @@ export default function AdminVouchersPage() {
   };
 
   const handleDeleteVoucher = async (voucherId: string) => {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer ce code de bon ?')) {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer cette clé d\'activation ?')) {
       return;
     }
 
@@ -206,7 +211,7 @@ export default function AdminVouchersPage() {
 
       toast({
         title: 'Succès',
-        description: 'Code de bon supprimé avec succès',
+        description: 'Clé d\'activation supprimée avec succès',
         variant: 'default',
       });
 
@@ -215,7 +220,7 @@ export default function AdminVouchersPage() {
       console.error('Error deleting voucher:', error);
       toast({
         title: 'Erreur',
-        description: error instanceof Error ? error.message : 'Impossible de supprimer le code de bon',
+        description: error instanceof Error ? error.message : 'Impossible de supprimer la clé d\'activation',
         variant: 'destructive',
       });
     } finally {
@@ -347,19 +352,24 @@ export default function AdminVouchersPage() {
                 Gestion des Codes et Coupons
               </h1>
               <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base">
-                Créez et gérez les codes de bon d'abonnement et les coupons de réduction
+                Créez et gérez les clés d'activation d'abonnement et les coupons de réduction
               </p>
             </div>
           </div>
 
           <Tabs defaultValue="vouchers" className="space-y-6">
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="vouchers">Codes d'abonnement</TabsTrigger>
+              <TabsTrigger value="vouchers">Clés d'abonnement</TabsTrigger>
               <TabsTrigger value="coupons">Coupons de réduction</TabsTrigger>
             </TabsList>
 
             <TabsContent value="vouchers" className="space-y-4 sm:space-y-6">
               <div className="flex flex-col sm:flex-row gap-2 sm:gap-2 w-full">
+                <Button variant="outline" onClick={() => fetchVouchers()} className="flex-1 sm:flex-initial">
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  <span className="hidden xs:inline">Actualiser</span>
+                  <span className="xs:hidden">Refresh</span>
+                </Button>
                 <Button variant="outline" className="flex-1 sm:flex-initial">
                   <Download className="h-4 w-4 mr-2" />
                   <span className="hidden xs:inline">Exporter</span>
@@ -375,9 +385,9 @@ export default function AdminVouchersPage() {
                   </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>Créer des codes de bon</DialogTitle>
+                    <DialogTitle>Créer des clés d'activation</DialogTitle>
                     <DialogDescription>
-                      Générez de nouveaux codes de bon pour les abonnements
+                      Générez de nouvelles clés d'activation pour les abonnements
                     </DialogDescription>
                   </DialogHeader>
                   
@@ -563,9 +573,9 @@ export default function AdminVouchersPage() {
           {/* Vouchers Table */}
           <Card>
             <CardHeader>
-              <CardTitle>Codes de Bon ({filteredVouchers.length})</CardTitle>
+              <CardTitle>Clés d'Activation ({filteredVouchers.length})</CardTitle>
               <CardDescription>
-                Liste de tous les codes de bon générés
+                Liste de toutes les clés d'activation générées
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -787,6 +797,11 @@ export default function AdminVouchersPage() {
 
             <TabsContent value="coupons" className="space-y-4 sm:space-y-6">
               <div className="flex gap-2 w-full sm:w-auto">
+                <Button variant="outline" onClick={() => fetchReductionCoupons()} className="flex-1 sm:flex-initial">
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  <span className="hidden xs:inline">Actualiser</span>
+                  <span className="xs:hidden">Refresh</span>
+                </Button>
                 <Button variant="outline" className="flex-1 sm:flex-initial">
                   <Download className="h-4 w-4 mr-2" />
                   <span className="hidden xs:inline">Exporter</span>

@@ -167,7 +167,7 @@ export default function LecturePageRoute() {
     // Don't automatically move to next question - let user see the result first
   };
 
-  const handleOpenSubmit = (answer: string, resultValue: boolean | 'partial') => {
+  const handleOpenSubmit = (answer: string, resultValue?: boolean | 'partial') => {
     // Only handle regular questions here, clinical cases are handled separately
     // Check if this is actually a clinical case (has questions array) vs a regular question
     if (!('questions' in currentQuestion!)) {
@@ -215,7 +215,12 @@ export default function LecturePageRoute() {
         return null;
       }
       
-      const isAnswered = clinicalCase.questions.every(q => answers[q.id] !== undefined);
+      const isAnswered = clinicalCase.questions.every(q => {
+        const answer = answers[q.id];
+        if (answer === undefined) return false;
+        if ((q.type as any) === 'clinic_croq' && typeof answer === 'string' && answer.trim().length === 0) return false;
+        return true;
+      });
       const caseAnswerResult = isAnswered ? 
         (clinicalCase.questions.every(q => answerResults[q.id] === true) ? true : 
          clinicalCase.questions.some(q => answerResults[q.id] === true || answerResults[q.id] === 'partial') ? 'partial' : false) : 
@@ -288,7 +293,8 @@ export default function LecturePageRoute() {
     }
 
     // Regular question handling
-    const isAnswered = answers[currentQuestion.id] !== undefined;
+    const isAnswered = answers[currentQuestion.id] !== undefined && 
+      (currentQuestion.type !== 'qroc' || (typeof answers[currentQuestion.id] === 'string' && answers[currentQuestion.id].trim().length > 0));
     const answerResult = answerResults[currentQuestion.id];
     const userAnswer = answers[currentQuestion.id];
     
@@ -365,7 +371,7 @@ export default function LecturePageRoute() {
                         <PlusCircle className="h-4 w-4 mr-2" />
                         <span className="hidden sm:inline">creer</span>
                       </Button>
-                      {user?.role === 'admin' && (
+                      {(user?.role === 'admin' || user?.role === 'maintainer') && (
                         <Button
                           variant="outline"
                           size="sm"
@@ -437,7 +443,7 @@ export default function LecturePageRoute() {
             lecture={lecture}
             isOpen={openQuestionsDialog}
         onOpenChange={(o)=>{ setOpenQuestionsDialog(o); if(!o) setOpenOrganizer(false); }}
-        initialOrganizerOpen={user?.role === 'admin' ? openOrganizer : false}
+        initialOrganizerOpen={(user?.role === 'admin' || user?.role === 'maintainer') ? openOrganizer : false}
             initialCreateOpen
           />
         )}
@@ -526,7 +532,7 @@ function GroupedQrocContainer({ clinicalCase, answers, answerResults, pinnedQues
               {groupHidden ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
             </Button>
           )}
-          {user?.role === 'admin' && (
+          {(user?.role === 'admin' || user?.role === 'maintainer') && (
             <Button variant="outline" size="sm" className="flex items-center gap-1 text-destructive" onClick={async () => { if (!confirm('Delete all questions in group?')) return; for (const q of clinicalCase.questions) { try { await fetch(`/api/questions/${q.id}`, { method: 'DELETE', credentials: 'include' }); } catch {} } window.location.reload(); }}>
               <Trash2 className="h-3.5 w-3.5" />
             </Button>
@@ -729,7 +735,7 @@ function GroupedMcqContainer({ clinicalCase, answers, answerResults, pinnedQuest
               {groupHidden ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
             </Button>
           )}
-          {user?.role === 'admin' && (
+          {(user?.role === 'admin' || user?.role === 'maintainer') && (
             <Button variant="outline" size="sm" className="flex items-center gap-1 text-destructive" onClick={async () => { if (!confirm('Delete all questions in group?')) return; for (const q of clinicalCase.questions) { try { await fetch(`/api/questions/${q.id}`, { method: 'DELETE', credentials: 'include' }); } catch {} } window.location.reload(); }}>
               <Trash2 className="h-3.5 w-3.5" />
             </Button>

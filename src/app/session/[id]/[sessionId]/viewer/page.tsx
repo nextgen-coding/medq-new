@@ -113,6 +113,8 @@ export default function SessionViewerPage() {
   const [correctionRotation, setCorrectionRotation] = useState(0);
   const [correctionLoading, setCorrectionLoading] = useState(true);
   const [correctionError, setCorrectionError] = useState<string | null>(null);
+  const [correctionPagesRendered, setCorrectionPagesRendered] = useState(0);
+  const correctionPagesRenderedRef = useRef(0);
   
   // PDF Linking Feature State
   const [isLinkingMode, setIsLinkingMode] = useState(false);
@@ -136,29 +138,44 @@ export default function SessionViewerPage() {
   // Refs for auto-fit sizing
   const examViewerRef = useRef<HTMLDivElement | null>(null);
   const correctionViewerRef = useRef<HTMLDivElement | null>(null);
+  const mobileCorrectionViewerRef = useRef<HTMLDivElement | null>(null);
   // Store last scroll position for correction PDF
   const correctionScrollPos = useRef<number>(0);
+  // Track if restoration is in progress to avoid fighting with user scrolling
+  const restorationInProgress = useRef<boolean>(false);
+  const restorationTimeouts = useRef<NodeJS.Timeout[]>([]);
 
   // Save scroll position when hiding correction PDF or collapsing panel
   const prevShowCorrectionPdf = useRef(showCorrectionPdf);
   const prevPanelCollapsed = useRef(panelCollapsed);
   useEffect(() => {
-    const ref = correctionViewerRef.current;
-    if (ref) {
-      // Save when hiding correction PDF
-      if (prevShowCorrectionPdf.current && !showCorrectionPdf) {
-        correctionScrollPos.current = ref.scrollTop;
+    // Try mobile ref first, then desktop ref
+    const mobileRef = mobileCorrectionViewerRef.current;
+    const desktopRef = correctionViewerRef.current;
+    
+    // Determine which ref has actual scroll data (non-zero scrollTop)
+    const activeRef = (mobileRef && mobileRef.scrollTop > 0) ? mobileRef : 
+                      (desktopRef && desktopRef.scrollTop > 0) ? desktopRef : null;
+    
+    if (activeRef) {
+      // Save when hiding correction PDF (only if we have a meaningful value)
+      if (prevShowCorrectionPdf.current && !showCorrectionPdf && activeRef.scrollTop > 0) {
+        correctionScrollPos.current = activeRef.scrollTop;
+        console.log(`💾 Auto-save (hide PDF): ${correctionScrollPos.current}px`);
       }
-      // Save when collapsing panel
-      if (!prevPanelCollapsed.current && panelCollapsed) {
-        correctionScrollPos.current = ref.scrollTop;
+      // Save when collapsing panel (only if we have a meaningful value)
+      if (!prevPanelCollapsed.current && panelCollapsed && activeRef.scrollTop > 0) {
+        correctionScrollPos.current = activeRef.scrollTop;
+        console.log(`💾 Auto-save (collapse panel): ${correctionScrollPos.current}px`);
       }
+    } else {
+      console.log(`⚠️ Auto-save skipped - no active ref with scrollTop > 0`);
     }
     prevShowCorrectionPdf.current = showCorrectionPdf;
     prevPanelCollapsed.current = panelCollapsed;
   }, [showCorrectionPdf, panelCollapsed]);
 
-  // Restore scroll position immediately when PDF should be visible
+  // Restore scroll position immediately when PDF should be visible (desktop)
   useEffect(() => {
     const shouldShowPdf = showCorrectionPdf || !correctionModeEnabled;
     if (!shouldShowPdf || panelCollapsed) return;
@@ -170,8 +187,99 @@ export default function SessionViewerPage() {
       setTimeout(() => {
         if (ref) ref.scrollTop = correctionScrollPos.current;
       }, 100);
+      // Additional delay for desktop to ensure full rendering
+      setTimeout(() => {
+        if (ref) ref.scrollTop = correctionScrollPos.current;
+      }, 300);
     }
   }, [showCorrectionPdf, panelCollapsed, correctionModeEnabled]);
+  
+  // Additional effect to restore scroll position when panel is opened on mobile
+  useEffect(() => {
+    if (!panelCollapsed && correctionScrollPos.current > 0) {
+      const ref = mobileCorrectionViewerRef.current;
+      if (ref) {
+        restorationInProgress.current = true;
+        // Clear any existing timeouts
+        restorationTimeouts.current.forEach(clearTimeout);
+        restorationTimeouts.current = [];
+        
+        // Multiple attempts to restore scroll position on mobile with longer delays
+        const attempts = [100, 300, 500, 800, 1200];
+        attempts.forEach(delay => {
+          const timeout = setTimeout(() => {
+            if (ref && correctionScrollPos.current > 0 && restorationInProgress.current) {
+              ref.scrollTop = correctionScrollPos.current;
+              console.log(`📍 Tentative restauration scroll mobile à ${correctionScrollPos.current}px après ${delay}ms`);
+            }
+          }, delay);
+          restorationTimeouts.current.push(timeout);
+        });
+        
+        // Stop restoration after max delay
+        const stopTimeout = setTimeout(() => {
+          restorationInProgress.current = false;
+          restorationTimeouts.current = [];
+          console.log(`✅ Restauration terminée - vous pouvez maintenant naviguer librement`);
+        }, 1500);
+        restorationTimeouts.current.push(stopTimeout);
+      }
+    }
+    
+    return () => {
+      // Cleanup on unmount
+      restorationTimeouts.current.forEach(clearTimeout);
+      restorationTimeouts.current = [];
+    };
+  }, [panelCollapsed]);
+  
+  // Restore scroll when all pages are rendered
+  useEffect(() => {
+    if (correctionPagesRendered > 0 && correctionNumPages && correctionPagesRendered >= correctionNumPages && restorationInProgress.current) {
+      const ref = mobileCorrectionViewerRef.current;
+      if (ref && correctionScrollPos.current > 0) {
+        // Delay to ensure DOM is fully updated
+        setTimeout(() => {
+          if (ref && restorationInProgress.current) {
+            ref.scrollTop = correctionScrollPos.current;
+            console.log(`✅ Toutes les pages mobile rendues (${correctionPagesRendered}/${correctionNumPages}), scroll restauré: ${correctionScrollPos.current}px`);
+            // Stop further restoration attempts
+            restorationInProgress.current = false;
+            restorationTimeouts.current.forEach(clearTimeout);
+            restorationTimeouts.current = [];
+          }
+        }, 100);
+      }
+    }
+  }, [correctionPagesRendered, correctionNumPages]);
+  
+  // Detect manual user scrolling and cancel restoration
+  useEffect(() => {
+    const ref = mobileCorrectionViewerRef.current;
+    if (!ref) return;
+    
+    let userScrollTimeout: NodeJS.Timeout;
+    const handleScroll = () => {
+      if (restorationInProgress.current) {
+        // User is manually scrolling during restoration
+        clearTimeout(userScrollTimeout);
+        userScrollTimeout = setTimeout(() => {
+          // If user scrolled and stayed at a position for 200ms, consider it intentional
+          restorationInProgress.current = false;
+          restorationTimeouts.current.forEach(clearTimeout);
+          restorationTimeouts.current = [];
+          console.log(`🛑 Restauration annulée - défilement manuel détecté`);
+        }, 200);
+      }
+    };
+    
+    ref.addEventListener('scroll', handleScroll, { passive: true });
+    
+    return () => {
+      ref.removeEventListener('scroll', handleScroll);
+      clearTimeout(userScrollTimeout);
+    };
+  }, [panelCollapsed]); // Re-attach when panel state changes
   const fitExamPage = useCallback(() => {
     // Disabled: always maintain 133% zoom
     setScale(1.33);
@@ -994,8 +1102,22 @@ export default function SessionViewerPage() {
                                     size="sm" 
                                     variant="outline" 
                                     onClick={() => {
-                                      if (correctionViewerRef.current) {
-                                        correctionScrollPos.current = correctionViewerRef.current.scrollTop;
+                                      const ref = mobileCorrectionViewerRef.current;
+                                      console.log('🔍 Debug - Ref mobile actuel:', ref);
+                                      console.log('🔍 Debug - scrollTop:', ref?.scrollTop);
+                                      console.log('🔍 Debug - scrollHeight:', ref?.scrollHeight);
+                                      console.log('🔍 Debug - clientHeight:', ref?.clientHeight);
+                                      if (ref) {
+                                        const scrollValue = ref.scrollTop;
+                                        correctionScrollPos.current = scrollValue;
+                                        console.log(`💾💾💾 Position scroll sauvegardée (mobile) - AVANT fermeture: ${correctionScrollPos.current}px`);
+                                        
+                                        // Verify it's saved
+                                        setTimeout(() => {
+                                          console.log(`✅ Vérification après 100ms - Position toujours sauvée: ${correctionScrollPos.current}px`);
+                                        }, 100);
+                                      } else {
+                                        console.error('❌ REF MOBILE EST NULL!');
                                       }
                                       setPanelCollapsed(true);
                                     }} 
@@ -1018,10 +1140,30 @@ export default function SessionViewerPage() {
                                     className="px-2 text-[11px] bg-white/70 dark:bg-muted/40 hover:bg-blue-50 dark:hover:bg-blue-900/30 border-blue-200 dark:border-blue-800">Ajuster</Button>
                                 </div>
                                 <div className="flex-1 relative min-h-0">
-                                  <div ref={correctionViewerRef} className="absolute inset-0 overflow-y-auto overflow-x-scroll px-4 py-4">
+                                  <div ref={mobileCorrectionViewerRef} className="absolute inset-0 overflow-y-auto overflow-x-scroll px-4 py-4">
                                     <PDFDoc
                                       file={correctionUrl}
-                                      onLoadSuccess={({ numPages }) => { setCorrectionNumPages(numPages); setCorrectionLoading(false); setCorrectionError(null); }}
+                                      onLoadSuccess={({ numPages }) => { 
+                                        setCorrectionNumPages(numPages); 
+                                        setCorrectionLoading(false); 
+                                        setCorrectionError(null);
+                                        setCorrectionPagesRendered(0); // Reset counter
+                                        correctionPagesRenderedRef.current = 0;
+                                        console.log(`📄 PDF mobile chargé (${numPages} pages), position sauvegardée: ${correctionScrollPos.current}px`);
+                                        // Restore scroll position after PDF loads (mobile fix) - only if restoration in progress
+                                        if (restorationInProgress.current) {
+                                          const delays = [50, 150, 300];
+                                          delays.forEach(delay => {
+                                            const timeout = setTimeout(() => {
+                                              if (mobileCorrectionViewerRef.current && correctionScrollPos.current > 0 && restorationInProgress.current) {
+                                                mobileCorrectionViewerRef.current.scrollTop = correctionScrollPos.current;
+                                                console.log(`📍 Restauration scroll mobile après chargement PDF: ${correctionScrollPos.current}px (délai: ${delay}ms)`);
+                                              }
+                                            }, delay);
+                                            restorationTimeouts.current.push(timeout);
+                                          });
+                                        }
+                                      }}
                                       onLoadError={(err) => { console.error(err); setCorrectionLoading(false); setCorrectionError('Erreur PDF.'); }}
                                       loading=""
                                       className="w-fit min-w-full flex flex-col items-center gap-8"
@@ -1044,6 +1186,11 @@ export default function SessionViewerPage() {
                                             className="shadow-xl bg-white rounded-lg border-2 border-blue-100 dark:border-blue-800"
                                             renderTextLayer={false}
                                             renderAnnotationLayer={false}
+                                            onRenderSuccess={() => {
+                                              correctionPagesRenderedRef.current += 1;
+                                              setCorrectionPagesRendered(correctionPagesRenderedRef.current);
+                                              console.log(`📄 Page mobile ${i + 1}/${correctionNumPages} rendue (total: ${correctionPagesRenderedRef.current})`);
+                                            }}
                                           />
                                         </div>
                                       )) : (
@@ -1055,6 +1202,11 @@ export default function SessionViewerPage() {
                                             className="shadow-xl bg-white rounded-lg border-2 border-blue-100 dark:border-blue-800"
                                             renderTextLayer={false}
                                             renderAnnotationLayer={false}
+                                            onRenderSuccess={() => {
+                                              correctionPagesRenderedRef.current = 1;
+                                              setCorrectionPagesRendered(1);
+                                              console.log(`📄 Page mobile 1/1 rendue`);
+                                            }}
                                           />
                                         </div>
                                       ))}
@@ -1097,7 +1249,17 @@ export default function SessionViewerPage() {
                                   <div ref={correctionViewerRef} className="absolute inset-0 overflow-y-auto overflow-x-scroll px-4 py-4">
                                     <PDFDoc
                                       file={correctionUrl}
-                                      onLoadSuccess={({ numPages }) => { setCorrectionNumPages(numPages); setCorrectionLoading(false); setCorrectionError(null); }}
+                                      onLoadSuccess={({ numPages }) => { 
+                                        setCorrectionNumPages(numPages); 
+                                        setCorrectionLoading(false); 
+                                        setCorrectionError(null);
+                                        // Restore scroll position after PDF loads (desktop)
+                                        setTimeout(() => {
+                                          if (correctionViewerRef.current && correctionScrollPos.current > 0) {
+                                            correctionViewerRef.current.scrollTop = correctionScrollPos.current;
+                                          }
+                                        }, 50);
+                                      }}
                                       onLoadError={(err) => { console.error(err); setCorrectionLoading(false); setCorrectionError('Erreur PDF.'); }}
                                       loading=""
                                       className="w-fit min-w-full flex flex-col items-center gap-8"

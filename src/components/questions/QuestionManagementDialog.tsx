@@ -35,7 +35,7 @@ interface QuestionManagementDialogProps {
 
 export function QuestionManagementDialog({ lecture, isOpen, onOpenChange, initialCreateOpen = false, initialOrganizerOpen = false }: QuestionManagementDialogProps) {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'admin' || user?.role === 'maintainer';
   const isMaintainer = user?.role === 'maintainer';
   const [questions, setQuestions] = useState<Question[]>([]);
   const [filteredQuestions, setFilteredQuestions] = useState<Question[]>([]);

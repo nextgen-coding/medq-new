@@ -383,9 +383,11 @@ export default function ProfilePageRoute() {
                               <Badge className={`px-3 py-1 text-sm font-medium ${
                                 user?.role === 'admin'
                                   ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white'
+                                  : user?.role === 'maintainer'
+                                  ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white'
                                   : 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white'
                               }`}>
-                                {user?.role === 'admin' ? 'Administrateur' : 'Étudiant'}
+                                {user?.role === 'admin' ? 'Administrateur' : user?.role === 'maintainer' ? 'Mainteneur' : 'Étudiant'}
                               </Badge>
                             </div>
 

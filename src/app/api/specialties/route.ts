@@ -15,29 +15,27 @@ async function getHandler(request: AuthenticatedRequest) {
 
   const user = await prisma.user.findUnique({
       where: { id: userId },
+      select: {
+        id: true,
+        role: true,
+        niveauId: true,
+        semesterId: true,
+        hasActiveSubscription: true,
+        subscriptionExpiresAt: true,
+      }
     });
 
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
+    // Check if user has active subscription
+    const hasActiveSubscription = user.hasActiveSubscription && 
+      (!user.subscriptionExpiresAt || new Date(user.subscriptionExpiresAt) > new Date());
+
     const whereClause: any = {};
-    if (user.role !== 'admin') {
-      // Non-admins: restrict by BOTH niveau and semester (if set)
-      // - Always require matching niveau
-      // - If the user has a semester, allow specialties in that semester OR with no semester (common)
-      if (user.niveauId) {
-        whereClause.niveauId = user.niveauId;
-      }
-      if (user.semesterId) {
-        whereClause.OR = [
-          { semesterId: user.semesterId },
-          { semesterId: null },
-        ];
-      }
-      // If user has no semester set, we don't constrain by semester (shows all semesters within their niveau)
-    } else {
-      // Admins may optionally filter by niveau and/or semester via query params
+    if (user.role === 'admin') {
+      // Admins can optionally filter by niveau and/or semester via query params
       if (niveauParam && niveauParam !== 'all') {
         whereClause.niveauId = niveauParam;
       }
@@ -49,6 +47,40 @@ async function getHandler(request: AuthenticatedRequest) {
           whereClause.semesterId = semesterParam;
         }
       }
+    } else if (user.role === 'maintainer') {
+      // Maintainers: restricted to their niveau only
+      if (user.niveauId) {
+        whereClause.niveauId = user.niveauId;
+      }
+      // Maintainers can optionally filter by semester within their niveau
+      if (semesterParam) {
+        if (semesterParam === 'none') {
+          whereClause.semesterId = null;
+        } else if (semesterParam !== 'all') {
+          whereClause.semesterId = semesterParam;
+        }
+      }
+    } else {
+      // Students: restrict by BOTH niveau and semester (if set)
+      // AND by free status if they don't have subscription
+      
+      if (!hasActiveSubscription) {
+        // No subscription: only show free specialties
+        whereClause.isFree = true;
+      }
+      
+      // Always require matching niveau
+      if (user.niveauId) {
+        whereClause.niveauId = user.niveauId;
+      }
+      // If the user has a semester, allow specialties in that semester OR with no semester (common)
+      if (user.semesterId) {
+        whereClause.OR = [
+          { semesterId: user.semesterId },
+          { semesterId: null },
+        ];
+      }
+      // If user has no semester set, we don't constrain by semester (shows all semesters within their niveau)
     }
 
     const specialties = await prisma.specialty.findMany({

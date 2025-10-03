@@ -55,9 +55,6 @@ export function OpenQuestionSelfAssessment({ onAssessment, userAnswerText, quest
       } else if (event.key === '3') {
         event.preventDefault();
         handleRatingSelect('wrong');
-      } else if (event.key === 'Enter') {
-        event.preventDefault();
-        handleSkip();
       }
     };
 
