@@ -37,7 +37,7 @@ async function getHandler(request: AuthenticatedRequest) {
       score: { not: null }
     };
 
-    if (user.role !== 'admin' && user.niveauId) {
+    if (user.role !== 'admin' && user.role !== 'maintainer' && user.niveauId) {
       whereClause.lecture = {
         specialty: {
           niveauId: user.niveauId

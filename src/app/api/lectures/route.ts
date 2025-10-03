@@ -16,7 +16,7 @@ async function getHandler(request: AuthenticatedRequest) {
   const specialtyId = searchParams.get('specialtyId');
   const semesterParam = searchParams.get('semester'); // 'none' | <semesterId>
 
-    // Get user with their niveau information
+    // Get user with their niveau information and subscription status
   const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { 
@@ -24,6 +24,8 @@ async function getHandler(request: AuthenticatedRequest) {
         role: true, 
     niveauId: true,
     semesterId: true,
+        hasActiveSubscription: true,
+        subscriptionExpiresAt: true,
       }
     });
 
@@ -34,6 +36,10 @@ async function getHandler(request: AuthenticatedRequest) {
       );
     }
 
+    // Check if user has active subscription
+    const hasActiveSubscription = user.hasActiveSubscription && 
+      (!user.subscriptionExpiresAt || new Date(user.subscriptionExpiresAt) > new Date());
+
     // Build the where clause for lectures
   const where: Record<string, any> = {};
     
@@ -41,31 +47,76 @@ async function getHandler(request: AuthenticatedRequest) {
       where.specialtyId = specialtyId;
     }
 
-    // Non-admins: enforce filters by user's niveau and semester (if set)
-    if (user.role !== 'admin') {
+    // Role-based filtering
+    if (user.role === 'admin') {
+      // Admins can see all lectures
+      // Optional semester filter
+      if (semesterParam) {
+        where.specialty = where.specialty || {};
+        if (semesterParam === 'none') {
+          where.specialty.semesterId = null;
+        } else if (semesterParam !== 'all') {
+          where.specialty.semesterId = semesterParam;
+        }
+      }
+    } else if (user.role === 'maintainer') {
+      // Maintainers: restricted to their niveau only
       const specialtyFilter: any = { ...(where.specialty || {}) };
       if (user.niveauId) {
         specialtyFilter.niveauId = user.niveauId;
       }
-      if (user.semesterId) {
-        // Allow content in user's semester or globally applicable (null semester)
-        specialtyFilter.OR = [
-          { semesterId: user.semesterId },
-          { semesterId: null },
-        ];
+      // Optional semester filter within their niveau
+      if (semesterParam) {
+        if (semesterParam === 'none') {
+          specialtyFilter.semesterId = null;
+        } else if (semesterParam !== 'all') {
+          specialtyFilter.semesterId = semesterParam;
+        }
       }
       if (Object.keys(specialtyFilter).length > 0) {
         where.specialty = specialtyFilter;
       }
-    }
-
-    // Optional semester filter applies only for admins; non-admins are governed by their profile
-    if (user.role === 'admin' && semesterParam) {
-      where.specialty = where.specialty || {};
-      if (semesterParam === 'none') {
-        where.specialty.semesterId = null;
-      } else if (semesterParam !== 'all') {
-        where.specialty.semesterId = semesterParam;
+    } else {
+      // Students: enforce filters by user's niveau and semester (if set)
+      // BUT: if user has active subscription OR content is free, they can access it
+      if (!hasActiveSubscription) {
+        // No subscription: only show free content from their niveau/semester
+        const specialtyFilter: any = { ...(where.specialty || {}) };
+        
+        // Must be free content
+        where.isFree = true;
+        
+        // Filter by niveau if set
+        if (user.niveauId) {
+          specialtyFilter.niveauId = user.niveauId;
+        }
+        // Filter by semester if set
+        if (user.semesterId) {
+          // Allow content in user's semester or globally applicable (null semester)
+          specialtyFilter.OR = [
+            { semesterId: user.semesterId },
+            { semesterId: null },
+          ];
+        }
+        if (Object.keys(specialtyFilter).length > 0) {
+          where.specialty = specialtyFilter;
+        }
+      } else {
+        // Has subscription: show all content from their niveau/semester
+        const specialtyFilter: any = { ...(where.specialty || {}) };
+        if (user.niveauId) {
+          specialtyFilter.niveauId = user.niveauId;
+        }
+        if (user.semesterId) {
+          // Allow content in user's semester or globally applicable (null semester)
+          specialtyFilter.OR = [
+            { semesterId: user.semesterId },
+            { semesterId: null },
+          ];
+        }
+        if (Object.keys(specialtyFilter).length > 0) {
+          where.specialty = specialtyFilter;
+        }
       }
     }
 
@@ -140,9 +191,9 @@ async function getHandler(request: AuthenticatedRequest) {
   const culmonNote = Math.round(avgScore * 20 * 100) / 100;
 
 
-        // Get reports count for admins
+        // Get reports count for admins and maintainers
         let reportsCount = 0;
-        if (user.role === 'admin') {
+        if (user.role === 'admin' || user.role === 'maintainer') {
           const reports = await prisma.report.findMany({
             where: {
               lectureId: lecture.id
@@ -166,7 +217,7 @@ async function getHandler(request: AuthenticatedRequest) {
                 userProgress[0].lastAccessed
               ) : undefined
           },
-          reportsCount: user.role === 'admin' ? reportsCount : undefined,
+          reportsCount: (user.role === 'admin' || user.role === 'maintainer') ? reportsCount : undefined,
           commentsCount
           ,culmonNote
         };

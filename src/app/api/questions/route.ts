@@ -39,13 +39,13 @@ async function getHandler(request: AuthenticatedRequest) {
     if (lectureId) where.lectureId = lectureId;
     if (type) where.type = type;
 
-    // If user is not admin, never return hidden questions
-    if (user.role !== 'admin') {
+    // If user is not admin or maintainer, never return hidden questions
+    if (user.role !== 'admin' && user.role !== 'maintainer') {
       where.hidden = false;
     }
 
-    // If user is not admin and has a niveau, filter by specialty niveau
-    if (user.role !== 'admin' && user.niveauId) {
+    // If user is not admin/maintainer and has a niveau, filter by specialty niveau
+    if (user.role !== 'admin' && user.role !== 'maintainer' && user.niveauId) {
       where.lecture = {
         specialty: {
           niveauId: user.niveauId

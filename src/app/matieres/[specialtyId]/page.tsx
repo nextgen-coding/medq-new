@@ -774,7 +774,7 @@ export default function SpecialtyPageRoute() {
                                       <Button
                                         variant="ghost"
                                         size="sm"
-                                        onClick={() => router.push(`/admin/reports?lectureId=${lecture.id}`)}
+                                        onClick={() => router.push(`${user?.role === 'admin' ? '/admin' : '/maintainer'}/reports?lectureId=${lecture.id}`)}
                                         className="flex items-center gap-1 hover:bg-orange-50 dark:hover:bg-orange-900/20 text-orange-600"
                                       >
                                         <AlertTriangle className="w-4 h-4" />
@@ -899,7 +899,7 @@ export default function SpecialtyPageRoute() {
                                             <Button
                                               variant="ghost"
                                               size="sm"
-                                              onClick={() => router.push(`/admin/reports?lectureId=${lecture.id}`)}
+                                              onClick={() => router.push(`${user?.role === 'admin' ? '/admin' : '/maintainer'}/reports?lectureId=${lecture.id}`)}
                                               className="flex items-center gap-1 hover:bg-orange-50 dark:hover:bg-orange-900/20 text-orange-600"
                                             >
                                               <AlertTriangle className="w-4 h-4" />
@@ -1044,7 +1044,7 @@ export default function SpecialtyPageRoute() {
                                   <Button
                                     variant="ghost"
                                     size="sm"
-                                    onClick={() => router.push(`/admin/reports?lectureId=${lecture.id}`)}
+                                    onClick={() => router.push(`${user?.role === 'admin' ? '/admin' : '/maintainer'}/reports?lectureId=${lecture.id}`)}
                                     className="flex items-center gap-2 hover:bg-orange-50 dark:hover:bg-orange-900/20"
                                   >
                                     <AlertTriangle className="w-4 h-4 text-orange-600" />
@@ -1194,7 +1194,7 @@ export default function SpecialtyPageRoute() {
                                     <Button
                                       variant="ghost"
                                       size="sm"
-                                      onClick={() => router.push(`/admin/reports?lectureId=${lecture.id}`)}
+                                      onClick={() => router.push(`${user?.role === 'admin' ? '/admin' : '/maintainer'}/reports?lectureId=${lecture.id}`)}
                                       className="flex items-center gap-2 hover:bg-orange-50 dark:hover:bg-orange-900/20"
                                     >
                                       <AlertTriangle className="w-4 h-4 text-orange-600" />

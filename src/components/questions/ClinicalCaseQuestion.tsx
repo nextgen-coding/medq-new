@@ -335,7 +335,7 @@ export function ClinicalCaseQuestion({
   };
 
   const handleDeleteGroup = async () => {
-    if (!user?.role || user.role !== 'admin') return;
+    if (!user?.role || (user.role !== 'admin' && user.role !== 'maintainer')) return;
     if (!confirm('Supprimer tout le cas clinique (toutes les sous-questions) ?')) return;
     setIsDeleting(true);
     try {

@@ -33,7 +33,7 @@ async function getHandler(request: AuthenticatedRequest) {
     // Build where clause for user's niveau
     const whereClause: Record<string, unknown> = {};
 
-    if (user.role !== 'admin' && user.niveauId) {
+    if (user.role !== 'admin' && user.role !== 'maintainer' && user.niveauId) {
       whereClause.specialty = {
         niveauId: user.niveauId
       };

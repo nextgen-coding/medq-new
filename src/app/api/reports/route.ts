@@ -72,7 +72,7 @@ async function getHandler(request: AuthenticatedRequest) {
       (where as any).reportType = mapped;
     }
 
-    // If user is not admin and has a niveau, filter by specialty niveau
+    // Admins can see all reports, maintainers and students see only reports from their niveau
     if (user.role !== 'admin' && user.niveauId) {
       where.lecture = {
         specialty: {

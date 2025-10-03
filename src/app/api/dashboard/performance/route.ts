@@ -18,7 +18,7 @@ async function getHandler(request: AuthenticatedRequest) {
     if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
     const baseWhere: any = { userId };
-    if (user.role !== 'admin' && user.niveauId) {
+    if (user.role !== 'admin' && user.role !== 'maintainer' && user.niveauId) {
       baseWhere.lecture = { specialty: { niveauId: user.niveauId } };
     }
 

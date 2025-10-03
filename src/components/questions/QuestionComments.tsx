@@ -30,7 +30,7 @@ type QComment = {
 export function QuestionComments({ questionId, commentType = 'regular' }: QuestionCommentsProps) {
   const { user } = useAuth();
   const ownerId = user?.id;
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'admin' || user?.role === 'maintainer';
 
   const [comments, setComments] = useState<QComment[]>([]);
   const [loading, setLoading] = useState(false);

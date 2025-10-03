@@ -231,7 +231,7 @@ export function AdminSidebar() {
                     <span className="font-bold text-base sm:text-lg bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
                       MedQ
                     </span>
-                    <span className="text-[10px] sm:text-xs text-muted-foreground">Panneau Admin</span>
+                    <span className="text-[10px] sm:text-xs text-muted-foreground">{isAdmin ? 'Panneau Admin' : 'Panneau Mainteneur'}</span>
                   </div>
                 </div>
               ) : (

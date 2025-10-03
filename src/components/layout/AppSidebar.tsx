@@ -40,7 +40,7 @@ export function AppSidebar() {
     { label: t('sidebar.profile', { defaultValue: 'Profil' }), icon: UserCircle, href: '/profile' },
   ];
 
-  const adminItem = isAdmin ? { label: t('sidebar.admin', { defaultValue: 'Administration' }), icon: Users, href: '/admin' } : null;
+  const adminItem = user?.role === 'admin' ? { label: t('sidebar.admin', { defaultValue: 'Administration' }), icon: Users, href: '/admin' } : null;
   const isMaintainer = user?.role === 'maintainer';
   const maintainerItems = isMaintainer
     ? [

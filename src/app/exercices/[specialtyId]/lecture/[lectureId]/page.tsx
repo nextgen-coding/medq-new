@@ -371,7 +371,7 @@ export default function LecturePageRoute() {
                         <PlusCircle className="h-4 w-4 mr-2" />
                         <span className="hidden sm:inline">creer</span>
                       </Button>
-                      {user?.role === 'admin' && (
+                      {(user?.role === 'admin' || user?.role === 'maintainer') && (
                         <Button
                           variant="outline"
                           size="sm"
@@ -443,7 +443,7 @@ export default function LecturePageRoute() {
             lecture={lecture}
             isOpen={openQuestionsDialog}
         onOpenChange={(o)=>{ setOpenQuestionsDialog(o); if(!o) setOpenOrganizer(false); }}
-        initialOrganizerOpen={user?.role === 'admin' ? openOrganizer : false}
+        initialOrganizerOpen={(user?.role === 'admin' || user?.role === 'maintainer') ? openOrganizer : false}
             initialCreateOpen
           />
         )}
@@ -532,7 +532,7 @@ function GroupedQrocContainer({ clinicalCase, answers, answerResults, pinnedQues
               {groupHidden ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
             </Button>
           )}
-          {user?.role === 'admin' && (
+          {(user?.role === 'admin' || user?.role === 'maintainer') && (
             <Button variant="outline" size="sm" className="flex items-center gap-1 text-destructive" onClick={async () => { if (!confirm('Delete all questions in group?')) return; for (const q of clinicalCase.questions) { try { await fetch(`/api/questions/${q.id}`, { method: 'DELETE', credentials: 'include' }); } catch {} } window.location.reload(); }}>
               <Trash2 className="h-3.5 w-3.5" />
             </Button>
@@ -735,7 +735,7 @@ function GroupedMcqContainer({ clinicalCase, answers, answerResults, pinnedQuest
               {groupHidden ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
             </Button>
           )}
-          {user?.role === 'admin' && (
+          {(user?.role === 'admin' || user?.role === 'maintainer') && (
             <Button variant="outline" size="sm" className="flex items-center gap-1 text-destructive" onClick={async () => { if (!confirm('Delete all questions in group?')) return; for (const q of clinicalCase.questions) { try { await fetch(`/api/questions/${q.id}`, { method: 'DELETE', credentials: 'include' }); } catch {} } window.location.reload(); }}>
               <Trash2 className="h-3.5 w-3.5" />
             </Button>

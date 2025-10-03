@@ -603,7 +603,7 @@ export default function QuestionsEpingleesTestPage() {
                                       Modifier la question
                                     </Button>
                                     
-                                    {user?.role === 'admin' && (
+                                    {(user?.role === 'admin' || user?.role === 'maintainer') && (
                                       <Button
                                         variant="outline"
                                         onClick={async () => {

@@ -33,7 +33,7 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
 
   const canAccessContent = (isFree: boolean): boolean => {
     if (!user) return false;
-    if (user.role === 'admin') return true;
+    if (user.role === 'admin' || user.role === 'maintainer') return true;
     if (isFree) return true;
     return hasActiveSubscription;
   };
