@@ -1,0 +1,235 @@
+# Rappel du Cours - AI Generation Removal
+
+**Date:** October 4, 2025  
+**Issue:** AI was auto-generating "rappel du cours" (course reminder) content when it should remain empty unless manually filled by content creators.
+
+## What Was Changed
+
+### 1. ✅ Disabled Fallback Rappel in MCQ Processing (Line 729-734)
+**Location:** `src/app/api/validation/ai-progress/route.ts` - `mcqForceFix()` function
+
+**Before:**
+```typescript
+if (!String(rec['rappel'] || '').trim()) {
+  const stem = String(rec['texte de la question'] || rec['texte du cas'] || '').trim();
+  rec['rappel'] = fallbackRappel(stem);
+}
+```
+
+**After:**
+```typescript
+// DISABLED: Let rappel remain empty if not manually filled
+// if (!String(rec['rappel'] || '').trim()) {
+//   const stem = String(rec['texte de la question'] || rec['texte du cas'] || '').trim();
+//   rec['rappel'] = fallbackRappel(stem);
+// }
+```
+
+### 2. ✅ Disabled Fallback Rappel in QROC Processing (Line 739-744)
+**Location:** `src/app/api/validation/ai-progress/route.ts` - `qrocForceFix()` function
+
+**Before:**
+```typescript
+if (!String(rec['rappel'] || '').trim()) {
+  const stem = String(rec['texte de la question'] || rec['texte du cas'] || '').trim();
+  rec['rappel'] = fallbackRappel(stem);
+}
+```
+
+**After:**
+```typescript
+// DISABLED: Let rappel remain empty if not manually filled
+// if (!String(rec['rappel'] || '').trim()) {
+//   const stem = String(rec['texte de la question'] || rec['texte du cas'] || '').trim();
+//   rec['rappel'] = fallbackRappel(stem);
+// }
+```
+
+### 3. ✅ Removed Rappel from AI Enhancement Prompt (Line 992-1007)
+**Location:** `src/app/api/validation/ai-progress/route.ts` - `enhanceMcqRows()` function
+
+**Removed from AI prompt:**
+- Line item: "4. RAPPEL DU COURS (3–5 phrases COMPLÈTES) clair, structuré et sans redondance."
+- Length requirement: "- Rappel: MINIMUM 3 phrases, MAXIMUM 5 phrases"
+- JSON output field: `"globalExplanation":"rappel 3-5 phrases"`
+
+**Current AI prompt:** Now ONLY generates per-option explanations (`optionExplanations`), NO rappel/globalExplanation
+
+### 4. ✅ Disabled AI-Generated Rappel in MCQ Batch Processing (Line 849-854)
+**Location:** `src/app/api/validation/ai-progress/route.ts` - MCQ AI batch result processing
+
+**Before:**
+```typescript
+const rplRaw = String(ai.globalExplanation || '').trim();
+const rplNorm = rplRaw ? clamp2to4Sentences(rplRaw) : '';
+const rappelTooShort = !(rplNorm && !explanationTooShort(rplNorm));
+rec['rappel'] = rappelTooShort ? fallbackRappel(rec['texte de la question'] || rec['texte du cas']) : rplNorm;
+if (rappelTooShort) needsEnhance = true;
+```
+
+**After:**
+```typescript
+// DISABLED: Don't generate rappel from AI - keep only manually curated content
+// const rplRaw = String(ai.globalExplanation || '').trim();
+// const rplNorm = rplRaw ? clamp2to4Sentences(rplRaw) : '';
+// const rappelTooShort = !(rplNorm && !explanationTooShort(rplNorm));
+// rec['rappel'] = rappelTooShort ? fallbackRappel(rec['texte de la question'] || rec['texte du cas']) : rplNorm;
+// if (rappelTooShort) needsEnhance = true;
+```
+
+### 5. ✅ Disabled AI-Generated Rappel in QROC Batch Processing (Line 893-896)
+**Location:** `src/app/api/validation/ai-progress/route.ts` - QROC AI batch result processing
+
+**Before:**
+```typescript
+if (ai && ai.explanation) {
+  if (!hasAnswer && ai.answer) rec['reponse'] = cleanAnswerText(String(ai.answer).trim()) || 'À préciser';
+  const expl = clamp2to4Sentences(String(ai.explanation).trim());
+  if (expl && !explanationTooShort(expl)) rec['rappel'] = expl; // use rappel only for QROC
+}
+```
+
+**After:**
+```typescript
+if (ai && ai.explanation) {
+  if (!hasAnswer && ai.answer) rec['reponse'] = cleanAnswerText(String(ai.answer).trim()) || 'À préciser';
+  // DISABLED: Don't use AI explanation as rappel - keep only manually curated content
+  // const expl = clamp2to4Sentences(String(ai.explanation).trim());
+  // if (expl && !explanationTooShort(expl)) rec['rappel'] = expl; // use rappel only for QROC
+}
+```
+
+### 6. ✅ Disabled Application of AI-Generated Rappel (Line 1066-1071)
+**Location:** `src/app/api/validation/ai-progress/route.ts` - Enhancement application section
+
+**Before:**
+```typescript
+const rVal = String(rapp || '').trim();
+if (rVal && !explanationTooShort(rVal)) {
+  t.obj['rappel'] = rVal;
+}
+```
+
+**After:**
+```typescript
+// DISABLED: Don't apply AI-generated rappel - keep only manually curated content
+// const rVal = String(rapp || '').trim();
+// if (rVal && !explanationTooShort(rVal)) {
+//   t.obj['rappel'] = rVal;
+// }
+```
+
+## What Still Works
+
+### ✅ Rappel Field Structure
+- The `rappel` column **still exists** in Excel exports
+- It's included in `IMPORT_HEADERS` (line 90)
+- It's part of the workbook schema
+- Header aliases still map various names to `rappel` (lines 63-67)
+
+### ✅ Manual Rappel Content
+- If a question already has rappel content in the input file, **it will be preserved**
+- Content creators can manually fill this field
+- The field just won't be auto-generated by AI anymore
+
+### ✅ All Other AI Features
+- Per-option explanations (explication a, b, c, d, e) **still work**
+- Fast mode / Quality mode **still work**
+- QROC answer generation **still works**
+- Question text repair **still works**
+
+## Testing Checklist
+
+### Fast Mode (Default: ON)
+- [ ] Upload file with empty rappel fields
+- [ ] Verify exported Excel has `rappel` column
+- [ ] Verify rappel cells are empty (no AI-generated content)
+- [ ] Verify all per-option explanations are generated
+- [ ] Verify processing is fast (2-3s per 100 questions)
+
+### Quality Mode (Fast Mode: OFF)
+- [ ] Upload file with empty rappel fields
+- [ ] Turn OFF fast mode checkbox
+- [ ] Verify exported Excel has `rappel` column
+- [ ] Verify rappel cells are **still empty** (no AI enhancement)
+- [ ] Verify per-option explanations are enhanced (longer, better quality)
+- [ ] Verify processing takes longer (12-33s per 100 questions)
+
+### Manual Rappel Preservation
+- [ ] Upload file with some questions having rappel content
+- [ ] Verify existing rappel content is **preserved unchanged**
+- [ ] Verify empty rappel fields stay empty
+
+## Code Flow Summary
+
+**AI Job Process:**
+1. **File Upload** → Parse Excel → Validate structure
+2. **MCQ Processing** (Fast Mode):
+   - Generate per-option fallback explanations ✅
+   - ~~Generate fallback rappel~~ **DISABLED** ❌
+3. **QROC Processing**:
+   - Generate answer if missing ✅
+   - ~~Generate fallback rappel~~ **DISABLED** ❌
+4. **Enhancement Pass** (Quality Mode Only):
+   - AI generates better per-option explanations ✅
+   - ~~AI generates globalExplanation (rappel)~~ **REMOVED FROM PROMPT** ❌
+   - ~~Apply AI-generated rappel~~ **DISABLED** ❌
+5. **Export** → Excel with all fields including **empty** rappel column ✅
+
+## Technical Details
+
+### Functions Modified
+1. `mcqForceFix()` - Lines 729-734 (Fallback rappel generation)
+2. `qrocForceFix()` - Lines 739-744 (Fallback rappel generation)
+3. MCQ Batch Processing - Lines 849-854 (AI globalExplanation → rappel)
+4. QROC Batch Processing - Lines 893-896 (AI explanation → rappel)
+5. `enhanceMcqRows()` - Lines 992-1007 (AI prompt removed rappel request)
+6. Enhancement Application - Lines 1066-1071 (Don't apply AI rappel)
+
+### Functions NOT Modified (Still Used)
+- `fallbackRappel()` - Line 396 (function still exists but is never called)
+- `fallbackExplanation()` - Line 375 (still generates per-option explanations)
+- Export headers - Line 90 (rappel still in IMPORT_HEADERS)
+- Header aliases - Lines 63-67 (rappel mappings still work)
+
+## Why This Approach?
+
+**Commenting Out vs Deletion:**
+- We **commented out** code instead of deleting it
+- Easy to revert if needed
+- Clear documentation of what was disabled
+- Preserves code structure for reference
+
+**Keeping the Field:**
+- Medical education quality requires **curated** course reminders
+- AI-generated content may be inaccurate or generic
+- Content creators should provide this critical information
+- Field structure maintained for future manual input
+
+## Expected Behavior
+
+### Before This Fix
+```
+Input:  rappel = ""
+Output: rappel = "Point de départ: [...]. Notion centrale: [...]."
+```
+
+### After This Fix
+```
+Input:  rappel = ""
+Output: rappel = ""
+
+Input:  rappel = "Manually curated course reminder"
+Output: rappel = "Manually curated course reminder"
+```
+
+## Related Files
+- `src/app/api/validation/ai-progress/route.ts` - Main AI validation route
+- `IMPORT_HEADERS` constant - Defines Excel column structure
+- `headerAliases` object - Maps various column names to canonical names
+
+## Notes
+- The `fallbackRappel()` function at line 396 still exists but is **never called**
+- Can be safely deleted in future cleanup if confirmed working
+- This change affects **both** fast mode and quality mode
+- Export structure remains 100% compatible with import system

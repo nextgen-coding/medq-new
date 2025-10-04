@@ -224,25 +224,36 @@ function mapSheetName(s: string): SheetName | null {
 }
 
 // Clean up a free-form source/session string:
-// - strip any () and [] characters
-// - remove surrounding quotes/brackets once
-// - collapse whitespace and commas
-// - clear if it becomes only a bare niveau without year/session
+// Extract ONLY the year/session (e.g., "juin 2010", "2015", "janvier 2018")
+// Remove brackets [], parentheses (), niveau indicators, and extra formatting
 function cleanSource(raw?: string | null): string {
   if (!raw) return '';
   let s = String(raw).trim();
-  // Remove bracketed segments entirely (including their contents)
+  
+  // Remove bracketed/parenthesized segments (like [niveau1], (PCEM2), etc.)
   s = s.replace(/\[[^\]]*\]/g, ' ').replace(/\([^)]*\)/g, ' ');
-  // Remove surrounding quotes once
+  
+  // Remove surrounding quotes
   s = s.replace(/^['"]|['"]$/g, '');
-  // Remove niveau/grade tokens (PCEM/DCEM + number, and 'Niveau 1/2/...')
+  
+  // Remove standalone niveau/grade tokens
   s = s.replace(/\b(?:PCEM|DCEM)\s*\d\b/gi, ' ');
   s = s.replace(/\bniveau\s*\d+\b/gi, ' ');
-  // Collapse multiple separators and trim
+  s = s.replace(/\bniveau\b/gi, ' ');
+  
+  // Extract year pattern: "month YYYY" or just "YYYY"
+  // Match patterns like: "juin 2010", "janvier 2018", "2015", "Mai 2020"
+  const yearMatch = s.match(/\b([a-zéû]+\s+)?\d{4}\b/i);
+  if (yearMatch) {
+    return yearMatch[0].trim();
+  }
+  
+  // If no year found, clean up remaining text
   s = s.replace(/[;,\s]+/g, ' ').trim();
-  // If remains only a bare niveau keyword, drop it
-  if (/^(PCEM|DCEM)\s*\d*$/i.test(s)) return '';
-  if (/^NIVEAU\s*\d+$/i.test(s)) return '';
+  
+  // If only niveau keywords remain, return empty
+  if (/^(PCEM|DCEM|niveau)\s*\d*$/i.test(s)) return '';
+  
   return s;
 }
 
@@ -321,7 +332,37 @@ async function runAiSession(file: File, instructions: string | undefined, aiId: 
 
     // Helpers: text repairs and fallbacks
     const htmlStrip = (input: string) => String(input || '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&lt;/gi, '<').replace(/&gt;/gi, '>').replace(/&quot;/gi, '"').replace(/&#39;/gi, "'");
-    const normalizeWhitespace = (s: string) => String(s || '').replace(/[\u00A0\t\r\n]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
+    
+    // Preserve paragraph breaks and list formatting while normalizing whitespace
+    const normalizeWhitespace = (s: string) => {
+      let text = String(s || '');
+      
+      // Preserve list markers and paragraph structure
+      // Replace \r\n or \r with \n for consistency
+      text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+      
+      // Detect list items (-, •, *, 1., 2., etc.)
+      const hasListMarkers = /^\s*[-•*]\s+/m.test(text) || /^\s*\d+\.\s+/m.test(text);
+      
+      // Replace tabs and non-breaking spaces with regular spaces
+      text = text.replace(/[\u00A0\t]/g, ' ');
+      
+      // Preserve double line breaks (paragraph separators)
+      text = text.replace(/\n\n+/g, '\n\n');
+      
+      // Clean up multiple spaces on same line (but keep line breaks)
+      text = text.split('\n').map(line => line.replace(/\s{2,}/g, ' ').trim()).join('\n');
+      
+      // If has list markers, preserve the structure
+      if (hasListMarkers) {
+        return text.trim();
+      }
+      
+      // For regular text, convert single line breaks to spaces but keep double breaks
+      text = text.replace(/\n(?!\n)/g, ' ').replace(/\n\n/g, '\n\n');
+      
+      return text.trim();
+    };
     const repairQuestionText = (t: string) => {
       let s = htmlStrip(t).replace(/[“”]/g, '"').replace(/[’]/g, "'");
       s = normalizeWhitespace(s);
@@ -342,17 +383,48 @@ async function runAiSession(file: File, instructions: string | undefined, aiId: 
       letters.sort((a,b) => order.indexOf(a) - order.indexOf(b));
       return letters.join(', ');
     };
-    const splitSentences = (t: string) => String(t || '')
-      .replace(/\s+/g, ' ')
-      .split(/(?<=[\.!?])\s+/)
-      .map(x => x.trim())
-      .filter(Boolean);
+    const splitSentences = (t: string) => {
+      const text = String(t || '');
+      // Check if text has list formatting or multiple paragraphs
+      const hasLists = /^\s*[-•*]\s+/m.test(text) || /^\s*\d+\.\s+/m.test(text);
+      const hasParagraphs = /\n\n/.test(text);
+      
+      if (hasLists || hasParagraphs) {
+        // Preserve structure, just split by sentence boundaries
+        return text.split(/(?<=[\.,!?])\s+/)
+          .map(x => x.trim())
+          .filter(Boolean);
+      }
+      
+      // Regular text: normalize spaces then split
+      return text
+        .replace(/\s+/g, ' ')
+        .split(/(?<=[\.,!?])\s+/)
+        .map(x => x.trim())
+        .filter(Boolean);
+    };
+    
     const clamp2to4Sentences = (t: string) => {
-      let arr = splitSentences(t);
+      const text = String(t || '').trim();
+      if (!text) return '';
+      
+      // Check for structured content (lists, paragraphs)
+      const hasLists = /^\s*[-•*]\s+/m.test(text) || /^\s*\d+\.\s+/m.test(text);
+      const hasParagraphs = /\n\n/.test(text);
+      
+      // If structured content, preserve it (don't clamp)
+      if (hasLists || hasParagraphs) {
+        return text;
+      }
+      
+      // Regular text: clamp to 2-4 sentences
+      let arr = splitSentences(text);
       if (arr.length === 0) return '';
       if (arr.length > 4) arr = arr.slice(0, 4);
-      // Ensure each sentence ends with a period
+      
+      // Ensure each sentence ends with punctuation
       arr = arr.map(x => /[\.!?]$/.test(x) ? x : x + '.');
+      
       return arr.join(' ');
     };
     const explanationTooShort = (s: string) => {
@@ -558,12 +630,17 @@ Format:
       if (!batch.length) return new Map();
       const user = JSON.stringify({ task: 'qroc_explanations', items: batch });
       
+      // Include user instructions if provided
+      const qrocFinalPrompt = instructions 
+        ? `${qrocSystemPrompt}\n\nINSTRUCTIONS ADMIN:\n${instructions}`
+        : qrocSystemPrompt;
+      
       let content = '';
       // ✅ OPTIMIZED: Use direct REST API (no AI SDK overhead)
       // Test results: REST API = 30-50s per batch vs AI SDK = 471-601s (rate limited)
       try {
         const restResult = await chatCompletion([
-          { role: 'system', content: qrocSystemPrompt },
+          { role: 'system', content: qrocFinalPrompt },
           { role: 'user', content: user }
         ], { maxTokens: 8000 });
         content = restResult.content;
@@ -727,20 +804,22 @@ Format:
         }
       }
       // Set a minimal rappel instead of global explication
-      if (!String(rec['rappel'] || '').trim()) {
-        const stem = String(rec['texte de la question'] || rec['texte du cas'] || '').trim();
-        rec['rappel'] = fallbackRappel(stem);
-      }
+      // DISABLED: Let rappel remain empty if not manually filled
+      // if (!String(rec['rappel'] || '').trim()) {
+      //   const stem = String(rec['texte de la question'] || rec['texte du cas'] || '').trim();
+      //   rec['rappel'] = fallbackRappel(stem);
+      // }
     }
 
   // QROC single fallback to guarantee fix
     async function qrocForceFix(rec: Record<string, any>) {
       rec['texte de la question'] = repairQuestionText(String(rec['texte de la question'] || ''));
       if (!String(rec['reponse'] || '').trim()) rec['reponse'] = 'À préciser';
-      if (!String(rec['rappel'] || '').trim()) {
-        const stem = String(rec['texte de la question'] || rec['texte du cas'] || '').trim();
-        rec['rappel'] = fallbackRappel(stem);
-      }
+      // DISABLED: Let rappel remain empty if not manually filled
+      // if (!String(rec['rappel'] || '').trim()) {
+      //   const stem = String(rec['texte de la question'] || rec['texte du cas'] || '').trim();
+      //   rec['rappel'] = fallbackRappel(stem);
+      // }
     }
 
     updateSession(aiId, { message: 'Fusion des résultats…', progress: 90 }, '🧩 Fusion des résultats…');
@@ -844,11 +923,12 @@ Format:
             rec[k] = tooShort ? fallbackExplanation(correctSet.has(j), options[j], rec['texte de la question'] || rec['texte du cas']) : val;
             if (tooShort) needsEnhance = true;
           }
-          const rplRaw = String(ai.globalExplanation || '').trim();
-          const rplNorm = rplRaw ? clamp2to4Sentences(rplRaw) : '';
-          const rappelTooShort = !(rplNorm && !explanationTooShort(rplNorm));
-          rec['rappel'] = rappelTooShort ? fallbackRappel(rec['texte de la question'] || rec['texte du cas']) : rplNorm;
-          if (rappelTooShort) needsEnhance = true;
+          // DISABLED: Don't generate rappel from AI - keep only manually curated content
+          // const rplRaw = String(ai.globalExplanation || '').trim();
+          // const rplNorm = rplRaw ? clamp2to4Sentences(rplRaw) : '';
+          // const rappelTooShort = !(rplNorm && !explanationTooShort(rplNorm));
+          // rec['rappel'] = rappelTooShort ? fallbackRappel(rec['texte de la question'] || rec['texte du cas']) : rplNorm;
+          // if (rappelTooShort) needsEnhance = true;
           if (needsEnhance) {
             enhanceTargets.push({
               id: `${s}:${r.row}`,
@@ -888,8 +968,9 @@ Format:
         if (hasAnswer) rec['reponse'] = cleanAnswerText(rec['reponse']);
         if (ai && ai.explanation) {
           if (!hasAnswer && ai.answer) rec['reponse'] = cleanAnswerText(String(ai.answer).trim()) || 'À préciser';
-          const expl = clamp2to4Sentences(String(ai.explanation).trim());
-          if (expl && !explanationTooShort(expl)) rec['rappel'] = expl; // use rappel only for QROC
+          // DISABLED: Don't use AI explanation as rappel - keep only manually curated content
+          // const expl = clamp2to4Sentences(String(ai.explanation).trim());
+          // if (expl && !explanationTooShort(expl)) rec['rappel'] = expl; // use rappel only for QROC
         }
         // Guarantee rappel
         if (!String(rec['reponse'] || '').trim() || !String(rec['rappel'] || '').trim()) {
@@ -996,15 +1077,18 @@ EXIGENCES IMPÉRATIVES:
    - Mécanisme/critère CLINIQUE pertinent avec un chiffre ou repère
    - Mini exemple clinique CONCRET (âge/contexte/signe clef)
 3. Chaque phrase se termine OBLIGATOIREMENT par un point.
-4. RAPPEL DU COURS (3–5 phrases COMPLÈTES) clair, structuré et sans redondance.
 
 LONGUEUR OBLIGATOIRE:
 - Chaque explication: MINIMUM 2 phrases, MAXIMUM 4 phrases
-- Rappel: MINIMUM 3 phrases, MAXIMUM 5 phrases
 - TOUT doit être CLAIR, PRÉCIS, SANS AMBIGUÏTÉ
 
 SORTIE JSON STRICTE:
-{ "results": [ { "id":"<id>", "optionExplanations":["explication A 2-4 phrases", "explication B 2-4 phrases", ...], "globalExplanation":"rappel 3-5 phrases" } ] }`;
+{ "results": [ { "id":"<id>", "optionExplanations":["explication A 2-4 phrases", "explication B 2-4 phrases", ...] } ] }`;
+
+      // Include user instructions if provided
+      const systemWithInstructions = instructions 
+        ? `${system}\n\nINSTRUCTIONS ADMIN:\n${instructions}`
+        : system;
 
       const out = new Map<string, any>();
       const BATCH = 50; // maximum speed processing - large batches for ultimate throughput
@@ -1015,7 +1099,7 @@ SORTIE JSON STRICTE:
         try {
           // ✅ OPTIMIZED: Use direct REST API (no AI SDK overhead)
           const res = await chatCompletion([
-            { role: 'system', content: system },
+            { role: 'system', content: systemWithInstructions },
             { role: 'user', content: user }
           ], { maxTokens: 8000 });
           content = res.content;
@@ -1061,10 +1145,11 @@ SORTIE JSON STRICTE:
           t.obj[key] = val;
         }
       }
-      const rVal = String(rapp || '').trim();
-      if (rVal && !explanationTooShort(rVal)) {
-        t.obj['rappel'] = rVal;
-      }
+      // DISABLED: Don't apply AI-generated rappel - keep only manually curated content
+      // const rVal = String(rapp || '').trim();
+      // if (rVal && !explanationTooShort(rVal)) {
+      //   t.obj['rappel'] = rVal;
+      // }
     }
 
     // Build workbook: per-type corrected sheets using import-ready headers

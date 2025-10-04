@@ -67,6 +67,8 @@ export function PersistentAiJob({ onJobCreated }: PersistentAiJobProps) {
   const [fastMode, setFastMode] = useState(true); // Default to fast mode
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true); // Auto-refresh toggle
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showFastModeConfirm, setShowFastModeConfirm] = useState(false);
+  const [confirmText, setConfirmText] = useState('');
   const [isDragOver, setIsDragOver] = useState(false);
   const [currentSession, setCurrentSession] = useState<AiSession | null>(null);
   const [recentSessions, setRecentSessions] = useState<AiSession[]>([]);
@@ -520,7 +522,16 @@ export function PersistentAiJob({ onJobCreated }: PersistentAiJobProps) {
             </div>
             <button
               type="button"
-              onClick={() => setFastMode(!fastMode)}
+              onClick={() => {
+                if (fastMode) {
+                  // Disabling fast mode - show confirmation
+                  setShowFastModeConfirm(true);
+                  setConfirmText('');
+                } else {
+                  // Enabling fast mode - no confirmation needed
+                  setFastMode(true);
+                }
+              }}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
                 fastMode ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
               }`}
@@ -910,6 +921,61 @@ export function PersistentAiJob({ onJobCreated }: PersistentAiJobProps) {
           <Button variant="outline" onClick={()=>setConfirmDeleteId(null)}>Annuler</Button>
           <Button variant="destructive" disabled={!!deletingId} onClick={()=> confirmDeleteId && deleteJob(confirmDeleteId)}>
             {deletingId ? 'Suppression...' : 'Supprimer'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    {/* Fast Mode Disable Confirmation Dialog */}
+    <Dialog open={showFastModeConfirm} onOpenChange={(o)=>{ if(!o) { setShowFastModeConfirm(false); setConfirmText(''); } }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>⚠️ Désactiver le Mode Rapide ?</DialogTitle>
+          <DialogDescription>
+            Le mode qualité maximale est <strong>10x plus lent</strong> et consomme beaucoup plus de ressources Azure.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+            <p className="text-sm text-amber-900 dark:text-amber-100 mb-2">
+              <strong>Comparaison des performances :</strong>
+            </p>
+            <ul className="text-xs text-amber-800 dark:text-amber-200 space-y-1 list-disc list-inside">
+              <li><strong>Mode Rapide :</strong> 2-3 secondes / 100 questions (Qualité: 85-90%)</li>
+              <li><strong>Mode Qualité :</strong> 12-33 secondes / 100 questions (Qualité: 95-100%)</li>
+            </ul>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Pour confirmer, tapez : <code className="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">je suis sûr</code></label>
+            <input
+              type="text"
+              value={confirmText}
+              onChange={(e) => setConfirmText(e.target.value)}
+              placeholder="je suis sûr"
+              className="w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-700"
+              autoFocus
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={()=>{ setShowFastModeConfirm(false); setConfirmText(''); }}>
+            Annuler
+          </Button>
+          <Button 
+            variant="default"
+            disabled={confirmText.toLowerCase().trim() !== 'je suis sûr'}
+            onClick={()=>{
+              if (confirmText.toLowerCase().trim() === 'je suis sûr') {
+                setFastMode(false);
+                setShowFastModeConfirm(false);
+                setConfirmText('');
+                toast.success('Mode Qualité Maximale activé', {
+                  description: 'Le traitement sera plus lent mais plus détaillé.'
+                });
+              }
+            }}
+          >
+            Confirmer
           </Button>
         </DialogFooter>
       </DialogContent>
