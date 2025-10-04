@@ -124,8 +124,20 @@ async function validateWorkbook(file: File) {
   const workbook = read(buffer);
 
   const foundSheets = Object.keys(workbook.Sheets);
+  
+  // Ignore special sheets like "Erreurs", "Errors", "Summary", etc.
+  const ignoredSheets = ['erreurs', 'errors', 'erreur', 'error', 'summary', 'resume', 'résumé'];
+  const isIgnoredSheet = (name: string): boolean => {
+    const normalized = normalizeSheet(name);
+    return ignoredSheets.includes(normalized);
+  };
+  
   const present = new Map<string, string>();
-  for (const name of foundSheets) present.set(normalizeSheet(name), name);
+  for (const name of foundSheets) {
+    if (!isIgnoredSheet(name)) {
+      present.set(normalizeSheet(name), name);
+    }
+  }
 
   const aliases: Record<SheetName, string[]> = {
     qcm: ['qcm', 'mcq'],
@@ -232,7 +244,10 @@ async function validateWorkbook(file: File) {
   }
 
   if (!recognizedAny) {
-    throw new Error(`Aucun onglet reconnu. Renommez vos onglets en: "qcm", "qroc", "cas qcm" ou "cas qroc". Feuilles trouvées: ${foundSheets.join(', ')}`);
+    // Filter out ignored sheets from error message
+    const relevantSheets = foundSheets.filter(s => !isIgnoredSheet(s));
+    const sheetList = relevantSheets.length > 0 ? relevantSheets.join(', ') : 'aucune';
+    throw new Error(`Aucun onglet reconnu. Renommez vos onglets en: "qcm", "qroc", "cas qcm" ou "cas qroc". Feuilles trouvées: ${sheetList}`);
   }
   if (good.length === 0 && bad.length === 0) {
     throw new Error("Feuilles reconnues mais sans lignes sous l'en-tête. Ajoutez des questions puis réessayez.");
@@ -304,20 +319,30 @@ export async function POST(request: NextRequest) {
     });
     const bufGood = write(wbGood, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
 
-    // Build error workbook (single sheet)
-  const errorHeader = ['sheet', 'row', 'reason', 'matiere', 'cours', 'question n', 'cas n', 'source', 'texte du cas', 'texte de la question', 'reponse', 'option a', 'option b', 'option c', 'option d', 'option e', 'rappel', 'explication', 'image'];
-    const errRows = bad.map((r: any) => {
+    // Build error workbook - maintain same structure as valid workbook with separate sheets
+    // Add 'reason' column at the beginning to show what's wrong
+    const ERROR_HEADERS = [
+      'reason', 'matiere', 'cours', 'question n', 'cas n', 'source', 'texte du cas', 'texte de la question',
+      'reponse', 'option a', 'option b', 'option c', 'option d', 'option e',
+      'rappel', 'explication', 'explication a', 'explication b', 'explication c', 'explication d', 'explication e',
+      'image', 'niveau', 'semestre'
+    ];
+
+    const bySheetErrors: Record<SheetName, any[]> = { qcm: [], qroc: [], cas_qcm: [], cas_qroc: [] };
+    for (const r of bad) {
       const rec = r.original || {};
-      const isCas = r.sheet === 'cas_qcm' || r.sheet === 'cas_qroc';
+      const sheet = (r.sheet as SheetName) || 'qcm';
+      const isCas = sheet === 'cas_qcm' || sheet === 'cas_qroc';
       const qTextRaw = String(rec?.['texte de la question'] ?? '').trim();
       const caseTextRaw = String(rec?.['texte du cas'] ?? '').trim();
       const qText = qTextRaw || (isCas ? caseTextRaw : '');
-      return {
-        sheet: r.sheet,
-        row: r.row,
-        reason: r.reason,
-        matiere: rec?.['matiere'] ?? '',
-        cours: rec?.['cours'] ?? '',
+      const mat = String(rec?.['matiere'] ?? '').trim();
+      const coursVal = String(rec?.['cours'] ?? '').trim() || mat;
+      
+      bySheetErrors[sheet].push({
+        reason: r.reason || '',
+        matiere: mat,
+        cours: coursVal,
         'question n': rec?.['question n'] ?? '',
         'cas n': rec?.['cas n'] ?? '',
         source: rec?.['source'] ?? '',
@@ -331,12 +356,24 @@ export async function POST(request: NextRequest) {
         'option e': rec?.['option e'] ?? '',
         rappel: rec?.['rappel'] ?? '',
         explication: rec?.['explication'] ?? '',
-        image: rec?.['image'] ?? ''
-      };
-    });
+        'explication a': rec?.['explication a'] ?? '',
+        'explication b': rec?.['explication b'] ?? '',
+        'explication c': rec?.['explication c'] ?? '',
+        'explication d': rec?.['explication d'] ?? '',
+        'explication e': rec?.['explication e'] ?? '',
+        image: rec?.['image'] ?? '',
+        niveau: rec?.['niveau'] ?? '',
+        semestre: rec?.['semestre'] ?? ''
+      });
+    }
+
     const wbErr = utils.book_new();
-    const wsErr = utils.json_to_sheet(errRows, { header: errorHeader });
-    utils.book_append_sheet(wbErr, wsErr, 'Erreurs');
+    (Object.keys(bySheetErrors) as SheetName[]).forEach((sn) => {
+      const rows = bySheetErrors[sn];
+      if (rows.length === 0) return;
+      const ws = utils.json_to_sheet(rows, { header: ERROR_HEADERS });
+      utils.book_append_sheet(wbErr, ws, sn);
+    });
     const bufErr = write(wbErr, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
 
     const sessionId = `val_${Date.now()}_${Math.random().toString(36).slice(2,9)}`;
@@ -390,22 +427,25 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No data to export' }, { status: 400 });
     }
 
-    const header = mode === 'good'
-      ? ['sheet', 'row', 'matiere', 'cours', 'question n', 'cas n', 'source', 'texte du cas', 'texte de la question', 'reponse', 'option a', 'option b', 'option c', 'option d', 'option e', 'rappel', 'explication', 'explication a', 'explication b', 'explication c', 'explication d', 'explication e', 'image', 'niveau', 'semestre']
-      : ['sheet', 'row', 'reason', 'matiere', 'cours', 'question n', 'cas n', 'source', 'texte du cas', 'texte de la question', 'reponse', 'option a', 'option b', 'option c', 'option d', 'option e', 'rappel', 'explication', 'image'];
-
-    const dataObjects = rows.map((r: any) => {
+    // Group rows by sheet type to maintain structure
+    const bySheet: Record<string, any[]> = {};
+    
+    for (const r of rows) {
+      const sheetName = String(r.sheet || 'qcm');
+      if (!bySheet[sheetName]) bySheet[sheetName] = [];
+      
       const rec = mode === 'good' ? r.data : r.original;
       const isCas = r.sheet === 'cas_qcm' || r.sheet === 'cas_qroc';
       const qTextRaw = String(rec?.['texte de la question'] ?? '').trim();
       const caseTextRaw = String(rec?.['texte du cas'] ?? '').trim();
       const qText = qTextRaw || (isCas ? caseTextRaw : '');
-      const base: any = {
-        sheet: r.sheet,
-        row: r.row,
-        ...(mode === 'good' ? {} : { reason: r.reason }),
-        matiere: rec?.['matiere'] ?? '',
-        cours: rec?.['cours'] ?? '',
+      const mat = String(rec?.['matiere'] ?? '').trim();
+      const coursVal = String(rec?.['cours'] ?? '').trim() || mat;
+      
+      const rowData: any = {
+        ...(mode === 'bad' ? { reason: r.reason } : {}),
+        matiere: mat,
+        cours: coursVal,
         'question n': rec?.['question n'] ?? '',
         'cas n': rec?.['cas n'] ?? '',
         source: rec?.['source'] ?? '',
@@ -425,17 +465,24 @@ export async function GET(request: NextRequest) {
         'explication d': rec?.['explication d'] ?? '',
         'explication e': rec?.['explication e'] ?? '',
         image: rec?.['image'] ?? '',
+        niveau: rec?.['niveau'] ?? '',
+        semestre: rec?.['semestre'] ?? ''
       };
-      if (mode === 'good') {
-        base['niveau'] = rec?.['niveau'] ?? '';
-        base['semestre'] = rec?.['semestre'] ?? '';
-      }
-      return base;
-    });
+      
+      bySheet[sheetName].push(rowData);
+    }
 
     const wb = utils.book_new();
-    const ws = utils.json_to_sheet(dataObjects, { header });
-    utils.book_append_sheet(wb, ws, mode === 'good' ? 'Valide' : 'Erreurs');
+    const header = mode === 'good'
+      ? ['matiere', 'cours', 'question n', 'cas n', 'source', 'texte du cas', 'texte de la question', 'reponse', 'option a', 'option b', 'option c', 'option d', 'option e', 'rappel', 'explication', 'explication a', 'explication b', 'explication c', 'explication d', 'explication e', 'image', 'niveau', 'semestre']
+      : ['reason', 'matiere', 'cours', 'question n', 'cas n', 'source', 'texte du cas', 'texte de la question', 'reponse', 'option a', 'option b', 'option c', 'option d', 'option e', 'rappel', 'explication', 'explication a', 'explication b', 'explication c', 'explication d', 'explication e', 'image', 'niveau', 'semestre'];
+    
+    // Create a sheet for each type (qcm, qroc, cas_qcm, cas_qroc)
+    for (const [sheetName, sheetRows] of Object.entries(bySheet)) {
+      if (sheetRows.length === 0) continue;
+      const ws = utils.json_to_sheet(sheetRows, { header });
+      utils.book_append_sheet(wb, ws, sheetName);
+    }
 
     const arrayBuffer = write(wb, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
     const bytes = new Uint8Array(arrayBuffer);

@@ -207,6 +207,13 @@ function normalizeSheetName(name: string) {
     .trim();
 }
 
+function isIgnoredSheet(name: string): boolean {
+  const norm = normalizeSheetName(name);
+  // Ignore special sheets like "Erreurs", "Errors", "Summary", etc.
+  const ignoredPatterns = ['erreur', 'error', 'summary', 'resume'];
+  return ignoredPatterns.some(pattern => norm.includes(pattern));
+}
+
 function mapSheetName(s: string): SheetName | null {
   const norm = normalizeSheetName(s);
   if (norm.includes('qcm') && norm.includes('cas')) return 'cas_qcm';
@@ -257,6 +264,12 @@ async function runAiSession(file: File, instructions: string | undefined, aiId: 
     const rows: Array<{ sheet: SheetName; row: number; original: Record<string, any> }> = [];
     let recognizedSheetCount = 0;
     for (const s of Object.keys(workbook.Sheets)) {
+      // Skip ignored sheets like "Erreurs"
+      if (isIgnoredSheet(s)) {
+        console.log(`[AI] ⏭️ Skipping ignored sheet: ${s}`);
+        continue;
+      }
+      
       const ws = workbook.Sheets[s];
       const data = utils.sheet_to_json(ws, { header: 1 });
       if (data.length < 2) continue;
@@ -292,8 +305,11 @@ async function runAiSession(file: File, instructions: string | undefined, aiId: 
     // If nothing parsed, guide user to proper sheet names
     if (rows.length === 0) {
       if (recognizedSheetCount === 0) {
+        // Filter out ignored sheets from error message
+        const relevantSheets = sheetNames.filter(s => !isIgnoredSheet(s));
+        const sheetList = relevantSheets.length > 0 ? relevantSheets.join(', ') : 'aucune';
         throw new Error(
-          `Aucune feuille reconnue parmi: ${sheetNames.join(', ')}. ` +
+          `Aucune feuille reconnue parmi: ${sheetList}. ` +
           `Veuillez nommer vos feuilles: "qcm", "qroc", "cas qcm", ou "cas qroc" (insensible à la casse).`
         );
       } else {
