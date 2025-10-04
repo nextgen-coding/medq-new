@@ -59,19 +59,23 @@ This feature branch contains critical fixes for production issues in the medical
 **Root Cause**: An optional AI enhancement pass runs after all batches to improve short explanations. This pass processes all questions in large batches (50 at a time) and can take 90+ seconds, causing timeouts when combined with the 160+ seconds of batch processing.
 
 **Solution**: 
-- Changed `AI_FAST_MODE` default from `'0'` to `'1'`
-- FAST_MODE skips the enhancement pass entirely
+- Removed environment variable dependency (`AI_FAST_MODE`)
+- Made FAST_MODE a direct function parameter controlled by UI checkbox
+- Default remains `true` (fast mode ON) for safety/performance
+- UI toggle in PersistentAiJob component allows users to enable/disable
+- Form data sends `fastMode` as '1' or '0' to API
 - Added logging: `⚡ FAST_MODE enabled: Skipping enhancement pass to avoid timeout`
-- Users can disable FAST_MODE by setting `AI_FAST_MODE=0` if needed
 
 **Files Changed**:
-- `src/app/api/validation/ai-progress/route.ts` - Enabled FAST_MODE by default
+- `src/app/api/validation/ai-progress/route.ts` - FAST_MODE as parameter
+- `src/components/validation/PersistentAiJob.tsx` - UI checkbox control
 
 **Impact**:
 - ✅ No more Vercel timeouts
 - ✅ AI jobs complete in ~160 seconds (MCQ) instead of 250+ seconds
 - ✅ Still maintains high quality with fallback explanations
-- ✅ Can be disabled for enhanced quality if needed
+- ✅ Direct user control via checkbox (no env vars needed)
+- ✅ Transparent toggle between fast (85-90% quality) and enhanced (95-100% quality)
 
 ---
 
@@ -128,10 +132,11 @@ This feature branch contains critical fixes for production issues in the medical
 
 ## 📝 Environment Variables
 
-### New Variables:
-- `AI_FAST_MODE` - Default: `'1'` (enabled)
-  - Set to `'0'` to enable enhancement pass (may cause timeouts)
-  - Recommended to keep at `'1'` for production
+### Removed Variables:
+- `AI_FAST_MODE` - **REMOVED** (now controlled via UI checkbox)
+  - Previously controlled fast mode via environment variable
+  - Now directly controlled by user through UI toggle in PersistentAiJob component
+  - Default: Fast mode ON (checked)
 
 ### Existing Variables (unchanged):
 - `AZURE_OPENAI_ENDPOINT`

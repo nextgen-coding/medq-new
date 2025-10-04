@@ -204,15 +204,39 @@ export default function AdminValidationPage() {
 
       if (!response.ok) {
         const err = await response.json().catch(() => null);
-        throw new Error(err?.error || 'Validation failed');
+        const errorMsg = err?.error || 'Validation failed';
+        
+        // Show user-friendly error message
+        toast.error("Erreur de validation", {
+          description: errorMsg,
+          duration: 6000, // Show longer for complex errors
+        });
+        throw new Error(errorMsg);
       }
 
       const result = await response.json();
       setValidationResult(result);
-      toast.success('Validation terminée', { description: `${result.goodCount} valides • ${result.badCount} erreurs` });
+      
+      // Show detailed success message
+      if (result.badCount === 0) {
+        toast.success('✅ Validation réussie!', { 
+          description: `${result.goodCount} question${result.goodCount > 1 ? 's' : ''} valide${result.goodCount > 1 ? 's' : ''} • Prêt pour l'import`,
+          duration: 4000
+        });
+      } else if (result.goodCount === 0) {
+        toast.error('❌ Aucune question valide', { 
+          description: `${result.badCount} erreur${result.badCount > 1 ? 's' : ''} détectée${result.badCount > 1 ? 's' : ''} • Consultez le fichier d'erreurs`,
+          duration: 5000
+        });
+      } else {
+        toast.warning('⚠️ Validation partielle', { 
+          description: `${result.goodCount} valide${result.goodCount > 1 ? 's' : ''} • ${result.badCount} erreur${result.badCount > 1 ? 's' : ''} • Téléchargez les deux fichiers`,
+          duration: 5000
+        });
+      }
     } catch (error) {
       console.error('Classic validation error:', error);
-      toast.error("Impossible de valider le fichier");
+      // Error already shown in toast above
     } finally {
       setValidating(false);
     }
@@ -569,21 +593,67 @@ export default function AdminValidationPage() {
 
                       {/* Bad rows preview */}
                       {validationResult.bad.length > 0 && (
-                        <div className="border rounded-lg p-3 bg-red-50 dark:bg-red-900/20 dark:border-red-800">
-                          <div className="flex items-center gap-2 mb-2">
-                            <BugIcon className="h-4 w-4 text-red-600 dark:text-red-400" />
-                            <span className="text-sm font-medium">Aperçu des erreurs (max 10)</span>
+                        <div className="border rounded-lg p-4 bg-red-50 dark:bg-red-900/20 dark:border-red-800">
+                          <div className="flex items-center gap-2 mb-3">
+                            <BugIcon className="h-5 w-5 text-red-600 dark:text-red-400" />
+                            <span className="text-sm font-semibold text-red-900 dark:text-red-100">
+                              Erreurs détectées ({validationResult.bad.length})
+                            </span>
                           </div>
-                          <ul className="list-disc ml-5 space-y-1 text-sm text-red-800 dark:text-red-200">
-                            {validationResult.bad.slice(0, 10).map((r, idx) => (
-                              <li key={idx}>
-                                [{r.sheet}] ligne {r.row}: {r.reason}
+                          
+                          {/* Error breakdown by sheet */}
+                          <div className="mb-3 flex gap-2 flex-wrap">
+                            {Object.entries(
+                              validationResult.bad.reduce((acc: Record<string, number>, r: any) => {
+                                acc[r.sheet] = (acc[r.sheet] || 0) + 1;
+                                return acc;
+                              }, {})
+                            ).map(([sheet, count]) => (
+                              <Badge key={sheet} variant="outline" className="bg-white dark:bg-gray-800 text-xs">
+                                {sheet}: {count}
+                              </Badge>
+                            ))}
+                          </div>
+                          
+                          <ul className="space-y-2 text-sm text-red-800 dark:text-red-200 mb-3">
+                            {validationResult.bad.slice(0, 10).map((r: any, idx: number) => (
+                              <li key={idx} className="border-l-2 border-red-400 pl-3 py-1">
+                                <div className="flex items-start gap-2">
+                                  <Badge variant="outline" className="text-xs shrink-0">
+                                    {r.sheet}
+                                  </Badge>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-medium">Ligne {r.row}</div>
+                                    <div className="text-xs opacity-90 break-words">{r.reason}</div>
+                                    {r.original?.['texte de la question'] && (
+                                      <div className="text-xs mt-1 opacity-75 truncate">
+                                        "{String(r.original['texte de la question']).substring(0, 60)}..."
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
                               </li>
                             ))}
+                            {validationResult.bad.length > 10 && (
+                              <li className="text-xs text-center opacity-75 pt-2">
+                                ... et {validationResult.bad.length - 10} autre{validationResult.bad.length - 10 > 1 ? 's' : ''} erreur{validationResult.bad.length - 10 > 1 ? 's' : ''}
+                              </li>
+                            )}
                           </ul>
-                          <p className="text-xs text-red-700 mt-2 dark:text-red-300">
-                            Conseil: Téléchargez les erreurs, puis utilisez la section "AI Enrichment" pour corriger automatiquement.
-                          </p>
+                          
+                          <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-red-200 dark:border-red-700">
+                            <div className="flex items-start gap-2">
+                              <Info className="h-4 w-4 text-purple-600 dark:text-purple-400 mt-0.5 shrink-0" />
+                              <div className="text-xs text-gray-700 dark:text-gray-300">
+                                <strong className="text-purple-700 dark:text-purple-300">💡 Solution :</strong> 
+                                <ol className="mt-1 ml-4 list-decimal space-y-1">
+                                  <li>Téléchargez le fichier d'erreurs (structure identique à l'original avec colonne "reason")</li>
+                                  <li>Corrigez manuellement OU utilisez l'AI Enrichment ci-dessous pour correction automatique</li>
+                                  <li>Les erreurs sont organisées par onglet (qcm, qroc, cas_qcm, cas_qroc) comme le fichier original</li>
+                                </ol>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       )}
                     </div>
